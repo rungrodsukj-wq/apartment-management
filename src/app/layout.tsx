@@ -47,21 +47,25 @@ export const metadata: Metadata = {
 
 
 export default function RootLayout({
+
   children,
+
 }: Readonly<{
+
   children: React.ReactNode;
+
 }>) {
+
   return (
-    <html 
-      lang="th" 
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      suppressHydrationWarning
-    >
-      <body suppressHydrationWarning>
-        <ClientLayoutWrapper geistSans={geistSans.variable} geistMono={geistMono.variable}>
-          {children}
-        </ClientLayoutWrapper>
-      </body>
+
+    <html lang="th" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+
+      <ClientLayoutWrapper geistSans={geistSans.variable} geistMono={geistMono.variable}>
+        {children}
+      </ClientLayoutWrapper>
+
     </html>
+
   );
+
 }

@@ -29,22 +29,20 @@ interface Room {
     view_direction: string;
 }
 
-interface Booking {
-    room_id?: string;
+interface Contract {
+    main_room_id?: string;
+    main_start_date?: string;
+    main_end_date?: string;
+    temp_room_id?: string;
+    temp_start_date?: string;
+    temp_end_date?: string;
+    move_to_room_id?: string;
+    move_start_date?: string;
+    move_end_date?: string;
     actual_check_in_date?: string;
-    actual_check_out_date?: string;
+    actual_end_date?: string;
     contract_start_date?: string;
     contract_end_date?: string;
-    // TODO: removed field - main_room_id (replaced by room_id)
-    // TODO: removed field - main_start_date
-    // TODO: removed field - main_end_date
-    // TODO: removed field - temp_room_id
-    // TODO: removed field - temp_start_date
-    // TODO: removed field - temp_end_date
-    // TODO: removed field - move_to_room_id
-    // TODO: removed field - move_start_date
-    // TODO: removed field - move_end_date
-    // TODO: removed field - actual_end_date (replaced by actual_check_out_date)
 }
 
 export default function AllocateRoomPage() {
@@ -54,15 +52,15 @@ export default function AllocateRoomPage() {
 
     const [waitlist, setWaitlist] = useState<Waitlist | null>(null);
     const [rooms, setRooms] = useState<Room[]>([]);
-    const [allBookings, setAllBookings] = useState<Booking[]>([]);
+    const [allContracts, setAllContracts] = useState<Contract[]>([]);
 
     const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-
+    const [assignAs, setAssignAs] = useState<'main' | 'temp'>('main'); 
+    
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(true);
     const [actualCheckInDate, setActualCheckInDate] = useState<string>('');
-    // TODO: removed field - temp_room_id (tempEndDate state removed)
-    // TODO: removed field - temp_room_id (assignAs state removed — always 'main')
+    const [tempEndDate, setTempEndDate] = useState<string>('');
 
     useEffect(() => {
         if (waitlist) {
@@ -74,7 +72,25 @@ export default function AllocateRoomPage() {
         fetchData();
     }, [waitlistId]);
 
-    // TODO: removed field - temp_room_id, temp_end_date (auto-calculate temp end date useEffect removed)
+    useEffect(() => {
+        if (assignAs === 'temp' && selectedRoomId && waitlist) {
+            const { availableUntil } = getRoomAvailability(selectedRoomId, waitlist.start_date);
+            
+            if (availableUntil) {
+                const defaultEndDate = new Date(availableUntil);
+                defaultEndDate.setDate(defaultEndDate.getDate() - 1);
+                
+                const yyyy = defaultEndDate.getFullYear();
+                const mm = String(defaultEndDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(defaultEndDate.getDate()).padStart(2, '0');
+                setTempEndDate(`${yyyy}-${mm}-${dd}`);
+            } else {
+                setTempEndDate(waitlist.end_date);
+            }
+        } else {
+            setTempEndDate('');
+        }
+    }, [assignAs, selectedRoomId, waitlist, allContracts]);
 
     async function fetchData() {
         setLoading(true);
@@ -85,33 +101,41 @@ export default function AllocateRoomPage() {
         if (rData) setRooms(rData);
 
         const { data: cData } = await supabase
-            .from('bookings')
-            .select('room_id, actual_check_in_date, actual_check_out_date, contract_start_date, contract_end_date')
+            .from('contracts')
+            .select('main_room_id, main_start_date, main_end_date, temp_room_id, temp_start_date, temp_end_date, move_to_room_id, move_start_date, move_end_date, actual_check_in_date, actual_end_date, contract_start_date, contract_end_date')
             .neq('status', 'cancelled');
-        if (cData) setAllBookings(cData);
+        if (cData) setAllContracts(cData);
 
         setLoading(false);
     }
 
-    const getRoomOccupancyIntervals = (roomId: string, bookings: Booking[]) => {
+    const getRoomOccupancyIntervals = (roomId: string, contracts: Contract[]) => {
         const intervals: { start: Date, end: Date }[] = [];
 
-        bookings.forEach(c => {
-            if (c.room_id === roomId) {
-                const s = c.actual_check_in_date || c.contract_start_date;
-                const e = c.actual_check_out_date || c.contract_end_date;
+        contracts.forEach(c => {
+            if (c.main_room_id === roomId) {
+                const s = c.main_start_date || c.actual_check_in_date || c.contract_start_date;
+                const e = c.actual_end_date || c.main_end_date || c.contract_end_date;
                 if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
             }
-            // TODO: removed field - temp_room_id, temp_start_date, temp_end_date (temp room interval removed)
-            // TODO: removed field - move_to_room_id, move_start_date, move_end_date (move room interval removed)
+            if (c.temp_room_id === roomId) {
+                const s = c.temp_start_date;
+                const e = c.temp_end_date;
+                if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
+            }
+            if (c.move_to_room_id === roomId) {
+                const s = c.move_start_date;
+                const e = c.actual_end_date || c.move_end_date || c.contract_end_date;
+                if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
+            }
         });
 
         return intervals;
     };
 
     const getRoomAvailability = (roomId: string, targetDateStr: string) => {
-        const intervals = getRoomOccupancyIntervals(roomId, allBookings);
-
+        const intervals = getRoomOccupancyIntervals(roomId, allContracts);
+        
         intervals.sort((a, b) => a.start.getTime() - b.start.getTime());
         const merged: { start: Date, end: Date }[] = [];
         intervals.forEach(curr => {
@@ -132,7 +156,7 @@ export default function AllocateRoomPage() {
         const target = new Date(targetDateStr);
 
         const overlapping = merged.find(i => target >= i.start && target < i.end);
-
+        
         if (overlapping) {
             availableFrom = new Date(overlapping.end);
             const next = merged.find(i => i.start > availableFrom);
@@ -148,9 +172,9 @@ export default function AllocateRoomPage() {
     };
 
     const getNextAvailableDate = (roomId: string, requestedStart: string) => {
-        const intervals = getRoomOccupancyIntervals(roomId, allBookings);
+        const intervals = getRoomOccupancyIntervals(roomId, allContracts);
         let currentStart = new Date(requestedStart);
-
+        
         intervals.sort((a, b) => a.start.getTime() - b.start.getTime());
 
         for (const interval of intervals) {
@@ -168,7 +192,7 @@ export default function AllocateRoomPage() {
     const getRoomAvailabilityText = (roomId: string, targetDateStr: string) => {
         const { availableFrom, availableUntil } = getRoomAvailability(roomId, targetDateStr);
 
-        const formatD = (d: Date) => d.toLocaleDateString('en-GB');
+        const formatD = (d: Date) => d.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
         const fromStr = availableFrom.getTime() === 0 || availableFrom <= new Date() ? 'ปัจจุบัน' : formatD(availableFrom);
         const untilStr = availableUntil ? formatD(availableUntil) : 'ไม่มีกำหนด';
 
@@ -179,31 +203,44 @@ export default function AllocateRoomPage() {
         if (!selectedRoomId || !waitlist) return;
         setIsSubmitting(true);
 
-        const bookingPayload: any = {
+        const { availableFrom } = getRoomAvailability(selectedRoomId, waitlist.start_date);
+        const reqStart = new Date(waitlist.start_date);
+        const isLate = reqStart < availableFrom;
+
+        const finalMainStartDate = isLate
+            ? getNextAvailableDate(selectedRoomId, waitlist.start_date)
+            : actualCheckInDate;
+
+        const contractPayload: any = {
             waitlist_id: waitlistId,
-            name: waitlist.name,
+            tenant_name: waitlist.name,
             actual_check_in_date: actualCheckInDate,
             contract_start_date: waitlist.start_date,
             contract_end_date: waitlist.end_date,
-            room_id: selectedRoomId,
             status: 'active',
-            // TODO: removed field - main_room_id (replaced by room_id)
-            // TODO: removed field - main_start_date
-            // TODO: removed field - main_end_date
-            // TODO: removed field - temp_room_id, temp_start_date, temp_end_date
         };
 
-        const { error: bookingError } = await supabase.from('bookings').insert([bookingPayload]);
+        if (assignAs === 'main') {
+            contractPayload.main_room_id = selectedRoomId;
+            contractPayload.main_start_date = finalMainStartDate;
+            contractPayload.main_end_date = waitlist.end_date;
+        } else {
+            contractPayload.temp_room_id = selectedRoomId;
+            contractPayload.temp_start_date = actualCheckInDate;
+            contractPayload.temp_end_date = tempEndDate; 
+        }
 
-        if (bookingError) {
-            alert('เกิดข้อผิดพลาดในการสร้าง Booking: ' + bookingError.message);
+        const { error: contractError } = await supabase.from('contracts').insert([contractPayload]);
+
+        if (contractError) {
+            alert('เกิดข้อผิดพลาดในการสร้างสัญญา: ' + contractError.message);
             setIsSubmitting(false);
             return;
         }
 
         await supabase.from('waitlists').update({ status: 'จัดสรรห้องแล้ว' }).eq('id', waitlistId);
 
-        alert('✅ จัดสรรห้องและสร้าง Booking สำเร็จ!');
+        alert(`✅ จัดสรร${assignAs === 'main' ? 'ห้องหลัก' : 'ห้องชั่วคราว'} และสร้างสัญญาสำเร็จ!`);
         router.push('/bookings');
     };
 
@@ -248,12 +285,12 @@ export default function AllocateRoomPage() {
         const { availableFrom, availableUntil } = getRoomAvailability(selectedRoomId, waitlist.start_date);
         const reqStart = new Date(waitlist.start_date);
         const reqEnd = new Date(waitlist.end_date);
-
+        
         if (reqStart < availableFrom) {
             isSelectedRoomLate = true;
         } else if (availableUntil && reqEnd > availableUntil) {
             isSelectedRoomExpireEarly = true;
-            expireDateStr = availableUntil.toLocaleDateString('en-GB');
+            expireDateStr = availableUntil.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
         }
     }
 
@@ -280,7 +317,7 @@ export default function AllocateRoomPage() {
                         </div>
                         <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
                             <span className="text-blue-400 block text-[10px] uppercase font-bold">ช่วงเวลาที่ต้องการ</span>
-                            <span className="font-bold text-blue-700">{new Date(waitlist.start_date).toLocaleDateString('en-GB')} - {new Date(waitlist.end_date).toLocaleDateString('en-GB')}</span>
+                            <span className="font-bold text-blue-700">{new Date(waitlist.start_date).toLocaleDateString('th-TH')} - {new Date(waitlist.end_date).toLocaleDateString('th-TH')}</span>
                         </div>
                     </div>
                 </div>
@@ -305,7 +342,8 @@ export default function AllocateRoomPage() {
                             {perfectMatches.length > 0 ? perfectMatches.map(room => (
                                 <div
                                     key={room.id}
-                                    onClick={() => { setSelectedRoomId(room.id); }}
+                                    // 🌟 เลือกให้เป็น Main Room
+                                    onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
                                     className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}
                                 >
                                     <div className="flex justify-between items-center">
@@ -332,7 +370,7 @@ export default function AllocateRoomPage() {
                     {partialMatches.length > 0 && (
                         <div className="pt-4 border-t border-gray-200">
                             <h2 className="text-lg font-bold text-yellow-600 mb-3 flex items-center gap-2">
-                                <span>⚠️</span> ห้องตรงสเปค ว่างพร้อมอยู่ (แต่ว่างไม่ครอบคลุมทั้งสัญญา)
+                                <span>⚠️</span> ห้องตรงสเปค ว่างพร้อมอยู่ (แต่ต้องย้ายออกทีหลัง)
                             </h2>
                             <div className="space-y-3">
                                 {partialMatches.map(room => {
@@ -340,13 +378,14 @@ export default function AllocateRoomPage() {
                                     return (
                                         <div
                                             key={room.id}
-                                            onClick={() => { setSelectedRoomId(room.id); }}
+                                            // 🌟 เลือกให้เป็น Temp Room อัตโนมัติ!
+                                            onClick={() => { setSelectedRoomId(room.id); setAssignAs('temp'); }}
                                             className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-yellow-300'}`}
                                         >
                                             <div className="flex justify-between items-center">
                                                 <div className="font-bold text-lg text-gray-900">ห้อง {room.room_number}</div>
                                                 <div className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-md font-bold">
-                                                    อยู่ได้ถึง {availableUntil ? availableUntil.toLocaleDateString('en-GB') : ''}
+                                                    อยู่ได้ถึง {availableUntil ? availableUntil.toLocaleDateString('th-TH', {day: 'numeric', month: 'short', year:'numeric'}) : ''}
                                                 </div>
                                             </div>
                                             <div className="text-sm text-gray-500 mt-2 flex gap-4">
@@ -374,13 +413,14 @@ export default function AllocateRoomPage() {
                                 return (
                                     <div
                                         key={room.id}
-                                        onClick={() => { setSelectedRoomId(room.id); }}
+                                        // 🌟 เลือกให้เป็น Main Room
+                                        onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
                                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-orange-200'}`}
                                     >
                                         <div className="flex justify-between items-center">
                                             <div className="font-bold text-lg text-gray-900">ห้อง {room.room_number}</div>
                                             <div className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-bold">
-                                                ว่างวันที่ {new Date(nextAvailDate).toLocaleDateString('en-GB')}
+                                                ว่างวันที่ {new Date(nextAvailDate).toLocaleDateString('th-TH')}
                                             </div>
                                         </div>
                                         <div className="text-sm text-gray-500 mt-2 flex gap-4">
@@ -409,7 +449,8 @@ export default function AllocateRoomPage() {
                             {alternativeMatches.length > 0 ? alternativeMatches.map(room => (
                                 <div
                                     key={room.id}
-                                    onClick={() => { setSelectedRoomId(room.id); }}
+                                    // 🌟 เลือกให้เป็น Main Room
+                                    onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
                                     className={`p-4 rounded-xl border-2 cursor-pointer transition-all opacity-80 hover:opacity-100 ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-blue-300'}`}
                                 >
                                     <div className="flex justify-between items-center">
@@ -434,10 +475,10 @@ export default function AllocateRoomPage() {
                     </div>
                 </div>
 
-                {/* แผงควบคุมด้านขวา */}
+                {/* แผงควบคุมด้านขวา (ปรับ UI ใหม่ให้เข้าใจง่ายขึ้น) */}
                 <div className="col-span-1">
                     <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
-
+                        
                         <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3 mb-5 sticky top-0 bg-white z-10">
                             สรุปการจัดสรรห้อง
                         </h3>
@@ -462,7 +503,7 @@ export default function AllocateRoomPage() {
                                     </div>
                                 </div>
 
-                                {/* 2. วันที่เข้าพัก */}
+                                {/* 2. วันที่เข้าพัก (จำเป็นสำหรับทุกคน) */}
                                 <div className="space-y-2">
                                     <label className="block text-sm font-bold text-gray-800">
                                         📅 วันที่เข้าพักจริง (Actual Check-in)
@@ -475,39 +516,128 @@ export default function AllocateRoomPage() {
                                         required
                                     />
                                     <p className="text-[11px] text-gray-500">
-                                        * กำหนดการตามสัญญาคือ {new Date(waitlist.start_date).toLocaleDateString('en-GB')}
+                                        * กำหนดการตามสัญญาคือ {new Date(waitlist.start_date).toLocaleDateString('th-TH')}
                                     </p>
                                 </div>
 
-                                {/* TODO: removed field - temp_room_id (assignAs radio cards removed — always assigns as main room) */}
-                                {/* TODO: removed field - temp_end_date (temp timeline section removed) */}
+                                {/* 3. รูปแบบการจัดสรร (Radio Cards) */}
+                                <div className="space-y-3 pt-2">
+                                    <label className="block text-sm font-bold text-gray-800">
+                                        📌 รูปแบบการเข้าพักสำหรับห้องนี้
+                                    </label>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {/* Card: ห้องหลัก */}
+                                        <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${
+                                            assignAs === 'main' 
+                                                ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' 
+                                                : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                        }`}>
+                                            <input 
+                                                type="radio" 
+                                                name="assignAs" 
+                                                value="main" 
+                                                className="sr-only"
+                                                checked={assignAs === 'main'}
+                                                onChange={() => setAssignAs('main')}
+                                            />
+                                            <span className="flex flex-1">
+                                                <span className="flex flex-col">
+                                                    <span className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                                                        🏠 ให้เป็น "ห้องหลัก"
+                                                    </span>
+                                                    <span className="mt-1 flex items-center text-xs text-gray-500 leading-relaxed">
+                                                        ลูกค้าจะอยู่ห้องนี้เป็นหลัก ยาวไปจนจบสัญญาเช่า
+                                                    </span>
+                                                </span>
+                                            </span>
+                                            {assignAs === 'main' && (
+                                                <svg className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                                                </svg>
+                                            )}
+                                        </label>
 
-                                {/* Warning Messages */}
-                                {isSelectedRoomLate && (
-                                    <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl text-orange-800 flex gap-3">
-                                        <span className="text-xl">⚠️</span>
-                                        <div>
-                                            <div className="font-bold text-sm">ห้องนี้ยังไม่ว่างในวันเข้าพัก!</div>
-                                            <div className="text-xs mt-1 opacity-90">ห้องนี้ยังติดจองอยู่ในวันที่ลูกค้าต้องการเข้าพัก</div>
+                                        {/* Card: ห้องชั่วคราว */}
+                                        <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${
+                                            assignAs === 'temp' 
+                                                ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-500' 
+                                                : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                        }`}>
+                                            <input 
+                                                type="radio" 
+                                                name="assignAs" 
+                                                value="temp" 
+                                                className="sr-only"
+                                                checked={assignAs === 'temp'}
+                                                onChange={() => setAssignAs('temp')}
+                                            />
+                                            <span className="flex flex-1">
+                                                <span className="flex flex-col">
+                                                    <span className="block text-sm font-bold text-purple-900 flex items-center gap-2">
+                                                        🧳 ให้เป็น "ห้องพักชั่วคราว"
+                                                    </span>
+                                                    <span className="mt-1 flex items-center text-xs text-purple-700/70 leading-relaxed">
+                                                        ให้เข้าพักชั่วคราวก่อน แล้วค่อยทำเรื่องย้ายห้องภายหลัง
+                                                    </span>
+                                                </span>
+                                            </span>
+                                            {assignAs === 'temp' && (
+                                                <svg className="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                                                </svg>
+                                            )}
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* 4. Timeline ห้องชั่วคราว (แสดงเฉพาะตอนเลือก Temp) */}
+                                {assignAs === 'temp' && (
+                                    <div className="bg-purple-100/50 p-4 rounded-xl border border-purple-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <label className="block text-sm font-bold text-purple-800 mb-2">
+                                            🛫 วันที่คาดว่าจะต้องย้ายออก
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="w-full border border-purple-300 rounded-xl p-3 text-sm text-purple-900 bg-white focus:ring-2 focus:ring-purple-500 transition-shadow outline-none"
+                                            value={tempEndDate}
+                                            onChange={(e) => setTempEndDate(e.target.value)}
+                                            required
+                                        />
+                                        <div className="mt-3 flex gap-2 items-start text-[11px] text-purple-700 bg-purple-100 p-2.5 rounded-lg">
+                                            <span className="text-sm">💡</span>
+                                            <p className="leading-relaxed">
+                                                ระบบได้ตั้งค่าแนะนำให้ย้ายออกก่อนวันที่ห้องนี้จะติดจองคิวถัดไป 1 วัน คุณสามารถปรับเปลี่ยนได้ตามความเหมาะสม
+                                            </p>
                                         </div>
                                     </div>
                                 )}
 
-                                {isSelectedRoomExpireEarly && (
+                                {/* Warning Messages */}
+                                {assignAs === 'main' && isSelectedRoomLate && (
+                                    <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl text-orange-800 flex gap-3">
+                                        <span className="text-xl">⚠️</span>
+                                        <div>
+                                            <div className="font-bold text-sm">ต้องจัดหาห้องชั่วคราวเพิ่ม!</div>
+                                            <div className="text-xs mt-1 opacity-90">ห้องนี้ยังไม่ว่างในวันเข้าพัก โปรดอัปเดต "ห้องชั่วคราว" ในภายหลัง</div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {assignAs === 'main' && isSelectedRoomExpireEarly && (
                                     <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl text-yellow-800 flex gap-3">
                                         <span className="text-xl">⚠️</span>
                                         <div>
                                             <div className="font-bold text-sm">ระวัง! ห้องนี้ว่างไม่จบสัญญา</div>
-                                            <div className="text-xs mt-1 opacity-90">ว่างถึงแค่วันที่ {expireDateStr}</div>
+                                            <div className="text-xs mt-1 opacity-90">ว่างถึงแค่วันที่ {expireDateStr} อย่าลืมทำเรื่องย้ายห้องในภายหลัง</div>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* 3. ปุ่ม Action */}
+                                {/* 5. ปุ่ม Action */}
                                 <div className="pt-4 mt-4 border-t border-gray-100 space-y-3">
                                     <button
                                         onClick={handleAllocate}
-                                        disabled={isSubmitting}
+                                        disabled={isSubmitting || (assignAs === 'temp' && !tempEndDate)}
                                         className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-300 text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-md hover:shadow-lg disabled:shadow-none flex justify-center items-center gap-2"
                                     >
                                         {isSubmitting ? (
@@ -519,7 +649,7 @@ export default function AllocateRoomPage() {
                                                 กำลังบันทึก...
                                             </>
                                         ) : (
-                                            'ยืนยันสร้าง Booking'
+                                            'ยืนยันสร้างสัญญาเช่า'
                                         )}
                                     </button>
                                     <button

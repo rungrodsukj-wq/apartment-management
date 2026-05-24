@@ -18,9 +18,9 @@ const menuItems = [
 
   { name: "ผังห้องพัก", href: "/rooms", icon: "🏢" },
 
-  { name: "จองไม่ระบุห้อง", href: "/bookings", icon: "📝" },
+  { name: "จองไม่ระบุห้อง", href: "/waitlists", icon: "📝" },
 
-  { name: "จัดการ Booking", href: "/contracts", icon: "📜" },
+  { name: "การจอง", href: "/bookings", icon: "📜" },
 
 ];
 

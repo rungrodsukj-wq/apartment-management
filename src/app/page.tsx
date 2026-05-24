@@ -18,25 +18,23 @@ interface Room {
   view_direction?: string; 
 }
 
-interface Booking { 
+interface Contract { 
   id: string; 
-  name: string; 
+  tenant_name: string; 
   status: string; 
-  actual_check_out_date?: string; 
-  room_id: string; 
-  contract_start_date: string; 
-  contract_end_date: string; 
-  // TODO: removed field - temp_room_id
-  // TODO: removed field - temp_start_date
-  // TODO: removed field - temp_end_date
-  // TODO: removed field - move_to_room_id
-  // TODO: removed field - move_start_date
-  // TODO: removed field - move_end_date
-  // TODO: removed field - main_start_date
-  // TODO: removed field - main_end_date
+  actual_end_date?: string; 
+  main_room_id: string; 
+  main_start_date: string; 
+  main_end_date: string; 
+  temp_room_id?: string; 
+  temp_start_date?: string; 
+  temp_end_date?: string; 
+  move_to_room_id?: string; 
+  move_start_date?: string; 
+  move_end_date?: string; 
 }
 interface Block { 
-  type: 'MAIN'; 
+  type: 'MAIN' | 'TEMP' | 'MOVE'; 
   name: string; 
   start: Date; 
   end: Date; 
@@ -54,7 +52,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({ totalVacant: 0, frontKitchen: 0, backKitchen: 0 });
   const [waitlistCount, setWaitlistCount] = useState(0);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [allBookings, setAllBookings] = useState<Booking[]>([]);
+  const [allContracts, setAllContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
 
   // 🌟 State สำหรับตัวกรอง
@@ -129,19 +127,21 @@ export default function DashboardPage() {
     const { data: roomsData } = await supabase.from('rooms').select('*').order('room_number');
     if (roomsData) setRooms(roomsData);
 
-    const { data: bookingsData } = await supabase.from('bookings').select('*');
-    if (bookingsData) setAllBookings(bookingsData);
+    const { data: contractsData } = await supabase.from('contracts').select('*');
+    if (contractsData) setAllContracts(contractsData);
 
     const occupiedRoomIds = new Set<string>();
-    bookingsData?.forEach(c => {
+    contractsData?.forEach(c => {
       const isCancelled = c.status === 'cancelled';
-      const actualEnd = isCancelled && c.actual_check_out_date ? c.actual_check_out_date : null;
+      const actualEnd = isCancelled && c.actual_end_date ? c.actual_end_date : null;
 
-      const endDate = actualEnd || c.contract_end_date;
-      // TODO: removed field - temp_room_id, temp_start_date, temp_end_date
-      // TODO: removed field - move_to_room_id, move_start_date, move_end_date
+      const mainEnd = actualEnd || c.main_end_date;
+      const tempEnd = actualEnd || c.temp_end_date;
+      const moveEnd = actualEnd || c.move_end_date;
 
-      if (c.room_id && c.contract_start_date && endDate && isDateOverlapping(c.contract_start_date, endDate, searchStartDate, searchEndDate)) occupiedRoomIds.add(c.room_id);
+      if (c.main_room_id && c.main_start_date && mainEnd && isDateOverlapping(c.main_start_date, mainEnd, searchStartDate, searchEndDate)) occupiedRoomIds.add(c.main_room_id);
+      if (c.temp_room_id && c.temp_start_date && tempEnd && isDateOverlapping(c.temp_start_date, tempEnd, searchStartDate, searchEndDate)) occupiedRoomIds.add(c.temp_room_id);
+      if (c.move_to_room_id && c.move_start_date && moveEnd && isDateOverlapping(c.move_start_date, moveEnd, searchStartDate, searchEndDate)) occupiedRoomIds.add(c.move_to_room_id);
     });
 
     if (roomsData) {
@@ -184,7 +184,7 @@ export default function DashboardPage() {
     const actualStart = curMonthStart < startDate ? startDate : curMonthStart;
     const actualEnd = monthEnd > endDate ? endDate : monthEnd;
     timelineMonths.push({
-      label: curMonthStart.toLocaleDateString('en-GB', { month: '2-digit', year: 'numeric' }),
+      label: curMonthStart.toLocaleDateString('th-TH', { month: 'short', year: '2-digit' }),
       days: getDaysDiff(actualStart, actualEnd) + 1
     });
     curMonthStart = new Date(curMonthStart.getFullYear(), curMonthStart.getMonth() + 1, 1);
@@ -199,18 +199,30 @@ export default function DashboardPage() {
   const getBlocksForRoom = (roomId: string) => {
     const blocks: Block[] = [];
     
-    allBookings.forEach(c => {
+    allContracts.forEach(c => {
       const isCancelled = c.status === 'cancelled';
-      const actualEnd = c.actual_check_out_date ? new Date(c.actual_check_out_date) : null;
+      const actualEnd = c.actual_end_date ? new Date(c.actual_end_date) : null;
 
-      if (c.room_id === roomId && c.contract_start_date && c.contract_end_date) {
-        const start = new Date(c.contract_start_date);
-        const defaultEnd = new Date(c.contract_end_date);
+      if (c.main_room_id === roomId && c.main_start_date && c.main_end_date) {
+        const start = new Date(c.main_start_date);
+        const defaultEnd = new Date(c.main_end_date);
         const end = (isCancelled && actualEnd) ? actualEnd : defaultEnd;
-        if (start <= end) blocks.push({ type: 'MAIN', name: c.name, start, end, isCancelled });
+        if (start <= end) blocks.push({ type: 'MAIN', name: c.tenant_name, start, end, isCancelled });
       }
-      // TODO: removed field - temp_room_id, temp_start_date, temp_end_date (TEMP blocks)
-      // TODO: removed field - move_to_room_id, move_start_date, move_end_date (MOVE blocks)
+      
+      if (c.temp_room_id === roomId && c.temp_start_date && c.temp_end_date) {
+        const start = new Date(c.temp_start_date);
+        const defaultEnd = new Date(c.temp_end_date);
+        const end = (isCancelled && actualEnd) ? actualEnd : defaultEnd;
+        if (start <= end) blocks.push({ type: 'TEMP', name: c.tenant_name, start, end, isCancelled });
+      }
+      
+      if (c.move_to_room_id === roomId && c.move_start_date && c.move_end_date) {
+        const start = new Date(c.move_start_date);
+        const defaultEnd = new Date(c.move_end_date);
+        const end = (isCancelled && actualEnd) ? actualEnd : defaultEnd;
+        if (start <= end) blocks.push({ type: 'MOVE', name: c.tenant_name, start, end, isCancelled });
+      }
     });
     return blocks;
   };
@@ -343,10 +355,10 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex gap-4 text-xs font-bold text-slate-500 bg-slate-50 px-5 py-2.5 rounded-xl border border-slate-100">
-            {/* TODO: removed field - temp_room_id (ห้องชั่วคราว legend removed) */}
-            <div className="flex items-center gap-2"><span className="w-3 h-3 bg-gradient-to-r from-[#4F81FF] to-[#3D6CE5] rounded-md shadow-sm"></span> ห้องพัก</div>
-            {/* TODO: removed field - move_to_room_id (ห้องย้าย legend removed) */}
-            <div className="flex items-center gap-2"><span className="w-3 h-3 bg-slate-200 border border-slate-300 rounded-md flex items-center justify-center overflow-hidden"><div className="w-full h-px bg-red-400 transform -rotate-45"></div></span> ยกเลิก Booking</div>
+            <div className="flex items-center gap-2"><span className="w-3 h-3 bg-gradient-to-r from-amber-400 to-orange-500 rounded-md shadow-sm"></span> ห้องชั่วคราว</div>
+            <div className="flex items-center gap-2"><span className="w-3 h-3 bg-gradient-to-r from-[#4F81FF] to-[#3D6CE5] rounded-md shadow-sm"></span> ห้องหลัก</div>
+            <div className="flex items-center gap-2"><span className="w-3 h-3 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-md shadow-sm"></span> ห้องย้าย</div>
+            <div className="flex items-center gap-2"><span className="w-3 h-3 bg-slate-200 border border-slate-300 rounded-md flex items-center justify-center overflow-hidden"><div className="w-full h-px bg-red-400 transform -rotate-45"></div></span> ยกเลิกสัญญา</div>
           </div>
         </div>
 
@@ -428,10 +440,14 @@ export default function DashboardPage() {
                             className={`absolute top-1.5 bottom-1.5 rounded-lg shadow-sm text-[10px] font-medium text-white flex items-center px-2.5 cursor-pointer transition-all hover:brightness-110 hover:shadow-md hover:z-20 border border-white/10
                               ${block.isCancelled
                                   ? 'bg-slate-200 !text-slate-500 line-through decoration-red-400/80 decoration-2 border-slate-300 border-dashed' 
-                                  : 'bg-gradient-to-r from-[#4F81FF] to-[#3D6CE5]'
+                                  : block.type === 'TEMP' 
+                                      ? 'bg-gradient-to-r from-amber-400 to-orange-500' 
+                                      : block.type === 'MOVE' 
+                                          ? 'bg-gradient-to-r from-purple-500 to-indigo-500' 
+                                          : 'bg-gradient-to-r from-[#4F81FF] to-[#3D6CE5]'
                               }
                             `}
-                            title={`คุณ ${block.name} ${block.isCancelled ? '(ยกเลิก)' : ''} | เข้า: ${block.start.toLocaleDateString('en-GB')} | ออก: ${block.end.toLocaleDateString('en-GB')}`}
+                            title={`คุณ ${block.name} ${block.isCancelled ? '(ยกเลิก)' : ''} | เข้า: ${block.start.toLocaleDateString('th-TH')} | ออก: ${block.end.toLocaleDateString('th-TH')}`}
                           >
                             {widthPx > 35 && <span className="truncate w-full drop-shadow-sm">{block.name}</span>}
                           </div>

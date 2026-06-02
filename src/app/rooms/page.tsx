@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -12,6 +12,7 @@ interface Room {
     id: string;
     room_number: string;
     floor: number | null; // เพิ่มบรรทัดนี้
+    building?: string | null;
     room_type: string;
     kitchen_type: string;
     view_direction: string;
@@ -24,6 +25,12 @@ export default function RoomsPage() {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
+
+    const [filterBuilding, setFilterBuilding] = useState('');
+    const [filterFloor, setFilterFloor] = useState('');
+    const [filterRoomType, setFilterRoomType] = useState('');
+    const [filterKitchen, setFilterKitchen] = useState('');
+    const [filterView, setFilterView] = useState('');
 
     const [formData, setFormData] = useState({
         room_number: '',
@@ -49,7 +56,7 @@ export default function RoomsPage() {
         let newView = formData.view_direction;
         let changed = false;
 
-        const strictKitchenTypes = ['One Bedroom', 'Triple Room', 'One Bedroom Suite'];
+        const strictKitchenTypes = ['One Bedroom', 'Triple Bedroom', 'One Bedroom Suite'];
         
         if (strictKitchenTypes.includes(formData.room_type)) {
             if (newKitchen !== 'ครัวหลัง') {
@@ -58,7 +65,7 @@ export default function RoomsPage() {
             }
         }
 
-        if (formData.room_type === 'Triple Room') {
+        if (formData.room_type === 'Triple Bedroom') {
             if (newView !== 'ทิศตะวันตก') {
                 newView = 'ทิศตะวันตก';
                 changed = true;
@@ -174,7 +181,44 @@ export default function RoomsPage() {
         }
     };
 
-    const strictKitchenTypes = ['One Bedroom', 'Triple Room', 'One Bedroom Suite'];
+    const strictKitchenTypes = ['One Bedroom', 'Triple Bedroom', 'One Bedroom Suite'];
+
+    const uniqueBuildings = useMemo(
+        () => Array.from(new Set(rooms.map(r => r.building || '').filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)),
+        [rooms]
+    );
+
+    const uniqueFloors = useMemo(
+        () => Array.from(new Set(rooms.map(r => r.floor).filter((f): f is number => f !== null && f !== undefined))).sort((a, b) => Number(a) - Number(b)),
+        [rooms]
+    );
+
+    const uniqueKitchens = useMemo(
+        () => Array.from(new Set(rooms.map(r => r.kitchen_type).filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b))),
+        [rooms]
+    );
+
+    const uniqueRoomTypes = useMemo(
+        () => Array.from(new Set(rooms.map(r => r.room_type).filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b))),
+        [rooms]
+    );
+
+    const uniqueViews = useMemo(
+        () => Array.from(new Set(rooms.map(r => r.view_direction).filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b))),
+        [rooms]
+    );
+
+    const filteredRooms = useMemo(
+        () => rooms.filter(room => {
+            const matchBuilding = filterBuilding === '' || room.building === filterBuilding;
+            const matchFloor = filterFloor === '' || String(room.floor ?? '') === filterFloor;
+            const matchRoomType = filterRoomType === '' || room.room_type === filterRoomType;
+            const matchKitchen = filterKitchen === '' || room.kitchen_type === filterKitchen;
+            const matchView = filterView === '' || room.view_direction === filterView;
+            return matchBuilding && matchFloor && matchRoomType && matchKitchen && matchView;
+        }),
+        [rooms, filterBuilding, filterFloor, filterRoomType, filterKitchen, filterView]
+    );
 
     return (
         <div className="flex-1 p-8 md:p-10">
@@ -207,12 +251,46 @@ export default function RoomsPage() {
                 <div className="flex justify-center p-20"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-[#4F81FF]"></div></div>
             ) : (
                 <div className="bg-white rounded-3xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 bg-slate-50/70 flex flex-wrap items-center gap-4">
+                        <span className="text-sm font-bold text-slate-500">กรองห้องพัก:</span>
+                        <select value={filterBuilding} onChange={(e) => setFilterBuilding(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[120px]">
+                            <option value="">ทุกตึก</option>
+                            {uniqueBuildings.map((building, i) => (
+                                <option key={i} value={building}>{building}</option>
+                            ))}
+                        </select>
+                        <select value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[100px]">
+                            <option value="">ทุกชั้น</option>
+                            {uniqueFloors.map((floor, i) => (
+                                <option key={i} value={String(floor)}>ชั้น {floor}</option>
+                            ))}
+                        </select>
+                        <select value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[140px]">
+                            <option value="">ทุกประเภทห้อง</option>
+                            {uniqueRoomTypes.map((type, i) => (
+                                <option key={i} value={type}>{type}</option>
+                            ))}
+                        </select>
+                        <select value={filterKitchen} onChange={(e) => setFilterKitchen(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[120px]">
+                            <option value="">ทุกประเภทครัว</option>
+                            {uniqueKitchens.map((kitchen, i) => (
+                                <option key={i} value={kitchen}>{kitchen}</option>
+                            ))}
+                        </select>
+                        <select value={filterView} onChange={(e) => setFilterView(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[120px]">
+                            <option value="">ทุกทิศ (View)</option>
+                            {uniqueViews.map((view, i) => (
+                                <option key={i} value={view}>{view}</option>
+                            ))}
+                        </select>
+                        <span className="text-xs text-slate-400 font-medium ml-auto">พบ {filteredRooms.length} ห้อง</span>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm text-slate-600">
                             <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 text-xs uppercase tracking-wider">
                                 <tr>
                                     <th className="p-5 pl-8">หมายเลขห้อง</th>
-                                    {/* 4. แสดงผลชั้นในตารางด้วย (Option) */}
+                                    <th className="p-5">ตึก</th>
                                     <th className="p-5">ชั้น</th>
                                     <th className="p-5">ประเภทห้อง</th>
                                     <th className="p-5">ประเภทครัว</th>
@@ -221,7 +299,7 @@ export default function RoomsPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {rooms.map(room => (
+                                {filteredRooms.map(room => (
                                     <tr key={room.id} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="p-5 pl-8">
                                             <div className="flex items-center gap-3">
@@ -230,6 +308,9 @@ export default function RoomsPage() {
                                                 </div>
                                                 <span className="font-bold text-[#0A2647] text-lg">{room.room_number}</span>
                                             </div>
+                                        </td>
+                                        <td className="p-5 font-medium text-slate-600">
+                                            {room.building || '-'}
                                         </td>
                                         <td className="p-5 font-medium text-slate-600">
                                             {room.floor ? `ชั้น ${room.floor}` : '-'}
@@ -320,7 +401,7 @@ export default function RoomsPage() {
                                     >
                                         <option value="One Bedroom">One Bedroom</option>
                                         <option value="One Bedroom Exclusive">One Bedroom Exclusive</option>
-                                        <option value="Triple Room">Triple Room</option>
+                                        <option value="Triple Bedroom">Triple Bedroom</option>
                                         <option value="One Bedroom Suite">One Bedroom Suite</option>
                                     </select>
                                 </div>
@@ -348,7 +429,7 @@ export default function RoomsPage() {
                                         value={formData.view_direction}
                                         onChange={(e) => setFormData({ ...formData, view_direction: e.target.value })}
                                     >
-                                        {formData.room_type === 'Triple Room' ? (
+                                        {formData.room_type === 'Triple Bedroom' ? (
                                             <option value="ทิศตะวันตก">ทิศตะวันตก</option>
                                         ) : (
                                             <>

@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 interface Room {
   id: string;
   room_number: string;
+  room_type: string;
   kitchen_type: string;
   building?: string;
   floor?: number | string;
@@ -59,6 +60,7 @@ export default function DashboardPage() {
   // 🌟 State สำหรับตัวกรอง
   const [filterBuilding, setFilterBuilding] = useState('');
   const [filterFloor, setFilterFloor] = useState('');
+  const [filterRoomType, setFilterRoomType] = useState('');
   const [filterKitchen, setFilterKitchen] = useState('');
   const [filterView, setFilterView] = useState('');
 
@@ -252,15 +254,17 @@ export default function DashboardPage() {
   const uniqueBuildings = Array.from(new Set(rooms.map(r => r.building).filter(Boolean)));
   const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor).filter(Boolean))).sort((a, b) => Number(a) - Number(b));
   const uniqueKitchens = Array.from(new Set(rooms.map(r => r.kitchen_type).filter(Boolean)));
+  const uniqueRoomTypes = Array.from(new Set(rooms.map(r => r.room_type).filter(Boolean)));
   const uniqueViews = Array.from(new Set(rooms.map(r => r.view_direction).filter(Boolean)));
 
   // 🌟 ฟิลเตอร์ห้องตาม State ที่ผู้ใช้เลือก
   const filteredRooms = rooms.filter(room => {
     const matchBuilding = filterBuilding === '' || room.building === filterBuilding;
     const matchFloor = filterFloor === '' || String(room.floor || '') === filterFloor;
+    const matchRoomType = filterRoomType === '' || room.room_type === filterRoomType;
     const matchKitchen = filterKitchen === '' || room.kitchen_type === filterKitchen;
     const matchView = filterView === '' || room.view_direction === filterView;
-    return matchBuilding && matchFloor && matchKitchen && matchView;
+    return matchBuilding && matchFloor && matchRoomType && matchKitchen && matchView;
   });
 
   const occupancyData = useMemo(() => {
@@ -725,6 +729,10 @@ export default function DashboardPage() {
           <select value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[100px]">
             <option value="">ทุกชั้น</option>
             {uniqueFloors.map((f, i) => <option key={i} value={String(f)}>ชั้น {f}</option>)}
+          </select>
+          <select value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[140px]">
+            <option value="">ทุกประเภทห้อง</option>
+            {uniqueRoomTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}
           </select>
           <select value={filterKitchen} onChange={(e) => setFilterKitchen(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[120px]">
             <option value="">ทุกประเภทครัว</option>

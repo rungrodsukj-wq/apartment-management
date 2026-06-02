@@ -86,7 +86,7 @@ export default function BookingsPage() {
         let newKitchenType = formData.kitchen_type;
         
         // ถ้าไม่ใช่ One Bedroom Exclusive ให้ล็อคเป็นครัวหลัง
-        if (['One Bedroom', 'Triple Room', 'One Bedroom Suite'].includes(newType)) {
+        if (['One Bedroom', 'Triple Bedroom', 'One Bedroom Suite'].includes(newType)) {
             newKitchenType = 'ครัวหลัง';
         }
 
@@ -94,7 +94,7 @@ export default function BookingsPage() {
         let newView = formData.view_preference;
         if (newType === 'One Bedroom') {
             newView = 'ทิศตะวันออก';
-        } else if (newType === 'Triple Room') {
+        } else if (newType === 'Triple Bedroom') {
             newView = 'ทิศตะวันตก';
         } else {
             // หากไม่มีค่าเดิม ให้ตั้งค่าเริ่มต้นเป็นทิศตะวันออก
@@ -232,8 +232,8 @@ export default function BookingsPage() {
         }
     }
 
-    const isKitchenDisabled = ['One Bedroom', 'Triple Room', 'One Bedroom Suite'].includes(formData.room_type);
-    const isViewDisabled = formData.room_type === 'One Bedroom' || formData.room_type === 'Triple Room';
+    const isKitchenDisabled = ['One Bedroom', 'Triple Bedroom', 'One Bedroom Suite'].includes(formData.room_type);
+    const isViewDisabled = formData.room_type === 'One Bedroom' || formData.room_type === 'Triple Bedroom';
 
     return (
         <div className="min-h-full flex flex-col bg-transparent">
@@ -362,7 +362,7 @@ export default function BookingsPage() {
                                     <select className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer" value={formData.room_type} onChange={handleRoomTypeChange}>
                                         <option value="One Bedroom">One Bedroom</option>
                                         <option value="One Bedroom Exclusive">One Bedroom Exclusive</option>
-                                        <option value="Triple Room">Triple Room</option>
+                                        <option value="Triple Bedroom">Triple Bedroom</option>
                                         <option value="One Bedroom Suite">One Bedroom Suite</option>
                                     </select>
                                 </div>
@@ -396,7 +396,7 @@ export default function BookingsPage() {
                                         <select disabled={isViewDisabled} className={`w-full ${isViewDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800'} border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all`} value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
                                             <option value="ทิศตะวันออก">ทิศตะวันออก</option>
                                         </select>
-                                    ) : formData.room_type === 'Triple Room' ? (
+                                    ) : formData.room_type === 'Triple Bedroom' ? (
                                         <select disabled={isViewDisabled} className={`w-full ${isViewDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800'} border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all`} value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
                                             <option value="ทิศตะวันตก">ทิศตะวันตก</option>
                                         </select>

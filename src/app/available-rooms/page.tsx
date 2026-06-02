@@ -187,7 +187,7 @@ export default function AvailableRoomsPage() {
             { key: 'One Bedroom', display: 'ONE BEDROOM' },
             { key: 'One Bedroom Exclusive', display: 'ONE BED EXCLUSIVE' },
             { key: 'One Bedroom Suite', display: 'ONE BED SUITE' },
-            { key: 'Triple Room', display: 'TRIPLE BEDROOM' }
+            { key: 'Triple Bedroom', display: 'TRIPLE BEDROOM' }
         ];
 
         // Also exclude locked rooms in the matrix

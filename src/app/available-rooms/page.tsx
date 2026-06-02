@@ -1,12 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from '../../lib/supabase';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -297,62 +292,62 @@ export default function AvailableRoomsPage() {
 
                         <h2 className="text-lg font-bold text-[#0A2647] mb-4">สรุปห้องว่าง (หักคิวจองล่วงหน้าแล้ว)</h2>
 
-                        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-10">
+                        <div className="bg-white rounded-[2rem] shadow-lg border border-slate-200 overflow-hidden mb-10">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm text-slate-600 border-collapse border border-black">
-                                    <thead>
+                                <table className="min-w-full text-left text-sm text-slate-700 border-collapse border border-slate-200">
+                                    <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase tracking-wider">
                                         <tr>
-                                            <th rowSpan={3} className="p-4 bg-[#D9EAD3] text-slate-800 font-bold border border-black text-center align-middle">
+                                            <th rowSpan={3} className="p-4 bg-gradient-to-br from-slate-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center align-middle rounded-tl-[1.5rem]">
                                                 TYPE ROOM
                                             </th>
-                                            <th rowSpan={3} className="p-4 bg-[#FCE5CD] text-slate-800 font-bold border border-black text-center align-middle max-w-[150px]">
+                                            <th rowSpan={3} className="p-4 bg-gradient-to-br from-amber-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center align-middle max-w-[150px]">
                                                 โควต้าจองไม่ระบุห้อง<br />(Waitlists ทั้งหมด)
                                             </th>
-                                            <th colSpan={2} className="p-3 bg-[#CFE2F3] text-slate-800 font-bold border border-black text-center">
+                                            <th colSpan={2} className="p-3 bg-gradient-to-br from-sky-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center">
                                                 ครัวหน้า
                                             </th>
-                                            <th colSpan={2} className="p-3 bg-[#EAD1DC] text-slate-800 font-bold border border-black text-center">
+                                            <th colSpan={2} className="p-3 bg-gradient-to-br from-rose-100 to-white text-slate-800 font-bold text-center rounded-tr-[1.5rem] border-slate-200">
                                                 ครัวหลัง
                                             </th>
                                         </tr>
                                         <tr>
-                                            <th colSpan={2} className="p-2 bg-[#CFE2F3] text-slate-700 text-xs font-bold border border-black text-center">
+                                            <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold border-r border-slate-200 text-center">
                                                 View
                                             </th>
-                                            <th colSpan={2} className="p-2 bg-[#EAD1DC] text-slate-700 text-xs font-bold border border-black text-center">
+                                            <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold text-center border-slate-200">
                                                 View
                                             </th>
                                         </tr>
                                         <tr>
-                                            <th className="p-3 bg-[#CFE2F3] text-slate-600 text-[10px] font-bold border border-black text-center max-w-[160px]">
+                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
                                                 SALAYA ONE RESIDENCES<br />(ตะวันตก)
                                             </th>
-                                            <th className="p-3 bg-[#CFE2F3] text-slate-600 text-[10px] font-bold border border-black text-center max-w-[160px]">
+                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
                                                 ซอยตั้งสิน<br />(ตะวันออก)
                                             </th>
-                                            <th className="p-3 bg-[#EAD1DC] text-slate-600 text-[10px] font-bold border border-black text-center max-w-[160px]">
+                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
                                                 SALAYA ONE RESIDENCES<br />(ตะวันตก)
                                             </th>
-                                            <th className="p-3 bg-[#EAD1DC] text-slate-600 text-[10px] font-bold border border-black text-center max-w-[160px]">
+                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold text-center max-w-[160px] rounded-tr-[1.5rem] border-slate-200">
                                                 ซอยตั้งสิน<br />(ตะวันออก)
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-50">
+                                    <tbody className="bg-white">
                                         {matrixData.map((row) => {
                                             const renderCell = (cell: any) => {
                                                 const isSoldOut = cell.net <= 0;
                                                 return (
-                                                    <td className="p-4 border border-black text-center">
+                                                    <td className="p-4 text-center align-top border border-slate-200">
                                                         <div className={`text-base font-black ${isSoldOut ? 'text-slate-400' : 'text-[#4F81FF]'}`}>
                                                             {cell.net} <span className="text-xs font-normal text-slate-500">ห้อง</span>
                                                         </div>
-                                                        <div className="text-[10px] text-slate-400 mt-0.5">
+                                                        <div className="text-[10px] text-slate-400 mt-1">
                                                             (ว่าง {cell.available} / ทั้งหมด {cell.total})
                                                         </div>
                                                         {cell.waitlist > 0 && (
-                                                            <div className="text-[9px] text-amber-500 font-medium">
-                                                                (หัก waitlist {cell.waitlist})
+                                                            <div className="mt-2 inline-flex items-center justify-center rounded-full bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-700">
+                                                                -{cell.waitlist} waitlist
                                                             </div>
                                                         )}
                                                     </td>
@@ -361,8 +356,8 @@ export default function AvailableRoomsPage() {
 
                                             return (
                                                 <tr key={row.key} className="hover:bg-slate-50/50 transition-colors">
-                                                    <td className="p-4 font-bold text-slate-800 border border-black bg-slate-50/50">{row.display}</td>
-                                                    <td className="p-4 border border-black text-center">
+                                                    <td className="p-4 font-bold text-slate-800 border border-slate-200 bg-slate-50/80 rounded-l-3xl">{row.display}</td>
+                                                    <td className="p-4 border border-slate-200 text-center bg-slate-50/80">
                                                         <div className={`text-base font-black ${row.netQuota <= 0 ? 'text-red-500' : 'text-emerald-600'}`}>
                                                             {row.netQuota} <span className="text-xs font-normal text-slate-500">ห้อง</span>
                                                         </div>

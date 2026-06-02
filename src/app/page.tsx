@@ -1,12 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from '../lib/supabase';
 
 // 🌟 อัปเดต Interface ให้มีฟิลด์สำหรับ Filter
 interface Room {
@@ -271,7 +266,7 @@ export default function DashboardPage() {
   const occupancyData = useMemo(() => {
     const start = new Date(searchStartDate);
     const end = new Date(searchEndDate);
-    const data: { monthLabel: string; occupiedRooms: number; totalRooms: number }[] = [];
+    const data: { monthLabel: string; occupiedRooms: number; bookingCount: number; totalRooms: number; occupancyRate: number; bookingRate: number }[] = [];
     const totalRoomsCount = rooms.length;
 
     if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
@@ -287,6 +282,8 @@ export default function DashboardPage() {
       const monthLabel = curMonth.toLocaleDateString('th-TH', { month: 'short', year: '2-digit' });
 
       const occupiedRooms = new Set<string>();
+      const bookedRooms = new Set<string>();
+
       allContracts.forEach(c => {
         if (c.status === 'cancelled' && !c.actual_end_date) return;
 
@@ -298,12 +295,18 @@ export default function DashboardPage() {
           if (startBlock <= monthEnd && endBlock >= monthStart) {
             occupiedRooms.add(c.main_room_id);
           }
+          if (startBlock >= monthStart && startBlock <= monthEnd) {
+            bookedRooms.add(c.main_room_id);
+          }
         }
         if (c.temp_room_id && c.temp_start_date && c.temp_end_date) {
           const startBlock = new Date(c.temp_start_date);
           const endBlock = new Date(actualEnd || c.temp_end_date);
           if (startBlock <= monthEnd && endBlock >= monthStart) {
             occupiedRooms.add(c.temp_room_id);
+          }
+          if (startBlock >= monthStart && startBlock <= monthEnd) {
+            bookedRooms.add(c.temp_room_id);
           }
         }
         if (c.move_to_room_id && c.move_start_date && c.move_end_date) {
@@ -312,13 +315,24 @@ export default function DashboardPage() {
           if (startBlock <= monthEnd && endBlock >= monthStart) {
             occupiedRooms.add(c.move_to_room_id);
           }
+          if (startBlock >= monthStart && startBlock <= monthEnd) {
+            bookedRooms.add(c.move_to_room_id);
+          }
         }
       });
 
+      const occupiedRoomsCount = occupiedRooms.size;
+      const bookingCount = bookedRooms.size;
+      const occupancyRate = totalRoomsCount > 0 ? (occupiedRoomsCount / totalRoomsCount) * 100 : 0;
+      const bookingRate = totalRoomsCount > 0 ? (bookingCount / totalRoomsCount) * 100 : 0;
+
       data.push({
         monthLabel,
-        occupiedRooms: occupiedRooms.size,
+        occupiedRooms: occupiedRoomsCount,
+        bookingCount,
         totalRooms: totalRoomsCount,
+        occupancyRate,
+        bookingRate,
       });
 
       curMonth = new Date(year, month + 1, 1);
@@ -588,57 +602,109 @@ export default function DashboardPage() {
 
       {/* Monthly Occupancy Rate Section */}
       <section className="bg-white border border-slate-100 rounded-[2rem] shadow-[0_8px_30px_-4px_rgba(0,0,0,0.04)] p-6">
-        <h2 className="font-bold text-[#0A2647] text-lg mb-4 flex items-center gap-2">
-          <span className="p-1.5 bg-blue-50 rounded-lg text-[#4F81FF]">📈</span> อัตราการเข้าพักรายเดือน (Occupancy Rate)
+        <h2 className="font-bold text-[#0A2647] text-lg mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span className="flex items-center gap-2"><span className="p-1.5 bg-blue-50 rounded-lg text-[#4F81FF]">📈</span> อัตราการเข้าพักและการจองรายเดือน</span>
+          <span className="text-sm text-slate-500">Occupancy Rate + Booking Rate</span>
         </h2>
         {loading ? (
           <div className="flex justify-center py-6">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4F81FF]"></div>
           </div>
         ) : (
-          <div 
-            className="flex flex-row gap-4 overflow-x-auto pb-3 scrollbar-hide min-w-0 select-none"
-            ref={occupancyScrollContainerRef}
-            style={{ cursor: 'grab' }}
-            onMouseDown={handleOccupancyMouseDown}
-            onMouseLeave={handleOccupancyMouseLeaveOrUp}
-            onMouseUp={handleOccupancyMouseLeaveOrUp}
-            onMouseMove={handleOccupancyMouseMove}
-          >
+          <div className="space-y-6">
+            <div className="flex flex-wrap gap-4 mb-4">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                <span className="w-3 h-3 rounded-full bg-[#4F81FF]"></span> อัตราการเข้าพัก
+              </div>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-600">
+                <span className="w-3 h-3 rounded-full bg-[#F59E0B]"></span> อัตราการจอง
+              </div>
+            </div>
 
-            {occupancyData.map((data, idx) => {
-              const percentage = data.totalRooms > 0 ? (data.occupiedRooms / data.totalRooms) * 100 : 0;
-              const isHigh = percentage >= 85;
-              const isMed = percentage >= 60 && percentage < 85;
-              const barColor = isHigh ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : isMed ? 'bg-gradient-to-r from-blue-400 to-[#4F81FF]' : 'bg-gradient-to-r from-amber-400 to-orange-500';
-              const textColor = isHigh ? 'text-emerald-600' : isMed ? 'text-blue-600' : 'text-orange-600';
-              const bgColor = isHigh ? 'bg-emerald-50/50 hover:bg-emerald-50' : isMed ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-orange-50/50 hover:bg-orange-50';
-              const borderColor = isHigh ? 'border-emerald-100 hover:border-emerald-300' : isMed ? 'border-blue-100 hover:border-blue-300' : 'border-orange-100 hover:border-orange-300';
-              const shadowColor = isHigh ? 'hover:shadow-emerald-500/20' : isMed ? 'hover:shadow-blue-500/20' : 'hover:shadow-orange-500/20';
+            <div className="overflow-x-auto pb-2">
+              <div className="min-w-[720px]">
+                <svg width={Math.max(720, occupancyData.length * 120)} height={260} className="rounded-3xl bg-slate-50/80">
+                  <defs>
+                    <linearGradient id="occupancyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#4F81FF" stopOpacity="0.25" />
+                      <stop offset="100%" stopColor="#4F81FF" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="bookingGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.25" />
+                      <stop offset="100%" stopColor="#F59E0B" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <g>
+                    {[0, 20, 40, 60, 80, 100].map((gridValue) => {
+                      const y = 220 - (gridValue / 100) * 160;
+                      return (
+                        <g key={gridValue}>
+                          <line x1={40} y1={y} x2={Math.max(720, occupancyData.length * 120) - 20} y2={y} stroke="#CBD5E1" strokeWidth="1" strokeDasharray="4 4" />
+                          <text x={10} y={y + 4} fill="#94A3B8" fontSize="10" fontWeight="600">{gridValue}%</text>
+                        </g>
+                      );
+                    })}
+                  </g>
+                  <g>
+                    {(() => {
+                      const chartWidth = Math.max(720, occupancyData.length * 120);
+                      const padding = 40;
+                      const step = occupancyData.length > 1 ? (chartWidth - padding - 20) / (occupancyData.length - 1) : 0;
+                      const lineHeight = 160;
+                      const occupancyPoints = occupancyData.map((data, idx) => {
+                        const x = padding + idx * step;
+                        const y = 220 - (data.occupancyRate / 100) * lineHeight;
+                        return `${x},${y}`;
+                      }).join(' ');
+                      const bookingPoints = occupancyData.map((data, idx) => {
+                        const x = padding + idx * step;
+                        const y = 220 - (data.bookingRate / 100) * lineHeight;
+                        return `${x},${y}`;
+                      }).join(' ');
+                      return (
+                        <>
+                          <polyline points={occupancyPoints} fill="none" stroke="#4F81FF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                          <polyline points={bookingPoints} fill="none" stroke="#F59E0B" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                          {occupancyData.map((data, idx) => {
+                            const x = padding + idx * step;
+                            const occupancyY = 220 - (data.occupancyRate / 100) * lineHeight;
+                            const bookingY = 220 - (data.bookingRate / 100) * lineHeight;
+                            return (
+                              <g key={idx}>
+                                <circle cx={x} cy={occupancyY} r="5" fill="#4F81FF" stroke="#FFFFFF" strokeWidth="2" />
+                                <circle cx={x} cy={bookingY} r="5" fill="#F59E0B" stroke="#FFFFFF" strokeWidth="2" />
+                                <text x={x} y={240} fill="#334155" fontSize="11" textAnchor="middle">{data.monthLabel}</text>
+                              </g>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
+                  </g>
+                </svg>
+              </div>
+            </div>
 
-              return (
-                <div key={idx} className={`group ${bgColor} border ${borderColor} rounded-3xl p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${shadowColor} shrink-0 w-[200px] sm:w-[220px]`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">{data.monthLabel}</p>
-                    <span className={`text-lg ${isHigh ? 'text-emerald-500' : isMed ? 'text-blue-500' : 'text-orange-500'}`}>
-                      {isHigh ? '🔥' : isMed ? '✨' : '⚠️'}
-                    </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {occupancyData.map((data, idx) => (
+                <div key={idx} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-sm font-bold text-slate-700">{data.monthLabel}</div>
+                    <div className="text-xs text-slate-500">จอง {data.bookingCount} ห้อง</div>
                   </div>
-                  <div className="mb-4">
-                    <p className={`text-4xl font-extrabold ${textColor} tracking-tight`}>{percentage.toFixed(1)}<span className="text-xl font-bold opacity-70">%</span></p>
-                  </div>
-                  <div>
-                    <div className="w-full bg-white/60 rounded-full h-2.5 overflow-hidden mb-2 shadow-inner">
-                      <div className={`h-full ${barColor} transition-all duration-1000 ease-out`} style={{ width: `${percentage}%` }}></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-white p-3 shadow-sm">
+                      <div className="text-sm text-slate-500">อัตราการเข้าพัก</div>
+                      <div className="mt-2 text-2xl font-extrabold text-[#4F81FF]">{data.occupancyRate.toFixed(1)}%</div>
                     </div>
-                    <div className="flex justify-between text-[11px] font-bold text-slate-500">
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> พักแล้ว: {data.occupiedRooms}</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span> รวม: {data.totalRooms}</span>
+                    <div className="rounded-2xl bg-white p-3 shadow-sm">
+                      <div className="text-sm text-slate-500">อัตราการจอง</div>
+                      <div className="mt-2 text-2xl font-extrabold text-[#F59E0B]">{data.bookingRate.toFixed(1)}%</div>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         )}
       </section>

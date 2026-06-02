@@ -2,15 +2,9 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { User } from '@supabase/supabase-js';
 import { logAudit } from '../lib/audit';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  { auth: { persistSession: true } }
-);
+import { supabase } from '../lib/supabase';
 
 export type UserRole = 'admin' | 'owner' | 'staff' | 'viewer';
 export type UserStatus = 'pending' | 'active' | 'disabled';
@@ -68,7 +62,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // โหลด session ปัจจุบัน
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Supabase auth getSession error:', error);
+        supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id).finally(() => setLoading(false));
@@ -78,7 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // ฟังการเปลี่ยนแปลง auth state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const authEvent = String(event);
+      if (authEvent.includes('REFRESH')) {
+        console.warn('Supabase token refresh event detected:', authEvent);
+        if (authEvent.includes('FAILED')) {
+          setUser(null);
+          setProfile(null);
+          supabase.auth.signOut();
+          return;
+        }
+      }
+
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);

@@ -25,14 +25,14 @@ const menuSections: MenuSection[] = [
     items: [
       { name: "ภาพรวม", href: "/", icon: "📊", key: "dashboard" },
       { name: "ห้องพักทั้งหมด", href: "/rooms", icon: "🏢", key: "rooms" },
-      { name: "ห้องว่างพร้อมเช่า", href: "/available-rooms", icon: "🛏️", key: "available_rooms" },
+      { name: "ห้องว่างพร้อมจอง", href: "/available-rooms", icon: "🛏️", key: "available_rooms" },
     ]
   },
   {
     title: "การจัดการ",
     items: [
       { name: "จองไม่ระบุห้อง", href: "/waitlists", icon: "📝", key: "waitlists" },
-      { name: "การจอง", href: "/bookings", icon: "📅", key: "bookings" },
+      { name: "จองระบุห้อง", href: "/bookings", icon: "📅", key: "bookings" },
       { name: "สอบถามต่อสัญญา", href: "/renewal-check", icon: "🔁", key: "renewal_check" },
       { name: "กิจกรรมระบบ", href: "/activity", icon: "🕒", key: "activity" },
     ]

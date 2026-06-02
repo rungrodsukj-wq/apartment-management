@@ -23,7 +23,7 @@ const roleLabels: Record<string, string> = {
 export function getHeaderInfo(pathname: string) {
   if (pathname === "/") return { breadcrumb: "Salaya One Service Apartment / ภาพรวม", title: "ภาพรวม" };
   if (pathname === "/rooms") return { breadcrumb: "Salaya One Service Apartment / ห้องพักทั้งหมด", title: "ห้องพักทั้งหมด" };
-  if (pathname === "/available-rooms") return { breadcrumb: "Salaya One Service Apartment / ห้องว่างพร้อมเช่า", title: "ห้องว่างพร้อมเช่า" };
+  if (pathname === "/available-rooms") return { breadcrumb: "Salaya One Service Apartment / ห้องว่างพร้อมจอง", title: "ห้องว่างพร้อมจอง" };
   if (pathname.startsWith("/waitlists")) return { breadcrumb: "Salaya One Service Apartment / จองไม่ระบุห้อง", title: "จองไม่ระบุห้อง" };
   if (pathname.startsWith("/bookings")) return { breadcrumb: "Salaya One Service Apartment / จองระบุห้อง", title: "จองระบุห้อง" };
   if (pathname.startsWith("/renewal-check")) return { breadcrumb: "Salaya One Service Apartment / สอบถามต่อสัญญา", title: "สอบถามต่อสัญญา" };

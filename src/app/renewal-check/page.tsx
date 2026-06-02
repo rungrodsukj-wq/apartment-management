@@ -75,13 +75,24 @@ export default function RenewalCheckPage() {
         const cutoff = new Date(today);
         cutoff.setMonth(cutoff.getMonth() + monthsAhead);
 
-        return contracts.filter(c => {
-            if (!c.contract_end_date) return false;
-            const end = new Date(c.contract_end_date);
-            end.setHours(0, 0, 0, 0);
-            return end >= today && end <= cutoff;
-        });
-    }, [contracts, monthsAhead]);
+        return contracts
+            .filter(c => {
+                if (!c.contract_end_date) return false;
+                const end = new Date(c.contract_end_date);
+                end.setHours(0, 0, 0, 0);
+                return end >= today && end <= cutoff;
+            })
+            .sort((a, b) => {
+                const roomA = getRoom(a.main_room_id)?.room_number ?? '';
+                const roomB = getRoom(b.main_room_id)?.room_number ?? '';
+                const numA = Number(roomA);
+                const numB = Number(roomB);
+                if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
+                    return numA - numB;
+                }
+                return String(roomA).localeCompare(String(roomB), undefined, { numeric: true, sensitivity: 'base' });
+            });
+    }, [contracts, monthsAhead, rooms]);
 
     const getIntention = (contractId: string): any | null => {
         return intentions.find(i => i.contract_id === contractId) || null;
@@ -166,7 +177,7 @@ export default function RenewalCheckPage() {
         return { overdue, urgent, soon, upcoming };
     }, [expiringContracts]);
 
-    const renderContractCard = (contract: any) => {
+    const renderContractCard = (contract: any, index: number) => {
         const room = getRoom(contract.main_room_id);
         const intention = getIntention(contract.id);
         const currentIntention: Intention = intention?.intention || 'pending';
@@ -188,13 +199,18 @@ export default function RenewalCheckPage() {
                 className={`bg-white rounded-2xl border border-slate-100 border-l-[6px] ${urgencyColor} shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 p-5 flex flex-col gap-4`}
             >
                 <div className="flex flex-col sm:flex-row sm:items-start gap-5">
-                    {/* Room badge */}
-                    <div className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center shrink-0 shadow-inner ${currentIntention === 'not_renew' ? 'bg-red-50 text-red-600' :
-                        currentIntention === 'renew' ? 'bg-emerald-50 text-emerald-600' :
-                            'bg-amber-50 text-amber-600'
-                        }`}>
-                        <span className="text-xs font-medium opacity-70 mb-[-2px]">ห้อง</span>
-                        <span className="font-extrabold text-xl">{room?.room_number || '?'}</span>
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-sm">
+                            {index}
+                        </div>
+                        {/* Room badge */}
+                        <div className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center shrink-0 shadow-inner ${currentIntention === 'not_renew' ? 'bg-red-50 text-red-600' :
+                            currentIntention === 'renew' ? 'bg-emerald-50 text-emerald-600' :
+                                'bg-amber-50 text-amber-600'
+                            }`}>
+                            <span className="text-xs font-medium opacity-70 mb-[-2px]">ห้อง</span>
+                            <span className="font-extrabold text-xl">{room?.room_number || '?'}</span>
+                        </div>
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -315,7 +331,7 @@ export default function RenewalCheckPage() {
                     </span>
                 </div>
                 <div className="flex flex-col gap-4">
-                    {list.map(c => renderContractCard(c))}
+                    {list.map((c, idx) => renderContractCard(c, idx + 1))}
                 </div>
             </div>
         );

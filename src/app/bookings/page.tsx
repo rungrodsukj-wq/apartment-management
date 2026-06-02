@@ -92,22 +92,22 @@ export default function BookingsPage() {
 
     const refreshContractStatuses = async (contractRows: any[]) => {
         const today = formatDateInput(new Date());
-        const activeToCompleteIds = contractRows
-            .filter((c: any) => c.status === 'active' && c.contract_end_date && c.contract_end_date < today)
+        const expiredIds = contractRows
+            .filter((c: any) => c.status !== 'cancelled' && c.contract_end_date && c.contract_end_date < today)
             .map((c: any) => c.id);
         const upcomingToActiveIds = contractRows
-            .filter((c: any) => c.status === 'upcoming' && c.contract_start_date && c.contract_start_date <= today)
+            .filter((c: any) => c.status === 'upcoming' && c.contract_start_date && c.contract_start_date <= today && (!c.contract_end_date || c.contract_end_date >= today))
             .map((c: any) => c.id);
 
-        if (activeToCompleteIds.length === 0 && upcomingToActiveIds.length === 0) {
+        if (expiredIds.length === 0 && upcomingToActiveIds.length === 0) {
             return false;
         }
 
-        if (activeToCompleteIds.length > 0) {
+        if (expiredIds.length > 0) {
             const { error } = await supabase
                 .from('contracts')
                 .update({ status: 'completed' })
-                .in('id', activeToCompleteIds);
+                .in('id', expiredIds);
             if (error) console.warn('Failed to complete expired contracts', error.message);
         }
 
@@ -215,6 +215,17 @@ export default function BookingsPage() {
             const keyB = resolveRoomKey(roomB);
             if (keyA < keyB) return -1;
             if (keyA > keyB) return 1;
+
+            const statusPriority: Record<string, number> = {
+                active: 0,
+                upcoming: 1,
+                completed: 2,
+                cancelled: 3,
+            };
+            const statusA = statusPriority[a.status] ?? 4;
+            const statusB = statusPriority[b.status] ?? 4;
+            if (statusA !== statusB) return statusA - statusB;
+
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
     };
@@ -338,9 +349,7 @@ export default function BookingsPage() {
         newStartDate.setDate(newStartDate.getDate() + 1);
         const newStartDateStr = newStartDate.toISOString().split('T')[0];
 
-        const newEndDate = new Date(newStartDate);
-        newEndDate.setFullYear(newEndDate.getFullYear() + 1);
-        const newEndDateStr = newEndDate.toISOString().split('T')[0];
+        const newEndDateStr = addDays(addYears(newStartDateStr, 1), -1);
 
         const newStatus = isOldContractExpired ? 'active' : 'upcoming';
 
@@ -432,6 +441,68 @@ export default function BookingsPage() {
         }
     };
 
+    // Move currently-selected main room into the temporary slot (for cases where user picked it by mistake)
+    const moveCreateMainToTemp = () => {
+        if (!createForm.main_room_id) return;
+        setCreateForm({
+            ...createForm,
+            has_temp_room: true,
+            temp_room_id: createForm.main_room_id,
+            temp_start_date: createForm.temp_start_date || createForm.actual_check_in_date || createForm.main_start_date || '',
+            temp_end_date: createForm.temp_end_date || createForm.main_end_date || createForm.contract_end_date || '',
+            main_room_id: '',
+            main_start_date: '',
+            main_end_date: '',
+        });
+    };
+
+    // Move currently-selected main room into the temp slot in edit form
+    const moveEditMainToTemp = () => {
+        if (!editForm || !editForm.main_room_id) return;
+        setEditForm({
+            ...editForm,
+            has_temp_room: true,
+            temp_room_id: editForm.main_room_id,
+            temp_start_date: editForm.temp_start_date || editForm.actual_check_in_date || editForm.main_start_date || '',
+            temp_end_date: editForm.temp_end_date || editForm.main_end_date || editForm.contract_end_date || '',
+            main_room_id: '',
+            main_start_date: '',
+            main_end_date: '',
+        });
+    };
+
+    // Move temp -> main for create modal
+    const moveCreateTempToMain = () => {
+        if (!createForm.temp_room_id) return;
+        setCreateForm({
+            ...createForm,
+            has_temp_room: false,
+            main_room_id: createForm.temp_room_id,
+            main_start_date: createForm.temp_start_date || createForm.actual_check_in_date || createForm.contract_start_date || '',
+            main_end_date: createForm.temp_end_date || createForm.main_end_date || createForm.contract_end_date || '',
+            temp_room_id: '',
+            temp_start_date: '',
+            temp_end_date: '',
+        });
+    };
+
+    // Move temp -> main for edit modal
+    const moveEditTempToMain = () => {
+        if (!editForm || !editForm.temp_room_id) return;
+        setEditForm({
+            ...editForm,
+            has_temp_room: false,
+            main_room_id: editForm.temp_room_id,
+            main_start_date: editForm.temp_start_date || editForm.actual_check_in_date || editForm.contract_start_date || '',
+            main_end_date: editForm.temp_end_date || editForm.main_end_date || editForm.contract_end_date || '',
+            temp_room_id: null,
+            temp_start_date: null,
+            temp_end_date: null,
+        });
+    };
+
+    const normalizeDate = (d?: string | null) => (d && d !== '') ? d : null;
+
     const handleSaveEdit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -459,18 +530,18 @@ export default function BookingsPage() {
         const updatePayload = {
             tenant_name: editForm.tenant_name,
             status: editForm.status,
-            contract_start_date: editForm.contract_start_date,
-            contract_end_date: editForm.contract_end_date,
-            actual_check_in_date: editForm.actual_check_in_date,
-            main_room_id: editForm.main_room_id,
-            main_start_date: editForm.main_start_date,
-            main_end_date: editForm.main_end_date,
-            temp_room_id: editForm.has_temp_room ? editForm.temp_room_id : null,
-            temp_start_date: editForm.has_temp_room ? editForm.temp_start_date : null,
-            temp_end_date: editForm.has_temp_room ? editForm.temp_end_date : null,
+            contract_start_date: normalizeDate(editForm.contract_start_date),
+            contract_end_date: normalizeDate(editForm.contract_end_date),
+            actual_check_in_date: normalizeDate(editForm.actual_check_in_date),
+            main_room_id: editForm.main_room_id || null,
+            main_start_date: normalizeDate(editForm.main_start_date),
+            main_end_date: normalizeDate(editForm.main_end_date),
+            temp_room_id: editForm.has_temp_room ? (editForm.temp_room_id || null) : null,
+            temp_start_date: editForm.has_temp_room ? normalizeDate(editForm.temp_start_date) : null,
+            temp_end_date: editForm.has_temp_room ? normalizeDate(editForm.temp_end_date) : null,
             move_to_room_id: editForm.move_to_room_id || null,
-            move_start_date: editForm.move_start_date || null,
-            move_end_date: editForm.move_end_date || null
+            move_start_date: normalizeDate(editForm.move_start_date),
+            move_end_date: normalizeDate(editForm.move_end_date)
         };
 
         const { error } = await supabase
@@ -549,21 +620,22 @@ export default function BookingsPage() {
 
         const payload: any = {
             tenant_name: createForm.tenant_name.trim(),
-            actual_check_in_date: createForm.actual_check_in_date,
-            contract_start_date: createForm.contract_start_date || createForm.actual_check_in_date,
-            contract_end_date: createForm.contract_end_date || null,
-            main_room_id: createForm.main_room_id,
-            main_start_date: effectiveMainStart,
-            main_end_date: effectiveMainEnd,
+            actual_check_in_date: normalizeDate(createForm.actual_check_in_date),
+            contract_start_date: normalizeDate(createForm.contract_start_date || createForm.actual_check_in_date),
+            contract_end_date: normalizeDate(createForm.contract_end_date),
+            main_room_id: createForm.main_room_id || null,
+            main_start_date: normalizeDate(effectiveMainStart),
+            main_end_date: normalizeDate(effectiveMainEnd),
+            monthly_rent: createForm.monthly_rent ? Number(createForm.monthly_rent) : null,
 
             // --- จุดที่แก้ไข 2 บรรทัดนี้ ---
             status: createForm.status || 'active',
             parent_contract_id: createForm.parent_contract_id || null,
             // -------------------------
 
-            temp_room_id: createForm.has_temp_room ? createForm.temp_room_id : null,
-            temp_start_date: createForm.has_temp_room ? createForm.temp_start_date : null,
-            temp_end_date: createForm.has_temp_room ? createForm.temp_end_date : null,
+            temp_room_id: createForm.has_temp_room ? (createForm.temp_room_id || null) : null,
+            temp_start_date: createForm.has_temp_room ? normalizeDate(createForm.temp_start_date) : null,
+            temp_end_date: createForm.has_temp_room ? normalizeDate(createForm.temp_end_date) : null,
         };
 
         const { data, error } = await supabase.from('contracts').insert([payload]).select('id');
@@ -820,6 +892,8 @@ export default function BookingsPage() {
                                 const ee = getDate(e);
                                 return ss && ee && ss <= today && today <= ee;
                             };
+                            const isBeforeCheckIn = contract.actual_check_in_date && getDate(contract.actual_check_in_date)! > today;
+                            const displayStatus = contract.status === 'cancelled' ? 'cancelled' : (isBeforeCheckIn ? 'upcoming' : contract.status);
                             const currentRoomId = (() => {
                                 if (contract.temp_room_id && inRange(contract.temp_start_date, contract.temp_end_date)) return contract.temp_room_id;
                                 if (contract.move_to_room_id && inRange(contract.move_start_date, contract.move_end_date)) return contract.move_to_room_id;
@@ -862,7 +936,7 @@ export default function BookingsPage() {
                                             {/* ----------------------------- */}
 
                                             <div className="mt-2 flex items-center flex-wrap gap-2">
-                                                {getStatusBadge(contract.status)}
+                                                {getStatusBadge(displayStatus)}
                                                 {getIntentionBadge(contract.id)}
                                             </div>
                                         </div>
@@ -1138,6 +1212,15 @@ export default function BookingsPage() {
                                         >
                                             ยกเลิก
                                         </button>
+                                        {createForm.temp_room_id && (
+                                            <button
+                                                type="button"
+                                                onClick={moveCreateTempToMain}
+                                                className="absolute top-4 right-20 text-xs px-3 py-1.5 bg-white text-emerald-700 border border-emerald-200 rounded-xl font-semibold hover:bg-emerald-50 transition-colors"
+                                            >
+                                                ตั้งเป็นห้องหลัก
+                                            </button>
+                                        )}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                                             <div>
                                                 <label className={labelCls}>เลือกห้อง</label>
@@ -1175,6 +1258,13 @@ export default function BookingsPage() {
                                 )}
                             </div>
 
+                            {/* Warn if a temp room is selected but no main room chosen yet */}
+                            {createForm.has_temp_room && createForm.temp_room_id && !createForm.main_room_id && (
+                                <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                                    ⚠️ คุณเลือกห้องชั่วคราวแล้ว แต่ยังไม่ได้เลือกห้องหลัก — โปรดเลือกห้องหลักก่อนยืนยันการจอง
+                                </div>
+                            )}
+
                             {/* Section 4: Main room */}
                             {/* Section 2: Room card picker */}
                             {createForm.contract_start_date && createForm.contract_end_date && (
@@ -1183,6 +1273,18 @@ export default function BookingsPage() {
                                         <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[10px]">2</span>
                                         เลือกห้องพักหลัก <span className="text-red-400">*</span>
                                     </p>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div />
+                                        {createForm.main_room_id && (
+                                            <button
+                                                type="button"
+                                                onClick={moveCreateMainToTemp}
+                                                className="text-xs px-3 py-1.5 bg-white text-amber-700 border border-amber-200 rounded-xl font-semibold hover:bg-amber-50 transition-colors"
+                                            >
+                                                ย้ายห้องที่เลือกเป็นชั่วคราว
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
                                         <div>
                                             <label className={labelCls}>ตึก</label>
@@ -1532,6 +1634,15 @@ export default function BookingsPage() {
                                         >
                                             ยกเลิก
                                         </button>
+                                        {editForm.temp_room_id && (
+                                            <button
+                                                type="button"
+                                                onClick={moveEditTempToMain}
+                                                className="absolute top-4 right-20 text-xs px-3 py-1.5 bg-white text-emerald-700 border border-emerald-200 rounded-xl font-semibold hover:bg-emerald-50 transition-colors"
+                                            >
+                                                ตั้งเป็นห้องหลัก
+                                            </button>
+                                        )}
                                         <div className="grid grid-cols-1 gap-4">
                                             <div className="space-y-3">
                                                 <label className={labelCls}>เลือกห้อง</label>
@@ -1568,6 +1679,17 @@ export default function BookingsPage() {
                                     <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[10px]">2</span>
                                     ห้องพักหลัก (Main Room)
                                 </p>
+                                <div className="flex items-center justify-end mb-3">
+                                    {editForm.main_room_id && (
+                                        <button
+                                            type="button"
+                                            onClick={moveEditMainToTemp}
+                                            className="text-xs px-3 py-1.5 bg-white text-amber-700 border border-amber-200 rounded-xl font-semibold hover:bg-amber-50 transition-colors"
+                                        >
+                                            ย้ายห้องหลักนี้เป็นชั่วคราว
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div className="flex gap-4">
                                         <div className="flex-1">

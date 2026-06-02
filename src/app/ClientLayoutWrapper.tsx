@@ -25,7 +25,7 @@ export function getHeaderInfo(pathname: string) {
   if (pathname === "/rooms") return { breadcrumb: "Salaya One Service Apartment / ห้องพักทั้งหมด", title: "ห้องพักทั้งหมด" };
   if (pathname === "/available-rooms") return { breadcrumb: "Salaya One Service Apartment / ห้องว่างพร้อมเช่า", title: "ห้องว่างพร้อมเช่า" };
   if (pathname.startsWith("/waitlists")) return { breadcrumb: "Salaya One Service Apartment / จองไม่ระบุห้อง", title: "จองไม่ระบุห้อง" };
-  if (pathname.startsWith("/bookings")) return { breadcrumb: "Salaya One Service Apartment / การจอง", title: "การจอง" };
+  if (pathname.startsWith("/bookings")) return { breadcrumb: "Salaya One Service Apartment / จองระบุห้อง", title: "จองระบุห้อง" };
   if (pathname.startsWith("/renewal-check")) return { breadcrumb: "Salaya One Service Apartment / สอบถามต่อสัญญา", title: "สอบถามต่อสัญญา" };
   if (pathname.startsWith("/users")) return { breadcrumb: "Salaya One Service Apartment / จัดการสิทธิ์และผู้ใช้งาน", title: "จัดการสิทธิ์และผู้ใช้งาน" };
   if (pathname.startsWith("/activity")) return { breadcrumb: "Salaya One Service Apartment / กิจกรรมระบบ", title: "กิจกรรมระบบ" };
@@ -53,7 +53,7 @@ export default function ClientLayoutWrapper({
   const quickActions = [
     { label: "เพิ่มห้องพัก", href: "/rooms?quickAction=newRoom", description: "ไปที่หน้าจัดการห้องพัก" },
     { label: "จองไม่ระบุห้อง", href: "/waitlists?quickAction=newWaitlist", description: "เพิ่มรายการจองไม่ระบุห้อง" },
-    { label: "เพิ่มการจอง", href: "/bookings?quickAction=newBooking", description: "ไปที่หน้าการจอง" },
+    { label: "เพิ่มการจองระบุห้อง", href: "/bookings?quickAction=newBooking", description: "ไปที่หน้าการจองระบุห้อง" },
   ];
 
   useEffect(() => {

@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,26 +121,70 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">รหัสผ่าน (Password)</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="อย่างน้อย 6 ตัวอักษร"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F81FF] focus:bg-white transition-all duration-200"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="อย่างน้อย 6 ตัวอักษร"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F81FF] focus:bg-white transition-all duration-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                  className="absolute inset-y-0 right-3 flex items-center justify-center w-10 text-slate-500 hover:text-slate-900"
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                      <path d="M17.94 17.94A10 10 0 0 1 6.06 6.06" />
+                      <path d="M1 1l22 22" />
+                      <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24" />
+                      <path d="M10.66 4.86A9.97 9.97 0 0 1 12 4c5.52 0 10 4.48 10 10a9.96 9.96 0 0 1-2.22 6.22" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">ยืนยันรหัสผ่าน (Confirm Password)</label>
-              <input
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="ป้อนรหัสผ่านอีกครั้ง"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F81FF] focus:bg-white transition-all duration-200"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="ป้อนรหัสผ่านอีกครั้ง"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F81FF] focus:bg-white transition-all duration-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                  className="absolute inset-y-0 right-3 flex items-center justify-center w-10 text-slate-500 hover:text-slate-900"
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                      <path d="M17.94 17.94A10 10 0 0 1 6.06 6.06" />
+                      <path d="M1 1l22 22" />
+                      <path d="M9.88 9.88a3 3 0 0 0 4.24 4.24" />
+                      <path d="M10.66 4.86A9.97 9.97 0 0 1 12 4c5.52 0 10 4.48 10 10a9.96 9.96 0 0 1-2.22 6.22" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             <button

@@ -2,7 +2,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
+import { canEditPage } from '../../lib/permissions';
+import { logAudit, describeChanges } from '../../lib/audit';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 const parseDateFromYYYYMMDD = (dateStr: string) => {
@@ -27,13 +31,19 @@ const isValidDateRange = (start: string, end: string) => {
 };
 
 export default function BookingsPage() {
+    const { profile } = useAuth();
+    const isEditable = canEditPage(profile, 'bookings');
+
     const [contracts, setContracts] = useState<any[]>([]);
     const [rooms, setRooms] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [intentions, setIntentions] = useState<any[]>([]);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editForm, setEditForm] = useState<any>(null);
     const [editRoomPicker, setEditRoomPicker] = useState<'temp' | 'main' | 'move' | null>(null);
+    const [selectedRoomForDetail, setSelectedRoomForDetail] = useState<any | null>(null);
+
 
     // ── NEW: Create booking state ──
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -50,6 +60,7 @@ export default function BookingsPage() {
         temp_start_date: '',
         temp_end_date: '',
         status: 'active',
+        monthly_rent: '',
     });
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const [cancelContractId, setCancelContractId] = useState<string | null>(null);
@@ -64,6 +75,7 @@ export default function BookingsPage() {
     });
 
     const [waitlists, setWaitlists] = useState<any[]>([]);
+    const searchParams = useSearchParams();
 
     const buildingOptions = Array.from(new Set(rooms.map((r: any) => r.building).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b));
     const floorOptions = Array.from(new Set(rooms.map((r: any) => r.floor != null ? String(r.floor) : '').filter(Boolean))).sort((a, b) => Number(a) - Number(b));
@@ -114,15 +126,23 @@ export default function BookingsPage() {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        if (isEditable && searchParams.get('quickAction') === 'newBooking') {
+            setIsCreateModalOpen(true);
+        }
+    }, [searchParams, isEditable]);
+
     async function fetchData() {
         setLoading(true);
         const { data: cData } = await supabase.from('contracts').select('*').order('created_at', { ascending: false });
         const { data: rData } = await supabase.from('rooms').select('*').order('room_number');
         const { data: wData } = await supabase.from('waitlists').select('*');
+        const { data: iData } = await supabase.from('renewal_intentions').select('*');
 
         const roomData = rData || [];
         if (rData) setRooms(rData);
         if (wData) setWaitlists(wData);
+        if (iData) setIntentions(iData);
 
         if (cData) {
             const sortedContracts = sortContractsByCurrentRoom(cData, roomData);
@@ -142,7 +162,8 @@ export default function BookingsPage() {
         if (!roomId) return '-';
         const room = rooms.find(r => r.id === roomId);
         if (!room) return 'ไม่ทราบ';
-        return `${room.room_number} ${room.room_type ? `(${room.room_type})` : ''}`;
+        return `${room.room_number}`;
+        // return `${room.room_number} ${room.room_type ? `(${room.room_type})` : ''}`;
     };
 
     const getonlyRoomNumber = (roomId: string) => {
@@ -165,6 +186,15 @@ export default function BookingsPage() {
             return contract.temp_room_id;
         }
         return contract.main_room_id || '';
+    };
+
+    const handleRoomClick = (roomId: string) => {
+        const room = rooms.find(r => r.id === roomId);
+        if (room) {
+            setSelectedRoomForDetail(room);
+        } else {
+            alert('ไม่พบข้อมูลห้องพักนี้ในระบบ');
+        }
     };
 
     const sortContractsByCurrentRoom = (contractsToSort: any[], roomData: any[]) => {
@@ -284,6 +314,7 @@ export default function BookingsPage() {
         if (error) {
             alert('เกิดข้อผิดพลาดในการยกเลิก: ' + error.message);
         } else {
+            await logAudit(profile, 'contracts', 'update', cancelContractId, 'ยกเลิกสัญญา', { status: 'cancelled', actual_end_date: cancelEndDate });
             setIsCancelModalOpen(false);
             setCancelContractId(null);
             setCancelTenantName('');
@@ -292,10 +323,8 @@ export default function BookingsPage() {
         }
     };
 
-    const handleRenewContract = async (oldContract: any) => {
-        const confirmRenew = window.confirm(`ต้องการ "ต่อสัญญา" ให้คุณ ${oldContract.tenant_name} ใช่หรือไม่?`);
-        if (!confirmRenew) return;
-
+    const handleRenewContract = (oldContract: any) => {
+        // 1. คำนวณวันเหมือนเดิม
         const today = (() => {
             const d = new Date();
             const year = d.getFullYear();
@@ -303,7 +332,6 @@ export default function BookingsPage() {
             const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
         })();
-
         const isOldContractExpired = oldContract.contract_end_date < today;
 
         const newStartDate = new Date(oldContract.contract_end_date);
@@ -316,30 +344,43 @@ export default function BookingsPage() {
 
         const newStatus = isOldContractExpired ? 'active' : 'upcoming';
 
-        const { error: insertError } = await supabase
-            .from('contracts')
-            .insert([{
-                tenant_name: oldContract.tenant_name,
-                parent_contract_id: oldContract.id,
-                main_room_id: oldContract.main_room_id,
-                actual_check_in_date: newStartDateStr,
-                contract_start_date: newStartDateStr,
-                contract_end_date: newEndDateStr,
-                main_start_date: newStartDateStr,
-                main_end_date: newEndDateStr,
-                status: newStatus
-            }]);
+        // 2. โยนข้อมูลใส่ createForm เพื่อเตรียมแสดงผลบน Modal
+        setCreateForm({
+            tenant_name: oldContract.tenant_name,
+            actual_check_in_date: newStartDateStr,
+            contract_start_date: newStartDateStr,
+            contract_end_date: newEndDateStr,
+            main_room_id: oldContract.main_room_id, // เซ็ตค่าเริ่มต้นเป็นห้องเดิมไว้ก่อน
+            main_start_date: newStartDateStr,
+            main_end_date: newEndDateStr,
+            has_temp_room: false,
+            temp_room_id: '',
+            temp_start_date: '',
+            temp_end_date: '',
+            status: newStatus,
+            parent_contract_id: oldContract.id // เก็บรหัสสัญญาเก่าไว้เพื่อเอาไปบันทึก
+        });
 
-        if (insertError) {
-            alert('เกิดข้อผิดพลาด: ' + insertError.message);
-        } else {
-            if (isOldContractExpired) {
-                await supabase.from('contracts').update({ status: 'completed' }).eq('id', oldContract.id);
-            }
-            alert(`สร้างสัญญาใหม่เรียบร้อย!${isOldContractExpired ? '' : ' สัญญาใหม่จะเป็นสถานะ upcoming เนื่องจากยังไม่ครบกำหนดสัญญาเดิม'}`);
-            fetchData();
-        }
+        // 3. เปิด Modal สร้างการจอง
+        setIsCreateModalOpen(true);
     };
+
+    useEffect(() => {
+        if (!loading && contracts.length > 0) {
+            const params = new URLSearchParams(window.location.search);
+            const renewContractId = params.get('renewContractId');
+            if (renewContractId) {
+                const contractToRenew = contracts.find((c: any) => c.id === renewContractId);
+                if (contractToRenew) {
+                    handleRenewContract(contractToRenew);
+                    // Clear the query parameter from the URL
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('renewContractId');
+                    window.history.replaceState(null, '', url.pathname + url.search);
+                }
+            }
+        }
+    }, [loading, contracts]);
 
     const handleMoveStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newDate = e.target.value;
@@ -415,29 +456,32 @@ export default function BookingsPage() {
             return;
         }
 
+        const updatePayload = {
+            tenant_name: editForm.tenant_name,
+            status: editForm.status,
+            contract_start_date: editForm.contract_start_date,
+            contract_end_date: editForm.contract_end_date,
+            actual_check_in_date: editForm.actual_check_in_date,
+            main_room_id: editForm.main_room_id,
+            main_start_date: editForm.main_start_date,
+            main_end_date: editForm.main_end_date,
+            temp_room_id: editForm.has_temp_room ? editForm.temp_room_id : null,
+            temp_start_date: editForm.has_temp_room ? editForm.temp_start_date : null,
+            temp_end_date: editForm.has_temp_room ? editForm.temp_end_date : null,
+            move_to_room_id: editForm.move_to_room_id || null,
+            move_start_date: editForm.move_start_date || null,
+            move_end_date: editForm.move_end_date || null
+        };
+
         const { error } = await supabase
             .from('contracts')
-            .update({
-                tenant_name: editForm.tenant_name,
-                status: editForm.status,
-                contract_start_date: editForm.contract_start_date,
-                contract_end_date: editForm.contract_end_date,
-                actual_check_in_date: editForm.actual_check_in_date,
-                main_room_id: editForm.main_room_id,
-                main_start_date: editForm.main_start_date,
-                main_end_date: editForm.main_end_date,
-                temp_room_id: editForm.has_temp_room ? editForm.temp_room_id : null,
-                temp_start_date: editForm.has_temp_room ? editForm.temp_start_date : null,
-                temp_end_date: editForm.has_temp_room ? editForm.temp_end_date : null,
-                move_to_room_id: editForm.move_to_room_id || null,
-                move_start_date: editForm.move_start_date || null,
-                move_end_date: editForm.move_end_date || null
-            })
+            .update(updatePayload)
             .eq('id', editForm.id);
 
         if (error) {
             alert('เกิดข้อผิดพลาด: ' + error.message);
         } else {
+            await logAudit(profile, 'contracts', 'update', editForm.id, 'แก้ไขสัญญาเช่า', describeChanges(updatePayload));
             setIsEditModalOpen(false);
             fetchData();
         }
@@ -511,17 +555,24 @@ export default function BookingsPage() {
             main_room_id: createForm.main_room_id,
             main_start_date: effectiveMainStart,
             main_end_date: effectiveMainEnd,
-            status: 'active',
+
+            // --- จุดที่แก้ไข 2 บรรทัดนี้ ---
+            status: createForm.status || 'active',
+            parent_contract_id: createForm.parent_contract_id || null,
+            // -------------------------
+
             temp_room_id: createForm.has_temp_room ? createForm.temp_room_id : null,
             temp_start_date: createForm.has_temp_room ? createForm.temp_start_date : null,
             temp_end_date: createForm.has_temp_room ? createForm.temp_end_date : null,
         };
 
-        const { error } = await supabase.from('contracts').insert([payload]);
+        const { data, error } = await supabase.from('contracts').insert([payload]).select('id');
 
         if (error) {
             alert('เกิดข้อผิดพลาด: ' + error.message);
         } else {
+            const newId = data?.[0]?.id ?? null;
+            if (newId) await logAudit(profile, 'contracts', 'create', newId, 'สร้างสัญญาเช่าใหม่', payload);
             setIsCreateModalOpen(false);
             setCreateForm({
                 tenant_name: '',
@@ -536,6 +587,7 @@ export default function BookingsPage() {
                 temp_start_date: '',
                 temp_end_date: '',
                 status: 'active',
+                parent_contract_id: null, // เพิ่มตรงนี้
             });
             fetchData();
         }
@@ -615,6 +667,26 @@ export default function BookingsPage() {
         }
     };
 
+    const getIntentionBadge = (contractId: string) => {
+        const intentionObj = intentions.find(i => i.contract_id === contractId);
+        if (!intentionObj) return null;
+
+        const config: any = {
+            pending: { label: 'รอตอบกลับ', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', icon: '⏳' },
+            renew: { label: 'ต่อสัญญา', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300', icon: '✅' },
+            not_renew: { label: 'ไม่ต่อสัญญา', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-300', icon: '🚪' },
+        };
+
+        const cfg = config[intentionObj.intention];
+        if (!cfg) return null;
+
+        return (
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border shadow-sm ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                {cfg.icon} {cfg.label}
+            </span>
+        );
+    };
+
     const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all";
     const labelCls = "block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2";
 
@@ -678,46 +750,44 @@ export default function BookingsPage() {
     };
 
     return (
-        <div className="min-h-full flex flex-col bg-[#F0F4F8]">
+        <div className="min-h-full flex flex-col bg-transparent">
             <div className="flex-1 p-8 md:p-10">
 
                 {/* Header */}
                 <div className="flex justify-between items-end mb-8">
-                    <div>
-                        <h1 className="text-[28px] font-bold text-[#0A2647] tracking-tight">การจอง</h1>
-                        <p className="text-sm text-slate-500 mt-1">จัดการการจองและการจัดสรรห้องของลูกบ้านทั้งหมด</p>
-                    </div>
 
                     {/* ── NEW: Create booking button ── */}
-                    <button
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 px-5 py-3 bg-[#4F81FF] hover:bg-[#3D6CE5] text-white rounded-2xl text-sm font-bold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-95"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-                        </svg>
-                        สร้างการจอง
-                    </button>
+                    {isEditable && (
+                        <button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="flex items-center gap-2 px-5 py-3 bg-[#4F81FF] hover:bg-[#3D6CE5] text-white rounded-2xl text-sm font-bold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-95"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                            </svg>
+                            สร้างการจอง
+                        </button>
+                    )}
                 </div>
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
                     <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl">📄</div>
+                        <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl">📋</div>
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">สัญญาทั้งหมด</p>
                             <p className="text-2xl font-bold text-[#0A2647]">{contracts.length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
                         </div>
                     </div>
                     <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl">🟢</div>
+                        <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl">✅</div>
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">สัญญา Active</p>
                             <p className="text-2xl font-bold text-[#0A2647]">{contracts.filter(c => c.status === 'active').length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
                         </div>
                     </div>
                     <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-red-100 text-red-500 rounded-2xl flex items-center justify-center text-2xl">⚠️</div>
+                        <div className="w-14 h-14 bg-red-100 text-red-500 rounded-2xl flex items-center justify-center text-2xl">⏳</div>
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">ต้องดำเนินการ</p>
                             <p className="text-2xl font-bold text-[#0A2647]">
@@ -735,7 +805,7 @@ export default function BookingsPage() {
                         <div className="animate-spin rounded-full h-10 w-10 border-b-4 border-[#4F81FF]"></div>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-4">
                         {contracts.map((contract) => {
                             const needsTempRoom = contract.actual_check_in_date &&
                                 contract.main_start_date &&
@@ -760,115 +830,173 @@ export default function BookingsPage() {
                             return (
                                 <div
                                     key={contract.id}
-                                    className={`bg-white rounded-2xl p-4 flex flex-col md:flex-row md:items-center gap-3 md:gap-4 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.06)] border border-slate-100 transition-all group ${contract.status === 'cancelled' ? 'opacity-60' : ''}`}
+                                    className={`bg-white rounded-2xl p-4 lg:p-5 flex flex-col lg:flex-row gap-4 lg:gap-6 shadow-sm hover:shadow-md border border-slate-100 transition-all duration-200 group ${contract.status === 'cancelled' ? 'opacity-60 grayscale-[20%]' : ''}`}
                                 >
-                                    {/* <div className="w-12 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 font-semibold text-sm">
+                                    {/* 1. ไอคอนเลขห้อง (ปรับขนาดให้สมดุลกับความสูงเนื้อหา) */}
+                                    <button
+                                        type="button"
+                                        onClick={() => currentRoomId && handleRoomClick(currentRoomId)}
+                                        disabled={!currentRoomId}
+                                        className={`w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-lg shadow-sm transition-all ${currentRoomId ? 'hover:bg-slate-100 hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
+                                        title={currentRoomId ? "ดูรายละเอียดห้อง" : undefined}
+                                    >
                                         {currentRoomId ? getonlyRoomNumber(currentRoomId) : '-'}
-                                    </div> */}
+                                    </button>
 
-                                    <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-semibold text-sm">
-                                        {currentRoomId ? getonlyRoomNumber(currentRoomId) : '-'}
-                                    </div>
+                                    {/* 2. เนื้อหาหลัก (ใช้ min-w-0 เพื่อป้องกันปัญหา Flex overflow ล้นจอ) */}
+                                    <div className="flex-1 min-w-0 flex flex-col md:flex-row gap-4 md:gap-6 items-start md:items-center">
 
-                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
-                                        <div className="md:col-span-3">
-                                            <h3 className="text-base font-bold text-slate-800">{contract.tenant_name}</h3>
-                                            <div className="mt-1">{getStatusBadge(contract.status)}</div>
+                                        {/* ข้อมูลผู้เช่า */}
+                                        <div className="md:w-1/3 shrink-0 flex flex-col justify-center">
+                                            <h3 className="text-base font-bold text-slate-800 truncate" title={contract.tenant_name}>
+                                                {contract.tenant_name}
+                                            </h3>
+
+                                            {/* --- ส่วนที่เพิ่มใหม่: วันที่สัญญา --- */}
+                                            <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                <span>{contract.contract_start_date ? formatDateTH(contract.contract_start_date) : '-'}</span>
+                                                <span className="mx-1">-</span>
+                                                <span>{contract.contract_end_date ? formatDateTH(contract.contract_end_date) : '-'}</span>
+                                            </div>
+                                            {/* ----------------------------- */}
+
+                                            <div className="mt-2 flex items-center flex-wrap gap-2">
+                                                {getStatusBadge(contract.status)}
+                                                {getIntentionBadge(contract.id)}
+                                            </div>
                                         </div>
 
-                                        <div className="md:col-span-8">
-                                            <div className="flex flex-wrap gap-2">
-                                                {needsTempRoom && (
-                                                    <span className="bg-red-50 text-red-600 border border-red-200/60 text-xs px-3 py-1.5 rounded-lg font-medium animate-pulse">
-                                                        🚨 ต้องระบุห้องชั่วคราว
-                                                    </span>
-                                                )}
-                                                {missingMainRoom && (
-                                                    <span className="bg-amber-50 text-amber-700 border border-amber-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">
-                                                        ⚠️ ยังไม่ระบุห้องหลัก
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            <div className="mt-4 flex flex-row flex-nowrap gap-3 text-sm text-slate-700 items-start justify-start overflow-x-auto pb-2">
-                                                {contract.temp_room_id && (
-                                                    <div className="flex-shrink-0 w-full max-w-[180px] rounded-2xl border border-amber-200/70 bg-amber-50 p-3 min-h-[100px] flex flex-col justify-between">
-                                                        <div>
-                                                            <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-1">ห้องพักชั่วคราว</div>
-                                                            <div className="font-semibold text-slate-900">{getRoomNumber(contract.temp_room_id)}</div>
-                                                        </div>
-                                                        <div className="text-xs text-slate-600 mt-1">
-                                                            {formatDateTH(contract.temp_start_date) || '-'} — {formatDateTH(contract.temp_end_date) || '-'}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <div className="flex-shrink-0 w-full max-w-[180px] rounded-2xl border border-slate-200 bg-slate-50 p-3 min-h-[100px] flex flex-col justify-between">
-                                                    <div>
-                                                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">ห้องพักหลัก</div>
-                                                        <div className="font-semibold text-slate-900">
-                                                            {contract.main_room_id ? getRoomNumber(contract.main_room_id) : 'ยังไม่ระบุห้องหลัก'}
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-xs text-slate-600 mt-1">
-                                                        {formatDateTH(contract.main_start_date) || '-'} — {formatDateTH(contract.main_end_date) || '-'}
-                                                    </div>
+                                        {/* ข้อมูลห้องและการแจ้งเตือน */}
+                                        <div className="md:w-2/3 min-w-0 flex flex-col gap-3">
+                                            {/* ป้ายเตือนต่างๆ */}
+                                            {(needsTempRoom || missingMainRoom) && (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {needsTempRoom && (
+                                                        <span className="bg-red-50 text-red-600 border border-red-200/60 text-xs px-3 py-1.5 rounded-lg font-medium animate-pulse flex items-center gap-1.5">
+                                                            🚨 ต้องระบุห้องชั่วคราว
+                                                        </span>
+                                                    )}
+                                                    {missingMainRoom && (
+                                                        <span className="bg-amber-50 text-amber-700 border border-amber-200/60 text-xs px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5">
+                                                            ⚠️ ยังไม่ระบุห้องหลัก
+                                                        </span>
+                                                    )}
                                                 </div>
+                                            )}
+
+                                            {/* การ์ดห้องพัก (Scroll แนวนอนแบบไม่เห็น Scrollbar) */}
+                                            <div className="flex flex-row flex-nowrap gap-3 text-sm overflow-x-auto pb-1 min-w-0 scrollbar-hide">
+                                                {contract.temp_room_id && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRoomClick(contract.temp_room_id)}
+                                                        className="shrink-0 w-[150px] rounded-xl border border-amber-200/70 bg-amber-50 p-3 min-h-[90px] flex flex-col justify-between text-left hover:bg-amber-100/50 hover:border-amber-300 hover:shadow-sm hover:scale-[1.02] active:scale-95 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-amber-400/50"
+                                                        title="คลิกเพื่อดูรายละเอียดห้องชั่วคราว"
+                                                    >
+                                                        <div>
+                                                            <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 mb-0.5">ห้องพักชั่วคราว</div>
+                                                            <div className="font-bold text-slate-900">{getRoomNumber(contract.temp_room_id)}</div>
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-600 mt-2 truncate">
+                                                            {formatDateTH(contract.temp_start_date) || '-'} - {formatDateTH(contract.temp_end_date) || '-'}
+                                                        </div>
+                                                    </button>
+                                                )}
+
+                                                {contract.main_room_id ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRoomClick(contract.main_room_id)}
+                                                        className="shrink-0 w-[150px] rounded-xl border border-slate-200 bg-slate-50 p-3 min-h-[90px] flex flex-col justify-between text-left hover:bg-slate-100/80 hover:border-slate-300 hover:shadow-sm hover:scale-[1.02] active:scale-95 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-slate-300"
+                                                        title="คลิกเพื่อดูรายละเอียดห้องหลัก"
+                                                    >
+                                                        <div>
+                                                            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">ห้องพักหลัก</div>
+                                                            <div className="font-bold text-slate-900 truncate">
+                                                                {getRoomNumber(contract.main_room_id)}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-600 mt-2 truncate">
+                                                            {formatDateTH(contract.main_start_date) || '-'} - {formatDateTH(contract.main_end_date) || '-'}
+                                                        </div>
+                                                    </button>
+                                                ) : (
+                                                    <div className="shrink-0 w-[150px] rounded-xl border border-slate-200 bg-slate-50 p-3 min-h-[90px] flex flex-col justify-between opacity-60">
+                                                        <div>
+                                                            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">ห้องพักหลัก</div>
+                                                            <div className="font-bold text-slate-400 truncate">
+                                                                ยังไม่ระบุห้อง
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-400 mt-2 truncate">
+                                                            {formatDateTH(contract.main_start_date) || '-'} - {formatDateTH(contract.main_end_date) || '-'}
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {contract.move_to_room_id && (
-                                                    <div className="flex-shrink-0 w-full max-w-[180px] rounded-2xl border border-sky-200 bg-sky-50 p-3 min-h-[100px] flex flex-col justify-between">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRoomClick(contract.move_to_room_id)}
+                                                        className="shrink-0 w-[150px] rounded-xl border border-sky-200 bg-sky-50 p-3 min-h-[90px] flex flex-col justify-between text-left hover:bg-sky-100/50 hover:border-sky-300 hover:shadow-sm hover:scale-[1.02] active:scale-95 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-sky-300"
+                                                        title="คลิกเพื่อดูรายละเอียดห้องที่ย้ายไป"
+                                                    >
                                                         <div>
-                                                            <div className="text-xs font-semibold uppercase tracking-wider text-sky-700 mb-1">ย้ายห้อง</div>
-                                                            <div className="font-semibold text-slate-900">{getRoomNumber(contract.move_to_room_id)}</div>
+                                                            <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-700 mb-0.5">ย้ายห้องไปที่</div>
+                                                            <div className="font-bold text-slate-900">{getRoomNumber(contract.move_to_room_id)}</div>
                                                         </div>
-                                                        <div className="text-xs text-slate-600 mt-1">
-                                                            {formatDateTH(contract.move_start_date) || '-'} — {formatDateTH(contract.move_end_date) || '-'}
+                                                        <div className="text-[11px] text-slate-600 mt-2 truncate">
+                                                            {formatDateTH(contract.move_start_date) || '-'} - {formatDateTH(contract.move_end_date) || '-'}
                                                         </div>
-                                                    </div>
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
-
-                                        
                                     </div>
 
-                                    <div className="flex items-center gap-2 md:pl-6 md:border-l border-slate-100 pt-3 md:pt-0 border-t md:border-t-0 mt-3 md:mt-0">
-                                        <button
-                                            onClick={() => handleEditClick(contract)}
-                                            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-[#4F81FF] transition-colors"
-                                            title="แก้ไข"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                        </button>
+                                    {/* 3. ปุ่ม Action (จัดเรียงชิดขวา และปรับความสูงให้เท่ากันที่พิกัด 38px/40px) */}
+                                    {isEditable && (
+                                        <div className="flex flex-wrap items-center justify-end gap-2 lg:pl-6 lg:border-l border-slate-100 pt-4 lg:pt-0 border-t lg:border-t-0 mt-2 lg:mt-0 shrink-0">
+                                            <button
+                                                onClick={() => handleEditClick(contract)}
+                                                className="h-[38px] w-[38px] rounded-xl border border-transparent flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                                                title="แก้ไขข้อมูล"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                            </button>
 
-                                        {contract.status !== 'cancelled' && (
-                                            <>
-                                                <button
-                                                    onClick={() => handleRenewContract(contract)}
-                                                    className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 px-4 py-2 rounded-xl text-sm font-semibold ml-1 transition-all flex items-center gap-1.5"
-                                                >
-                                                    ต่อสัญญา <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                                </button>
-                                                <button
-                                                    onClick={() => openCancelModal(contract)}
-                                                    className="bg-red-50 hover:bg-red-500 text-red-600 hover:text-white border border-red-200 hover:border-red-500 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2"
-                                                    title="ยกเลิกสัญญา"
-                                                >
-                                                    ยกเลิกสัญญา
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
+                                            {contract.status !== 'cancelled' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleRenewContract(contract)}
+                                                        className="h-[38px] bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 px-4 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5"
+                                                    >
+                                                        ต่อสัญญา
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => openCancelModal(contract)}
+                                                        className="h-[38px] bg-red-50 hover:bg-red-500 text-red-600 hover:text-white border border-red-200 hover:border-red-500 px-4 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5"
+                                                        title="ยกเลิกสัญญา"
+                                                    >
+                                                        ยกเลิกสัญญา
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
 
+                        {/* Empty State */}
                         {contracts.length === 0 && (
-                            <div className="text-center py-20 text-slate-400 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
-                                <div className="text-5xl mb-4">📭</div>
-                                <p className="font-medium text-lg text-slate-600">ยังไม่มีสัญญาเช่า</p>
-                                <p className="text-sm mt-1">สัญญาจะปรากฏที่นี่หลังจากจัดสรรห้องเรียบร้อยแล้ว</p>
+                            <div className="text-center py-16 text-slate-400 bg-white/50 rounded-3xl border border-slate-200 border-dashed flex flex-col items-center">
+                                <div className="text-5xl mb-4 opacity-50 grayscale">📭</div>
+                                <p className="font-semibold text-lg text-slate-600">ยังไม่มีสัญญาเช่า</p>
+                                <p className="text-sm mt-1 text-slate-500">สัญญาจะปรากฏที่นี่หลังจากจัดสรรห้องเรียบร้อยแล้ว</p>
                             </div>
                         )}
                     </div>
@@ -942,7 +1070,6 @@ export default function BookingsPage() {
                                             value={createForm.contract_end_date}
                                             readOnly
                                         />
-                                        <p className="mt-2 text-[11px] text-slate-500">สัญญาจะสิ้นสุด 1 ปีถัดไปจากวันเริ่มต้น</p>
                                     </div>
                                     <div>
                                         <label className={labelCls}>วันเข้าพักจริง</label>
@@ -951,6 +1078,17 @@ export default function BookingsPage() {
                                             className={inputCls}
                                             value={createForm.actual_check_in_date}
                                             onChange={(e) => setCreateForm({ ...createForm, actual_check_in_date: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    {/* เพิ่มช่องกรอกราคาเป็นnumeric contracts.monthly_rent */}
+                                    <div>
+                                        <label className={labelCls}>ราคาเช่าต่อเดือน</label>
+                                        <input
+                                            type="number"
+                                            className={inputCls}
+                                            value={createForm.monthly_rent}
+                                            onChange={(e) => setCreateForm({ ...createForm, monthly_rent: parseFloat(e.target.value) || 0 })}
                                             required
                                         />
                                     </div>
@@ -1254,7 +1392,7 @@ export default function BookingsPage() {
                                     value={cancelEndDate}
                                     onChange={(e) => setCancelEndDate(e.target.value)}
                                 />
-                                <p className="mt-2 text-sm text-slate-500">{cancelEndDate ? new Date(cancelEndDate).toLocaleDateString('th-TH') : '-'}</p>
+                                {/* <p className="mt-2 text-sm text-slate-500">{cancelEndDate ? new Date(cancelEndDate).toLocaleDateString('th-TH') : '-'}</p> */}
                             </div>
                         </div>
                         <div className="px-8 py-5 border-t border-slate-100 flex gap-4 shrink-0">
@@ -1345,12 +1483,14 @@ export default function BookingsPage() {
                                         <label className={labelCls}>วันเริ่มสัญญา</label>
                                         <input type="date" className={inputCls}
                                             value={editForm.contract_start_date || ''}
+                                            disabled
                                             onChange={(e) => setEditForm({ ...editForm, contract_start_date: e.target.value })} />
                                     </div>
                                     <div>
                                         <label className={labelCls}>วันสิ้นสุดสัญญา</label>
                                         <input type="date" className={inputCls}
                                             value={editForm.contract_end_date || ''}
+                                            disabled
                                             onChange={(e) => setEditForm({ ...editForm, contract_end_date: e.target.value })} />
                                     </div>
                                 </div>
@@ -1803,6 +1943,128 @@ export default function BookingsPage() {
                                     })()}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Room Details Modal ─── */}
+            {selectedRoomForDetail && (
+                <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        {/* Modal Header */}
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center shrink-0">
+                            <div>
+                                <h2 className="text-xl font-bold text-[#0A2647]">ข้อมูลห้องพัก</h2>
+                                <p className="text-sm text-slate-500 mt-0.5">รายละเอียดและสิ่งอำนวยความสะดวก</p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedRoomForDetail(null)}
+                                className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-8 space-y-6 overflow-y-auto">
+                            {/* Main Header visual */}
+                            <div className="flex items-center gap-5 bg-slate-50 border border-slate-100 rounded-3xl p-5">
+                                <div className="w-16 h-16 bg-[#4F81FF] text-white rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg shadow-blue-500/20">
+                                    🚪
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-[#0A2647]">ห้อง {selectedRoomForDetail.room_number}</h3>
+                                    <p className="text-sm text-slate-500 font-medium">
+                                        ตึก {selectedRoomForDetail.building || '-'} · ชั้น {selectedRoomForDetail.floor != null ? selectedRoomForDetail.floor : '-'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Features List */}
+                            <div className="space-y-4">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">คุณลักษณะของห้อง</p>
+
+                                <div className="grid grid-cols-1 gap-3.5">
+                                    {/* ประเภทห้อง */}
+                                    <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-lg">🛏️</span>
+                                            <span className="text-sm font-semibold text-slate-500">ประเภทห้อง</span>
+                                        </div>
+                                        <span className="text-sm font-bold text-slate-800 bg-white border border-slate-200/60 px-3 py-1 rounded-xl">
+                                            {selectedRoomForDetail.room_type || 'ไม่ระบุ'}
+                                        </span>
+                                    </div>
+
+                                    {/* ประเภทครัว */}
+                                    <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-lg">🍳</span>
+                                            <span className="text-sm font-semibold text-slate-500">ประเภทครัว</span>
+                                        </div>
+                                        <span className="text-sm font-bold text-slate-800 bg-white border border-slate-200/60 px-3 py-1 rounded-xl">
+                                            {selectedRoomForDetail.kitchen_type || 'ไม่ระบุ'}
+                                        </span>
+                                    </div>
+
+                                    {/* ทิศ / วิว */}
+                                    <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-lg">🌅</span>
+                                            <span className="text-sm font-semibold text-slate-500">ทิศ / วิว</span>
+                                        </div>
+                                        <span className="text-sm font-bold text-slate-800 bg-white border border-slate-200/60 px-3 py-1 rounded-xl">
+                                            {selectedRoomForDetail.view_direction || 'ไม่ระบุ'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Occupancy Status Section */}
+                            <div className="pt-4 border-t border-slate-100 space-y-3">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">สถานะการใช้งานปัจจุบัน</p>
+                                {(() => {
+                                    const activeContract = contracts.find(
+                                        c => c.status === 'active' && getCurrentRoomId(c) === selectedRoomForDetail.id
+                                    );
+
+                                    if (activeContract) {
+                                        return (
+                                            <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-4 space-y-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                                                    <span className="text-sm font-bold text-amber-800">มีผู้เข้าพักในขณะนี้</span>
+                                                </div>
+                                                <div className="text-xs text-amber-700 space-y-1">
+                                                    <p className="font-semibold">ผู้เช่า: <span className="text-slate-900 font-bold">{activeContract.tenant_name}</span></p>
+                                                    <p>
+                                                        ระยะเวลาสัญญา: {formatDateTH(activeContract.contract_start_date) || '-'} - {formatDateTH(activeContract.contract_end_date) || '-'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    } else {
+                                        return (
+                                            <div className="bg-emerald-50 border border-emerald-200/60 rounded-2xl p-4 flex items-center gap-3">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                                <span className="text-sm font-bold text-emerald-800">ว่าง (ไม่มีผู้พักอาศัยในปัจจุบัน)</span>
+                                            </div>
+                                        );
+                                    }
+                                })()}
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="px-8 py-5 border-t border-slate-100 bg-slate-50 flex gap-3 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedRoomForDetail(null)}
+                                className="w-full px-6 py-3.5 text-sm font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all text-center"
+                            >
+                                ปิดหน้าต่าง
+                            </button>
                         </div>
                     </div>
                 </div>

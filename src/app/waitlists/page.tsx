@@ -3,7 +3,10 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '../../context/AuthContext';
+import { canEditPage } from '../../lib/permissions';
+import { logAudit, describeChanges } from '../../lib/audit';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,14 +24,22 @@ interface Waitlist {
     special_request: string;
     bed_size: string; // เพิ่มฟิลด์ขนาดเตียง
     preferred_floors: number[]; // เพิ่มฟิลด์ชั้นที่ต้องการเป็น Array
+    monthly_rent?: number; // เพิ่มราคาค่าเช่าต่อเดือน
+    status?: string;
+    created_at?: string;
+    queue_number?: number;
 }
 
 export default function BookingsPage() {
+    const { profile } = useAuth();
+    const isEditable = canEditPage(profile, 'waitlists');
+
     const router = useRouter();
     const [items, setItems] = useState<Waitlist[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+
 
     const [formData, setFormData] = useState({
         name: '',
@@ -39,12 +50,21 @@ export default function BookingsPage() {
         preferred_floors: [] as number[], // ค่าเริ่มต้นชั้น (Array ว่าง)
         start_date: '',
         end_date: '',
-        special_request: ''
+        special_request: '',
+        monthly_rent: '' as string | number
     });
+
+    const searchParams = useSearchParams();
 
     useEffect(() => {
         fetchWaitlist();
     }, []);
+
+    useEffect(() => {
+        if (isEditable && searchParams.get('quickAction') === 'newWaitlist') {
+            handleAddNew();
+        }
+    }, [searchParams, isEditable]);
 
     const calculateEndDate = (startDate: string) => {
         if (!startDate) return '';
@@ -109,14 +129,24 @@ export default function BookingsPage() {
 
     async function fetchWaitlist() {
         setLoading(true);
+        // ดึงข้อมูลทั้งหมดเพื่อคำนวณคิวที่แท้จริง
         const { data } = await supabase
             .from('waitlists')
             .select('*')
-            .not('status', 'eq', 'จัดสรรห้องแล้ว')
-            // 👇 เปลี่ยนตรงนี้เป็น ascending: true เพื่อให้คิวที่จองก่อนขึ้นก่อน
+            // 👇 ให้คิวที่จองก่อนขึ้นก่อน
             .order('created_at', { ascending: true });
 
-        if (data) setItems(data);
+        if (data) {
+            // กำหนดหมายเลขคิวจากลำดับทั้งหมด (เพื่อไม่ให้คิวเลื่อนเมื่อคนก่อนหน้าได้ห้องแล้ว)
+            const dataWithQueue = data.map((item: any, index: number) => ({
+                ...item,
+                queue_number: index + 1
+            }));
+
+            // กรองเฉพาะคนที่ยังไม่จัดสรรห้อง
+            const activeItems = dataWithQueue.filter((item: any) => item.status !== 'จัดสรรห้องแล้ว');
+            setItems(activeItems);
+        }
         setLoading(false);
     }
 
@@ -127,7 +157,8 @@ export default function BookingsPage() {
             name: '', room_type: 'One Bedroom',
             kitchen_type: 'ครัวหลัง', view_preference: 'ทิศตะวันออก',
             bed_size: '3.5 ฟุต', preferred_floors: [],
-            start_date: '', end_date: '', special_request: ''
+            start_date: '', end_date: '', special_request: '',
+            monthly_rent: ''
         });
     };
 
@@ -147,46 +178,67 @@ export default function BookingsPage() {
             preferred_floors: item.preferred_floors || [],
             start_date: item.start_date,
             end_date: item.end_date,
-            special_request: item.special_request || ''
+            special_request: item.special_request || '',
+            monthly_rent: item.monthly_rent !== undefined && item.monthly_rent !== null ? item.monthly_rent : ''
         });
         setIsModalOpen(true);
     };
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        const payload = {
+            ...formData,
+            monthly_rent: formData.monthly_rent !== '' ? Number(formData.monthly_rent) : null
+        };
+
         if (editingId) {
-            const { error } = await supabase.from('waitlists').update(formData).eq('id', editingId);
-            if (error) alert(`เกิดข้อผิดพลาด: ${error.message}`);
-            else { closeModal(); fetchWaitlist(); }
+            const { error } = await supabase.from('waitlists').update(payload).eq('id', editingId);
+            if (error) {
+                alert(`เกิดข้อผิดพลาด: ${error.message}`);
+            } else {
+                await logAudit(profile, 'waitlists', 'update', editingId, 'แก้ไขรายการจอง', describeChanges(payload));
+                closeModal();
+                fetchWaitlist();
+            }
         } else {
-            const { error } = await supabase.from('waitlists').insert([formData]);
-            if (error) alert('เกิดข้อผิดพลาดในการบันทึก');
-            else { closeModal(); fetchWaitlist(); }
+            const { data, error } = await supabase.from('waitlists').insert([payload]).select('id');
+            if (error) {
+                alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
+            } else {
+                const newId = data?.[0]?.id ?? null;
+                if (newId) await logAudit(profile, 'waitlists', 'create', newId, 'เพิ่มรายการจอง', payload);
+                closeModal();
+                fetchWaitlist();
+            }
         }
     }
 
     async function deleteItem(id: string) {
         if (confirm('ยืนยันการลบรายการจองนี้?')) {
-            await supabase.from('waitlists').delete().eq('id', id);
-            fetchWaitlist();
+            const { error } = await supabase.from('waitlists').delete().eq('id', id);
+            if (!error) {
+                await logAudit(profile, 'waitlists', 'delete', id, 'ลบรายการจอง', null);
+                fetchWaitlist();
+            } else {
+                alert('ไม่สามารถลบรายการได้: ' + error.message);
+            }
         }
     }
 
     const isKitchenDisabled = ['One Bedroom', 'Triple Room', 'One Bedroom Suite'].includes(formData.room_type);
 
     return (
-        <div className="min-h-full flex flex-col bg-[#F0F4F8]">
+        <div className="min-h-full flex flex-col bg-transparent">
             {/* Content Area */}
             <div className="flex-1 p-8 md:p-10">
                 <div className="flex justify-between items-end mb-8">
-                    <div>
-                        <h1 className="text-[28px] font-bold text-[#0A2647] tracking-tight">จองไม่ระบุห้องพัก</h1>
-                        <p className="text-sm text-slate-500 mt-1">จัดการคิวลูกค้าที่รอเลือกห้องพักทั้งหมด</p>
-                    </div>
-                    <button onClick={handleAddNew} className="bg-[#4F81FF] hover:bg-[#3D6CE5] text-white px-6 py-3 rounded-2xl font-medium shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all active:scale-95">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-                        เพิ่มรายการจอง
-                    </button>
+                
+                    {isEditable && (
+                        <button onClick={handleAddNew} className="bg-[#4F81FF] hover:bg-[#3D6CE5] text-white px-6 py-3 rounded-2xl font-medium shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all active:scale-95">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                            เพิ่มรายการจอง
+                        </button>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
@@ -209,7 +261,7 @@ export default function BookingsPage() {
                             <div key={item.id} className="bg-white rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4 md:gap-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.06)] border border-slate-100 transition-all group">
 
                                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 font-bold text-lg hidden md:flex">
-                                    {item.name.charAt(0)}
+                                    {item.queue_number}
                                 </div>
 
                                 <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
@@ -222,7 +274,7 @@ export default function BookingsPage() {
                                         )}
                                     </div>
 
-                                    <div className="md:col-span-5 flex flex-wrap gap-2">
+                                    <div className="md:col-span-4 flex flex-wrap gap-2">
                                         <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🚪 {item.room_type}</span>
                                         <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🍳 {item.kitchen_type}</span>
                                         {item.bed_size && (
@@ -233,7 +285,14 @@ export default function BookingsPage() {
                                         )}
                                     </div>
 
-                                    <div className="md:col-span-4">
+                                    <div className="md:col-span-2">
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ค่าเช่าต่อเดือน</p>
+                                        <span className="text-xs font-extrabold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-lg inline-block">
+                                            {item.monthly_rent ? `${item.monthly_rent.toLocaleString('th-TH')} บาท` : '-'}
+                                        </span>
+                                    </div>
+
+                                    <div className="md:col-span-3">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ระยะเวลาสัญญา</p>
                                         <p className="text-xs text-slate-700 font-medium bg-slate-50 inline-block px-3 py-1.5 rounded-lg border border-slate-100">
                                             {new Date(item.start_date).toLocaleDateString('en-GB')} - {new Date(item.end_date).toLocaleDateString('en-GB')}
@@ -241,17 +300,19 @@ export default function BookingsPage() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 md:pl-6 md:border-l border-slate-100 pt-3 md:pt-0 border-t md:border-t-0 mt-3 md:mt-0">
-                                    <button onClick={() => handleEdit(item)} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-[#4F81FF] transition-colors" title="แก้ไข">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                    </button>
-                                    <button onClick={() => deleteItem(item.id)} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-red-500 transition-colors" title="ลบ">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                    </button>
-                                    <button onClick={() => router.push(`/allocate/${item.id}`)} className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 px-4 py-2 rounded-xl text-sm font-semibold ml-2 transition-all flex items-center gap-2">
-                                        จัดสรรห้อง <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                                    </button>
-                                </div>
+                                {isEditable && (
+                                    <div className="flex items-center gap-2 md:pl-6 md:border-l border-slate-100 pt-3 md:pt-0 border-t md:border-t-0 mt-3 md:mt-0">
+                                        <button onClick={() => handleEdit(item)} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-[#4F81FF] transition-colors" title="แก้ไข">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                        </button>
+                                        <button onClick={() => deleteItem(item.id)} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-red-500 transition-colors" title="ลบ">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                        <button onClick={() => router.push(`/allocate/${item.id}`)} className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 px-4 py-2 rounded-xl text-sm font-semibold ml-2 transition-all flex items-center gap-2">
+                                            จัดสรรห้อง <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         ))}
                         {items.length === 0 && (
@@ -376,6 +437,17 @@ export default function BookingsPage() {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">สิ้นสุดสัญญา (อัตโนมัติ 1 ปี)</label>
                                     <input type="date" required className="w-full bg-slate-100 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-500 outline-none cursor-not-allowed" value={formData.end_date} readOnly />
+                                </div>
+
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ค่าเช่าต่อเดือน (บาท)</label>
+                                    <input
+                                        type="number"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all"
+                                        value={formData.monthly_rent}
+                                        onChange={(e) => setFormData({ ...formData, monthly_rent: e.target.value })}
+                                        placeholder="เช่น 5500, 6000"
+                                    />
                                 </div>
 
                                 <div className="col-span-2">

@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
+import { useAuth } from '../../context/AuthContext';
+import { canEditPage, canEdit } from '../../lib/permissions';
+import { logAudit, describeChanges } from '../../lib/audit';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,6 +23,8 @@ interface Room {
 }
 
 export default function RoomsPage() {
+    const { profile } = useAuth();
+    const userCanEdit = canEditPage(profile, 'rooms');
     const [rooms, setRooms] = useState<Room[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,9 +37,17 @@ export default function RoomsPage() {
         view_direction: 'ทิศตะวันออก'
     });
 
+    const searchParams = useSearchParams();
+
     useEffect(() => {
         fetchRooms();
     }, []);
+
+    useEffect(() => {
+        if (canEdit(profile?.role) && searchParams.get('quickAction') === 'newRoom') {
+            handleOpenModal();
+        }
+    }, [searchParams, profile?.role]);
 
     useEffect(() => {
         let newKitchen = formData.kitchen_type;
@@ -130,13 +144,23 @@ export default function RoomsPage() {
                 .update(payload)
                 .eq('id', editId);
 
-            if (error) alert('เกิดข้อผิดพลาดในการแก้ไข: ' + error.message);
+            if (error) {
+                alert('เกิดข้อผิดพลาดในการแก้ไข: ' + error.message);
+            } else {
+                await logAudit(profile, 'rooms', 'update', editId, 'แก้ไขข้อมูลห้อง', describeChanges(payload));
+            }
         } else {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('rooms')
-                .insert([payload]);
+                .insert([payload])
+                .select('id');
 
-            if (error) alert('เกิดข้อผิดพลาดในการเพิ่มข้อมูล: ' + error.message);
+            if (error) {
+                alert('เกิดข้อผิดพลาดในการเพิ่มข้อมูล: ' + error.message);
+            } else {
+                const newId = data?.[0]?.id ?? null;
+                if (newId) await logAudit(profile, 'rooms', 'create', newId, 'เพิ่มข้อมูลห้อง', payload);
+            }
         }
 
         setIsModalOpen(false);
@@ -149,6 +173,7 @@ export default function RoomsPage() {
             if (error) {
                 alert('ไม่สามารถลบได้ อาจมีข้อมูลผูกอยู่กับห้องนี้');
             } else {
+                await logAudit(profile, 'rooms', 'delete', id, 'ลบข้อมูลห้อง', null);
                 fetchRooms();
             }
         }
@@ -160,10 +185,7 @@ export default function RoomsPage() {
         <div className="flex-1 p-8 md:p-10">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-8">
-                <div>
-                    <h1 className="text-[28px] font-bold text-[#0A2647] tracking-tight">จัดการข้อมูลห้องพัก</h1>
-                    <p className="text-sm text-slate-500 mt-1">เพิ่ม แก้ไข และจัดการข้อมูลห้องพัก (Rooms) ทั้งหมดในระบบ</p>
-                </div>
+                {userCanEdit && (
                 <button
                     onClick={() => handleOpenModal()}
                     className="bg-[#4F81FF] hover:bg-[#3D6CE5] text-white px-6 py-3 rounded-2xl font-medium shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all active:scale-95 whitespace-nowrap"
@@ -171,6 +193,7 @@ export default function RoomsPage() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                     เพิ่มห้องพักใหม่
                 </button>
+                )}
             </div>
 
             {/* Summary Cards */}
@@ -236,12 +259,16 @@ export default function RoomsPage() {
                                             )}
                                         </td>
                                         <td className="p-5 pr-8 text-right space-x-2">
+                                            {userCanEdit && (
+                                            <>
                                             <button onClick={() => handleOpenModal(room)} className="p-2 rounded-xl text-slate-400 hover:bg-blue-50 hover:text-[#4F81FF] transition-colors" title="แก้ไข">
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                             </button>
                                             <button onClick={() => handleDelete(room.id, room.room_number)} className="p-2 rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors" title="ลบ">
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                             </button>
+                                            </>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

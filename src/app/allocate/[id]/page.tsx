@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
+import { useAuth } from '../../../context/AuthContext';
+import { canEdit } from '../../../lib/permissions';
+import { logAudit, describeChanges } from '../../../lib/audit';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,6 +22,7 @@ interface Waitlist {
     end_date: string;
     status: string;
     special_request?: string;
+    monthly_rent?: number;
 }
 
 interface Room {
@@ -46,6 +50,7 @@ interface Contract {
 }
 
 export default function AllocateRoomPage() {
+    const { profile, loading: authLoading } = useAuth();
     const params = useParams();
     const router = useRouter();
     const waitlistId = params.id as string;
@@ -55,8 +60,8 @@ export default function AllocateRoomPage() {
     const [allContracts, setAllContracts] = useState<Contract[]>([]);
 
     const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-    const [assignAs, setAssignAs] = useState<'main' | 'temp'>('main'); 
-    
+    const [assignAs, setAssignAs] = useState<'main' | 'temp'>('main');
+
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(true);
     const [actualCheckInDate, setActualCheckInDate] = useState<string>('');
@@ -75,11 +80,11 @@ export default function AllocateRoomPage() {
     useEffect(() => {
         if (assignAs === 'temp' && selectedRoomId && waitlist) {
             const { availableUntil } = getRoomAvailability(selectedRoomId, waitlist.start_date);
-            
+
             if (availableUntil) {
                 const defaultEndDate = new Date(availableUntil);
                 defaultEndDate.setDate(defaultEndDate.getDate() - 1);
-                
+
                 const yyyy = defaultEndDate.getFullYear();
                 const mm = String(defaultEndDate.getMonth() + 1).padStart(2, '0');
                 const dd = String(defaultEndDate.getDate()).padStart(2, '0');
@@ -135,7 +140,7 @@ export default function AllocateRoomPage() {
 
     const getRoomAvailability = (roomId: string, targetDateStr: string) => {
         const intervals = getRoomOccupancyIntervals(roomId, allContracts);
-        
+
         intervals.sort((a, b) => a.start.getTime() - b.start.getTime());
         const merged: { start: Date, end: Date }[] = [];
         intervals.forEach(curr => {
@@ -156,7 +161,7 @@ export default function AllocateRoomPage() {
         const target = new Date(targetDateStr);
 
         const overlapping = merged.find(i => target >= i.start && target < i.end);
-        
+
         if (overlapping) {
             availableFrom = new Date(overlapping.end);
             const next = merged.find(i => i.start > availableFrom);
@@ -174,7 +179,7 @@ export default function AllocateRoomPage() {
     const getNextAvailableDate = (roomId: string, requestedStart: string) => {
         const intervals = getRoomOccupancyIntervals(roomId, allContracts);
         let currentStart = new Date(requestedStart);
-        
+
         intervals.sort((a, b) => a.start.getTime() - b.start.getTime());
 
         for (const interval of intervals) {
@@ -218,6 +223,7 @@ export default function AllocateRoomPage() {
             contract_start_date: waitlist.start_date,
             contract_end_date: waitlist.end_date,
             status: 'active',
+            monthly_rent: waitlist.monthly_rent || null,
         };
 
         if (assignAs === 'main') {
@@ -227,10 +233,10 @@ export default function AllocateRoomPage() {
         } else {
             contractPayload.temp_room_id = selectedRoomId;
             contractPayload.temp_start_date = actualCheckInDate;
-            contractPayload.temp_end_date = tempEndDate; 
+            contractPayload.temp_end_date = tempEndDate;
         }
 
-        const { error: contractError } = await supabase.from('contracts').insert([contractPayload]);
+        const { data: contractData, error: contractError } = await supabase.from('contracts').insert([contractPayload]).select('id');
 
         if (contractError) {
             alert('เกิดข้อผิดพลาดในการสร้างสัญญา: ' + contractError.message);
@@ -238,13 +244,33 @@ export default function AllocateRoomPage() {
             return;
         }
 
-        await supabase.from('waitlists').update({ status: 'จัดสรรห้องแล้ว' }).eq('id', waitlistId);
+        const insertedContractId = contractData?.[0]?.id ?? null;
+        if (insertedContractId) {
+            await logAudit(profile, 'contracts', 'create', insertedContractId, 'จัดสรรห้องให้ waitlist และสร้างสัญญา', contractPayload);
+        }
+
+        const { error: waitlistError } = await supabase.from('waitlists').update({ status: 'จัดสรรห้องแล้ว' }).eq('id', waitlistId);
+        if (!waitlistError) {
+            await logAudit(profile, 'waitlists', 'update', waitlistId, 'อัปเดตสถานะ waitlist เป็นจัดสรรห้องแล้ว', { status: 'จัดสรรห้องแล้ว' });
+        }
 
         alert(`✅ จัดสรร${assignAs === 'main' ? 'ห้องหลัก' : 'ห้องชั่วคราว'} และสร้างสัญญาสำเร็จ!`);
         router.push('/bookings');
     };
 
-    if (loading || !waitlist) return <div className="p-10 text-center text-gray-500">กำลังโหลดข้อมูล...</div>;
+    if (authLoading || loading) return <div className="p-10 text-center text-gray-500">กำลังโหลดข้อมูล...</div>;
+
+    if (!profile || !canEdit(profile.role)) {
+        return (
+            <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
+                <div className="text-red-500 text-5xl mb-4">⚠️</div>
+                <h2 className="text-2xl font-bold text-[#0A2647] mb-2">ไม่มีสิทธิ์เข้าถึง</h2>
+                <p className="text-slate-500">เฉพาะผู้ดูแลระบบ เจ้าของหอพัก หรือพนักงานที่มีสิทธิ์เท่านั้นที่สามารถจัดสรรห้องได้</p>
+            </div>
+        );
+    }
+
+    if (!waitlist) return <div className="p-10 text-center text-gray-500">ไม่พบข้อมูลการจอง...</div>;
 
     const matchedRooms = rooms.filter(r =>
         (!waitlist.room_type || waitlist.room_type === 'ไม่ระบุ' || r.room_type === waitlist.room_type) &&
@@ -285,7 +311,7 @@ export default function AllocateRoomPage() {
         const { availableFrom, availableUntil } = getRoomAvailability(selectedRoomId, waitlist.start_date);
         const reqStart = new Date(waitlist.start_date);
         const reqEnd = new Date(waitlist.end_date);
-        
+
         if (reqStart < availableFrom) {
             isSelectedRoomLate = true;
         } else if (availableUntil && reqEnd > availableUntil) {
@@ -385,7 +411,7 @@ export default function AllocateRoomPage() {
                                             <div className="flex justify-between items-center">
                                                 <div className="font-bold text-lg text-gray-900">ห้อง {room.room_number}</div>
                                                 <div className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-md font-bold">
-                                                    อยู่ได้ถึง {availableUntil ? availableUntil.toLocaleDateString('th-TH', {day: 'numeric', month: 'short', year:'numeric'}) : ''}
+                                                    อยู่ได้ถึง {availableUntil ? availableUntil.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
                                                 </div>
                                             </div>
                                             <div className="text-sm text-gray-500 mt-2 flex gap-4">
@@ -478,7 +504,7 @@ export default function AllocateRoomPage() {
                 {/* แผงควบคุมด้านขวา (ปรับ UI ใหม่ให้เข้าใจง่ายขึ้น) */}
                 <div className="col-span-1">
                     <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
-                        
+
                         <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3 mb-5 sticky top-0 bg-white z-10">
                             สรุปการจัดสรรห้อง
                         </h3>
@@ -527,15 +553,14 @@ export default function AllocateRoomPage() {
                                     </label>
                                     <div className="grid grid-cols-1 gap-3">
                                         {/* Card: ห้องหลัก */}
-                                        <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${
-                                            assignAs === 'main' 
-                                                ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' 
-                                                : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                                        }`}>
-                                            <input 
-                                                type="radio" 
-                                                name="assignAs" 
-                                                value="main" 
+                                        <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${assignAs === 'main'
+                                            ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500'
+                                            : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                            }`}>
+                                            <input
+                                                type="radio"
+                                                name="assignAs"
+                                                value="main"
                                                 className="sr-only"
                                                 checked={assignAs === 'main'}
                                                 onChange={() => setAssignAs('main')}
@@ -558,15 +583,14 @@ export default function AllocateRoomPage() {
                                         </label>
 
                                         {/* Card: ห้องชั่วคราว */}
-                                        <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${
-                                            assignAs === 'temp' 
-                                                ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-500' 
-                                                : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                                        }`}>
-                                            <input 
-                                                type="radio" 
-                                                name="assignAs" 
-                                                value="temp" 
+                                        <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${assignAs === 'temp'
+                                            ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-500'
+                                            : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                            }`}>
+                                            <input
+                                                type="radio"
+                                                name="assignAs"
+                                                value="temp"
                                                 className="sr-only"
                                                 checked={assignAs === 'temp'}
                                                 onChange={() => setAssignAs('temp')}

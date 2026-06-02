@@ -685,7 +685,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {occupancyData.map((data, idx) => (
                 <div key={idx} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center justify-between mb-3">
@@ -704,7 +704,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
-            </div>
+            </div> */}
           </div>
         )}
       </section>

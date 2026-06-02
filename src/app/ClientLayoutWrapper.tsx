@@ -232,7 +232,7 @@ export default function ClientLayoutWrapper({
                 onClick={logout}
                 className="w-full py-2 px-3 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border border-red-100"
               >
-                <span>🚪</span> ออกจากระบบ
+                <span>➡️</span> ออกจากระบบ
               </button>
             </div>
           ) : (
@@ -249,7 +249,7 @@ export default function ClientLayoutWrapper({
                 className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-all duration-200 cursor-pointer border border-red-100"
                 title="ออกจากระบบ"
               >
-                🚪
+                ➡️
               </button>
             </div>
           )}

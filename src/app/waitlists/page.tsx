@@ -285,6 +285,9 @@ export default function BookingsPage() {
                                     <div className="md:col-span-4 flex flex-wrap gap-2">
                                         <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🚪 {item.room_type}</span>
                                         <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🍳 {item.kitchen_type}</span>
+                                        {item.view_preference && (
+                                            <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🌅 {item.view_preference}</span>
+                                        )}
                                         {item.bed_size && (
                                             <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🛏️ เตียง {item.bed_size}</span>
                                         )}

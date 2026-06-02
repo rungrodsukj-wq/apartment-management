@@ -1085,10 +1085,23 @@ export default function BookingsPage() {
                                     <div>
                                         <label className={labelCls}>ราคาเช่าต่อเดือน</label>
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
                                             className={inputCls}
-                                            value={createForm.monthly_rent}
-                                            onChange={(e) => setCreateForm({ ...createForm, monthly_rent: parseFloat(e.target.value) || 0 })}
+                                            value={
+                                                createForm.monthly_rent
+                                                    ? Number(createForm.monthly_rent).toLocaleString("en-US")
+                                                    : ""
+                                            }
+                                            onChange={(e) => {
+                                                const value = e.target.value.replace(/,/g, "").replace(/\D/g, "");
+
+                                                setCreateForm({
+                                                    ...createForm,
+                                                    monthly_rent: value ? Number(value) : 0,
+                                                });
+                                            }}
+                                            placeholder="เช่น 17,000"
                                             required
                                         />
                                     </div>

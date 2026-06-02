@@ -84,16 +84,28 @@ export default function BookingsPage() {
     const handleRoomTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newType = e.target.value;
         let newKitchenType = formData.kitchen_type;
-
+        
         // ถ้าไม่ใช่ One Bedroom Exclusive ให้ล็อคเป็นครัวหลัง
         if (['One Bedroom', 'Triple Room', 'One Bedroom Suite'].includes(newType)) {
             newKitchenType = 'ครัวหลัง';
         }
 
+        // กำหนดค่า view_preference เองตามประเภทห้องที่เลือก
+        let newView = formData.view_preference;
+        if (newType === 'One Bedroom') {
+            newView = 'ทิศตะวันออก';
+        } else if (newType === 'Triple Room') {
+            newView = 'ทิศตะวันตก';
+        } else {
+            // หากไม่มีค่าเดิม ให้ตั้งค่าเริ่มต้นเป็นทิศตะวันออก
+            newView = newView || 'ทิศตะวันออก';
+        }
+
         setFormData({
             ...formData,
             room_type: newType,
-            kitchen_type: newKitchenType
+            kitchen_type: newKitchenType,
+            view_preference: newView
         });
     };
 
@@ -221,6 +233,7 @@ export default function BookingsPage() {
     }
 
     const isKitchenDisabled = ['One Bedroom', 'Triple Room', 'One Bedroom Suite'].includes(formData.room_type);
+    const isViewDisabled = formData.room_type === 'One Bedroom' || formData.room_type === 'Triple Room';
 
     return (
         <div className="min-h-full flex flex-col bg-transparent">
@@ -376,11 +389,21 @@ export default function BookingsPage() {
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ทิศที่ต้องการ</label>
-                                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer" value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
-                                        <option value="ทิศตะวันออก">ทิศตะวันออก</option>
-                                        <option value="ทิศตะวันตก">ทิศตะวันตก</option>
-                                        <option value="ไม่ระบุ">ไม่ระบุ</option>
-                                    </select>
+                                    {formData.room_type === 'One Bedroom' ? (
+                                        <select disabled={isViewDisabled} className={`w-full ${isViewDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800'} border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all`} value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
+                                            <option value="ทิศตะวันออก">ทิศตะวันออก</option>
+                                        </select>
+                                    ) : formData.room_type === 'Triple Room' ? (
+                                        <select disabled={isViewDisabled} className={`w-full ${isViewDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800'} border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all`} value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
+                                            <option value="ทิศตะวันตก">ทิศตะวันตก</option>
+                                        </select>
+                                    ) : (
+                                        <select disabled={isViewDisabled} className={`w-full ${isViewDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800'} border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer`} value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
+                                            <option value="ทิศตะวันออก">ทิศตะวันออก</option>
+                                            <option value="ทิศตะวันตก">ทิศตะวันตก</option>
+                                            <option value="ไม่ระบุ">ไม่ระบุ</option>
+                                        </select>
+                                    )}
                                 </div>
 
                                 {/* ส่วนเลือกชั้นที่ต้องการ แบบ Checkbox */}
@@ -437,11 +460,23 @@ export default function BookingsPage() {
                                 <div className="col-span-2">
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ค่าเช่าต่อเดือน (บาท)</label>
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputMode="numeric"
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all"
-                                        value={formData.monthly_rent}
-                                        onChange={(e) => setFormData({ ...formData, monthly_rent: e.target.value })}
-                                        placeholder="เช่น 5500, 6000"
+                                        value={
+                                            formData.monthly_rent
+                                                ? Number(formData.monthly_rent).toLocaleString("en-US")
+                                                : ""
+                                        }
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/,/g, "").replace(/\D/g, "");
+
+                                            setFormData({
+                                                ...formData,
+                                                monthly_rent: value,
+                                            });
+                                        }}
+                                        placeholder="เช่น 17,000, 18,000..."
                                     />
                                 </div>
 

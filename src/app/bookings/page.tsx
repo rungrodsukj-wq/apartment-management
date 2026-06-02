@@ -50,6 +50,7 @@ export default function BookingsPage() {
     const [createForm, setCreateForm] = useState<any>({
         tenant_name: '',
         actual_check_in_date: '',
+        actual_end_date: '',
         contract_start_date: '',
         contract_end_date: '',
         main_room_id: '',
@@ -281,6 +282,8 @@ export default function BookingsPage() {
                 contract_end_date: '',
                 main_start_date: '',
                 main_end_date: '',
+                actual_check_in_date: createForm.actual_check_in_date || '',
+                actual_end_date: createForm.actual_end_date || '',
             });
             return;
         }
@@ -292,16 +295,18 @@ export default function BookingsPage() {
             ...createForm,
             contract_start_date: startDate,
             contract_end_date: newEndDate,
-            actual_check_in_date: startDate,
             main_start_date: startDate,
             main_end_date: newEndDate,
+            actual_check_in_date: createForm.actual_check_in_date || startDate,
+            actual_end_date: createForm.actual_end_date || newEndDate,
         });
     };
 
     const handleEditClick = (contract: any) => {
         setEditForm({
             ...contract,
-            has_temp_room: !!contract.temp_room_id
+            has_temp_room: !!contract.temp_room_id,
+            actual_end_date: contract.actual_end_date || contract.contract_end_date || '',
         });
         setEditRoomPicker(null);
         setIsEditModalOpen(true);
@@ -357,6 +362,7 @@ export default function BookingsPage() {
         setCreateForm({
             tenant_name: oldContract.tenant_name,
             actual_check_in_date: newStartDateStr,
+            actual_end_date: newEndDateStr,
             contract_start_date: newStartDateStr,
             contract_end_date: newEndDateStr,
             main_room_id: oldContract.main_room_id, // เซ็ตค่าเริ่มต้นเป็นห้องเดิมไว้ก่อน
@@ -526,13 +532,22 @@ export default function BookingsPage() {
             alert('❌ วันเริ่มและสิ้นสุดของห้องหลักต้องถูกต้อง');
             return;
         }
+        if (editForm.actual_check_in_date && editForm.contract_start_date && new Date(editForm.actual_check_in_date) > new Date(editForm.contract_start_date)) {
+            alert('❌ วันเข้าพักก่อนเริ่มสัญญาต้องไม่เกินวันเริ่มสัญญา');
+            return;
+        }
+        if (editForm.actual_end_date && editForm.contract_end_date && new Date(editForm.actual_end_date) < new Date(editForm.contract_end_date)) {
+            alert('❌ วันเข้าพักหลังสิ้นสุดสัญญาต้องไม่ต่ำกว่าวันสิ้นสุดสัญญา');
+            return;
+        }
 
         const updatePayload = {
             tenant_name: editForm.tenant_name,
             status: editForm.status,
             contract_start_date: normalizeDate(editForm.contract_start_date),
             contract_end_date: normalizeDate(editForm.contract_end_date),
-            actual_check_in_date: normalizeDate(editForm.actual_check_in_date),
+            actual_check_in_date: normalizeDate(editForm.actual_check_in_date || editForm.contract_start_date),
+            actual_end_date: normalizeDate(editForm.actual_end_date || editForm.contract_end_date),
             main_room_id: editForm.main_room_id || null,
             main_start_date: normalizeDate(editForm.main_start_date),
             main_end_date: normalizeDate(editForm.main_end_date),
@@ -570,10 +585,6 @@ export default function BookingsPage() {
             alert('❌ กรุณาเลือกห้องพักหลัก');
             return;
         }
-        if (!createForm.actual_check_in_date) {
-            alert('❌ กรุณาระบุวันเข้าพักจริง');
-            return;
-        }
         if (!createForm.contract_start_date) {
             alert('❌ กรุณาระบุวันเริ่มต้นสัญญา');
             return;
@@ -601,8 +612,12 @@ export default function BookingsPage() {
             alert('❌ วันเริ่มต้นและวันสิ้นสุดของห้องหลักต้องถูกต้อง');
             return;
         }
-        if (createForm.actual_check_in_date && createForm.contract_end_date && new Date(createForm.actual_check_in_date) > new Date(createForm.contract_end_date)) {
-            alert('❌ วันเข้าพักจริงต้องไม่เกินวันสิ้นสุดสัญญา');
+        if (createForm.actual_check_in_date && createForm.contract_start_date && new Date(createForm.actual_check_in_date) > new Date(createForm.contract_start_date)) {
+            alert('❌ วันเข้าพักก่อนเริ่มสัญญาต้องไม่เกินวันเริ่มสัญญา');
+            return;
+        }
+        if (createForm.actual_end_date && createForm.contract_end_date && new Date(createForm.actual_end_date) < new Date(createForm.contract_end_date)) {
+            alert('❌ วันเข้าพักหลังสิ้นสุดสัญญาต้องไม่ต่ำกว่าวันสิ้นสุดสัญญา');
             return;
         }
         if (createForm.has_temp_room && !createForm.temp_room_id) {
@@ -620,8 +635,9 @@ export default function BookingsPage() {
 
         const payload: any = {
             tenant_name: createForm.tenant_name.trim(),
-            actual_check_in_date: normalizeDate(createForm.actual_check_in_date),
-            contract_start_date: normalizeDate(createForm.contract_start_date || createForm.actual_check_in_date),
+            actual_check_in_date: normalizeDate(createForm.actual_check_in_date || createForm.contract_start_date),
+            actual_end_date: normalizeDate(createForm.actual_end_date || createForm.contract_end_date),
+            contract_start_date: normalizeDate(createForm.contract_start_date),
             contract_end_date: normalizeDate(createForm.contract_end_date),
             main_room_id: createForm.main_room_id || null,
             main_start_date: normalizeDate(effectiveMainStart),
@@ -649,6 +665,7 @@ export default function BookingsPage() {
             setCreateForm({
                 tenant_name: '',
                 actual_check_in_date: '',
+                actual_end_date: '',
                 contract_start_date: '',
                 contract_end_date: '',
                 main_room_id: '',
@@ -659,6 +676,7 @@ export default function BookingsPage() {
                 temp_start_date: '',
                 temp_end_date: '',
                 status: 'active',
+                monthly_rent: '',
                 parent_contract_id: null, // เพิ่มตรงนี้
             });
             fetchData();
@@ -764,7 +782,7 @@ export default function BookingsPage() {
 
     // ── Shared room selector for create modal ──
     const renderCreateRoomSelector = () => {
-        const start = createForm.main_start_date || createForm.actual_check_in_date;
+        const start = createForm.main_start_date || createForm.contract_start_date;
         const end = createForm.main_end_date || createForm.contract_end_date;
 
         if (!start || !end) {
@@ -818,6 +836,129 @@ export default function BookingsPage() {
                     <option value="" disabled>❌ ไม่มีห้องว่างในช่วงนี้</option>
                 )}
             </select>
+        );
+    };
+
+    const renderCreateTempRoomSelector = () => {
+        if (!createForm.temp_start_date || !createForm.temp_end_date) {
+            return (
+                <div className="rounded-2xl bg-white border border-slate-200 p-6 text-slate-600 text-sm">
+                    กรุณาระบุวันที่เริ่มเข้าพักและวันที่ย้ายออกของห้องชั่วคราว
+                </div>
+            );
+        }
+
+        const start = createForm.temp_start_date;
+        const end = createForm.temp_end_date;
+        const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
+        const isMatch = (prefVal: any, roomVal: any) => {
+            if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
+            return prefVal === roomVal;
+        };
+        const availableRooms = rooms.filter(r => r.id !== createForm.main_room_id && isRoomAvailable(r.id, start, end) && applyRoomFilters(r));
+        const perfectMatchRooms = availableRooms.filter(r =>
+            isMatch(customerPref.room_type, r.room_type) &&
+            isMatch(customerPref.kitchen_type, r.kitchen_type) &&
+            isMatch(customerPref.view_preference, r.view_direction)
+        );
+        const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
+
+        if (availableRooms.length === 0) {
+            return (
+                <div className="flex items-center gap-3 bg-red-50 border border-red-200/60 rounded-2xl px-4 py-4 text-sm text-red-600 font-medium">
+                    <span className="text-xl">❌</span> ไม่มีห้องชั่วคราวว่างในช่วงนี้
+                </div>
+            );
+        }
+
+        const RoomCard = ({ room, isMatchRoom }: { room: any; isMatchRoom: boolean }) => {
+            const isSelected = createForm.temp_room_id === room.id;
+            const fw = getRoomFreeWindow(room.id, start, end);
+            const fmtDate = (d: string) =>
+                (!d || d === '2000-01-01' || d === '2099-12-31')
+                    ? null
+                    : new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+
+            return (
+                <button
+                    type="button"
+                    onClick={() => setCreateForm({ ...createForm, temp_room_id: createForm.temp_room_id === room.id ? '' : room.id })}
+                    className={`relative text-left rounded-2xl p-4 border transition-all w-full ${isSelected
+                        ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20'
+                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                >
+                    {isMatchRoom && <span className="absolute top-2.5 right-2.5 text-[10px]">⭐</span>}
+                    <p className={`text-base font-bold mb-2 ${isSelected ? 'text-[#4F81FF]' : 'text-slate-800'}`}>
+                        ห้อง {room.room_number}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                        {room.room_type && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
+                                {room.room_type}
+                            </span>
+                        )}
+                        {room.view_direction && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
+                                วิว{room.view_direction}
+                            </span>
+                        )}
+                        {room.kitchen_type && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
+                                ครัว{room.kitchen_type}
+                            </span>
+                        )}
+                    </div>
+                    <div className={`flex items-center gap-1 text-[10px] font-medium ${isSelected ? 'text-blue-500' : 'text-emerald-600'}`}>
+                        <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        ว่าง: {fmtDate(fw.start) ?? 'ตั้งแต่ต้น'} — {fmtDate(fw.end) ?? 'ไม่มีกำหนด'}
+                    </div>
+                </button>
+            );
+        };
+
+        return (
+            <div className="space-y-4">
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>ห้องชั่วคราวว่าง <span className="font-bold text-slate-700">{availableRooms.length}</span> ห้อง</span>
+                    {perfectMatchRooms.length > 0 && (
+                        <span className="bg-amber-50 text-amber-700 border border-amber-200/60 px-3 py-1 rounded-full font-semibold text-[11px]">
+                            ⭐ ตรงสเปก {perfectMatchRooms.length} ห้อง
+                        </span>
+                    )}
+                </div>
+                {perfectMatchRooms.length > 0 && (
+                    <div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                            {perfectMatchRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={true} />)}
+                        </div>
+                    </div>
+                )}
+                {otherRooms.length > 0 && (
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 mb-2">🏢 ห้องว่างอื่นๆ</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                            {otherRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={false} />)}
+                        </div>
+                    </div>
+                )}
+                {createForm.temp_room_id && (() => {
+                    const room = rooms.find(r => r.id === createForm.temp_room_id);
+                    return room ? (
+                        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200/60 rounded-2xl px-4 py-3">
+                            <div className="w-8 h-8 bg-[#4F81FF] rounded-xl flex items-center justify-center text-white text-sm shrink-0">🔑</div>
+                            <div>
+                                <p className="text-sm font-bold text-blue-800">ห้อง {room.room_number} — เลือกแล้ว</p>
+                                <p className="text-xs text-blue-600">
+                                    {[room.room_type, room.view_direction ? `วิว${room.view_direction}` : null, room.kitchen_type ? `ครัว${room.kitchen_type}` : null].filter(Boolean).join(' · ')}
+                                </p>
+                            </div>
+                        </div>
+                    ) : null;
+                })()}
+            </div>
         );
     };
 
@@ -1080,7 +1221,7 @@ export default function BookingsPage() {
             {/* ─── Create Booking Modal ─── */}
             {isCreateModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                    <div className="bg-white rounded-[2rem] w-full max-w-8xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
 
                         {/* Modal header */}
                         <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center shrink-0">
@@ -1097,184 +1238,186 @@ export default function BookingsPage() {
                         </div>
 
                         {/* Modal body */}
-                        <form id="create-contract-form" onSubmit={handleCreateContract} className="p-8 space-y-6 overflow-y-auto flex-1">
+                        <div className="p-8 overflow-y-auto flex-1">
+                            <div className="grid gap-8 xl:grid-cols-[0.7fr_1fr]">
+                                <form id="create-contract-form" onSubmit={handleCreateContract} className="space-y-6">
 
-
-                            {/* Section 1: ชื่อ + วันที่ */}
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[10px]">1</span>
-                                    ข้อมูลผู้เช่า & ระยะเวลาสัญญา
-                                </p>
-                                <div className="mb-4">
-                                    <label className={labelCls}>ชื่อผู้เช่า</label>
-                                    <input
-                                        type="text"
-                                        className={inputCls}
-                                        placeholder="กรอกชื่อผู้เช่า..."
-                                        value={createForm.tenant_name}
-                                        onChange={(e) => setCreateForm({ ...createForm, tenant_name: e.target.value })}
-                                        required
-                                    />
-                                    {createForm.tenant_name && (() => {
-                                        const pref = waitlists.find(w => w.name === createForm.tenant_name);
-                                        return pref ? (
-                                            <p className="mt-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 inline-flex items-center gap-1.5">
-                                                📋 ความต้องการ: <span className="font-semibold text-slate-700">{pref.room_type} | ครัว{pref.kitchen_type} | วิว{pref.view_preference}</span>
-                                            </p>
-                                        ) : null;
-                                    })()}
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                    {/* Section 1: ชื่อ + วันที่ */}
                                     <div>
-                                        <label className={labelCls}>วันเริ่มต้นสัญญา <span className="text-red-400">*</span></label>
-                                        <input
-                                            type="date"
-                                            className={inputCls}
-                                            value={createForm.contract_start_date}
-                                            onChange={handleCreateStartDateChange}
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className={labelCls}>วันสิ้นสุดสัญญา (1 ปี)</label>
-                                        <input
-                                            type="date"
-                                            className={inputCls}
-                                            value={createForm.contract_end_date}
-                                            readOnly
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className={labelCls}>วันเข้าพักจริง</label>
-                                        <input
-                                            type="date"
-                                            className={inputCls}
-                                            value={createForm.actual_check_in_date}
-                                            onChange={(e) => setCreateForm({ ...createForm, actual_check_in_date: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    {/* เพิ่มช่องกรอกราคาเป็นnumeric contracts.monthly_rent */}
-                                    <div>
-                                        <label className={labelCls}>ราคาเช่าต่อเดือน</label>
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            className={inputCls}
-                                            value={
-                                                createForm.monthly_rent
-                                                    ? Number(createForm.monthly_rent).toLocaleString("en-US")
-                                                    : ""
-                                            }
-                                            onChange={(e) => {
-                                                const value = e.target.value.replace(/,/g, "").replace(/\D/g, "");
-
-                                                setCreateForm({
-                                                    ...createForm,
-                                                    monthly_rent: value ? Number(value) : 0,
-                                                });
-                                            }}
-                                            placeholder="เช่น 17,000"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 3: Temp room (optional) */}
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center text-[10px]">3</span>
-                                    ห้องพักชั่วคราว (ถ้ามี)
-                                </p>
-
-                                {!createForm.has_temp_room ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setCreateForm({
-                                            ...createForm,
-                                            has_temp_room: true,
-                                            temp_start_date: createForm.actual_check_in_date || '',
-                                            temp_end_date: createForm.main_start_date || '',
-                                        })}
-                                        className="w-full flex items-center justify-center gap-2 py-4 bg-amber-50 border-2 border-dashed border-amber-200 text-amber-600 rounded-2xl text-sm font-semibold hover:bg-amber-100 hover:border-amber-300 transition-all"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                                        เพิ่มห้องพักชั่วคราว (กรณีเข้าพักก่อนห้องหลักพร้อม)
-                                    </button>
-                                ) : (
-                                    <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-5 relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => setCreateForm({ ...createForm, has_temp_room: false, temp_room_id: '' })}
-                                            className="absolute top-4 right-4 text-xs px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-xl font-semibold hover:bg-red-50 transition-colors"
-                                        >
-                                            ยกเลิก
-                                        </button>
-                                        {createForm.temp_room_id && (
-                                            <button
-                                                type="button"
-                                                onClick={moveCreateTempToMain}
-                                                className="absolute top-4 right-20 text-xs px-3 py-1.5 bg-white text-emerald-700 border border-emerald-200 rounded-xl font-semibold hover:bg-emerald-50 transition-colors"
-                                            >
-                                                ตั้งเป็นห้องหลัก
-                                            </button>
-                                        )}
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[10px]">1</span>
+                                            ข้อมูลผู้เช่า & ระยะเวลาสัญญา
+                                        </p>
+                                        <div className="mb-4">
+                                            <label className={labelCls}>ชื่อผู้เช่า</label>
+                                            <input
+                                                type="text"
+                                                className={inputCls}
+                                                placeholder="กรอกชื่อผู้เช่า..."
+                                                value={createForm.tenant_name}
+                                                onChange={(e) => setCreateForm({ ...createForm, tenant_name: e.target.value })}
+                                                required
+                                            />
+                                            {createForm.tenant_name && (() => {
+                                                const pref = waitlists.find(w => w.name === createForm.tenant_name);
+                                                return pref ? (
+                                                    <p className="mt-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 inline-flex items-center gap-1.5">
+                                                        📋 ความต้องการ: <span className="font-semibold text-slate-700">{pref.room_type} | ครัว{pref.kitchen_type} | วิว{pref.view_preference}</span>
+                                                    </p>
+                                                ) : null;
+                                            })()}
+                                        </div>
+                                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
                                             <div>
-                                                <label className={labelCls}>เลือกห้อง</label>
-                                                <select
-                                                    className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 outline-none transition-all cursor-pointer"
-                                                    value={createForm.temp_room_id}
-                                                    onChange={(e) => setCreateForm({ ...createForm, temp_room_id: e.target.value })}
-                                                >
-                                                    <option value="">-- เลือกห้อง --</option>
-                                                    {rooms.filter(r => r.id !== createForm.main_room_id).map(r => (
-                                                        <option key={r.id} value={r.id}>ห้อง {r.room_number}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className={labelCls}>เริ่มเข้าพัก</label>
+                                                <label className={labelCls}>วันเริ่มต้นสัญญา <span className="text-red-400">*</span></label>
                                                 <input
                                                     type="date"
-                                                    className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
-                                                    value={createForm.temp_start_date}
-                                                    onChange={(e) => setCreateForm({ ...createForm, temp_start_date: e.target.value })}
+                                                    className={inputCls}
+                                                    value={createForm.contract_start_date}
+                                                    onChange={handleCreateStartDateChange}
+                                                    required
                                                 />
                                             </div>
                                             <div>
-                                                <label className={labelCls}>ย้ายออก (ไปห้องหลัก)</label>
+                                                <label className={labelCls}>วันเข้าพักก่อนเริ่มสัญญา</label>
                                                 <input
                                                     type="date"
-                                                    className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
-                                                    value={createForm.temp_end_date}
-                                                    onChange={handleCreateTempEndDateChange}
+                                                    className={inputCls}
+                                                    value={createForm.actual_check_in_date}
+                                                    onChange={(e) => setCreateForm({ ...createForm, actual_check_in_date: e.target.value })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelCls}>วันสิ้นสุดสัญญา (1 ปี)</label>
+                                                <input
+                                                    type="date"
+                                                    className={inputCls}
+                                                    value={createForm.contract_end_date}
+                                                    readOnly
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelCls}>วันเข้าพักหลังสิ้นสุดสัญญา</label>
+                                                <input
+                                                    type="date"
+                                                    className={inputCls}
+                                                    value={createForm.actual_end_date}
+                                                    onChange={(e) => setCreateForm({ ...createForm, actual_end_date: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
+                                            <div className="md:col-span-2">
+                                                <label className={labelCls}>ราคาเช่าต่อเดือน</label>
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    className={inputCls}
+                                                    value={
+                                                        createForm.monthly_rent
+                                                            ? Number(createForm.monthly_rent).toLocaleString("en-US")
+                                                            : ""
+                                                    }
+                                                    onChange={(e) => {
+                                                        const value = e.target.value.replace(/,/g, "").replace(/\D/g, "");
+
+                                                        setCreateForm({
+                                                            ...createForm,
+                                                            monthly_rent: value ? Number(value) : 0,
+                                                        });
+                                                    }}
+                                                    placeholder="เช่น 17,000"
+                                                    required
                                                 />
                                             </div>
                                         </div>
                                     </div>
-                                )}
-                            </div>
 
-                            {/* Warn if a temp room is selected but no main room chosen yet */}
-                            {createForm.has_temp_room && createForm.temp_room_id && !createForm.main_room_id && (
-                                <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-                                    ⚠️ คุณเลือกห้องชั่วคราวแล้ว แต่ยังไม่ได้เลือกห้องหลัก — โปรดเลือกห้องหลักก่อนยืนยันการจอง
-                                </div>
-                            )}
+                                    {/* Section 3: Temp room (optional) */}
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center text-[10px]">3</span>
+                                            ห้องพักชั่วคราว (ถ้ามี)
+                                        </p>
 
-                            {/* Section 4: Main room */}
-                            {/* Section 2: Room card picker */}
-                            {createForm.contract_start_date && createForm.contract_end_date && (
-                                <div>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                        <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[10px]">2</span>
-                                        เลือกห้องพักหลัก <span className="text-red-400">*</span>
-                                    </p>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div />
+                                        {!createForm.has_temp_room ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setCreateForm({
+                                                    ...createForm,
+                                                    has_temp_room: true,
+                                                    temp_start_date: createForm.actual_check_in_date || createForm.contract_start_date || '',
+                                                    temp_end_date: createForm.main_start_date || '',
+                                                })}
+                                                className="w-full flex items-center justify-center gap-2 py-4 bg-amber-50 border-2 border-dashed border-amber-200 text-amber-600 rounded-2xl text-sm font-semibold hover:bg-amber-100 hover:border-amber-300 transition-all"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                                                เพิ่มห้องพักชั่วคราว (กรณีเข้าพักก่อนห้องหลักพร้อม)
+                                            </button>
+                                        ) : (
+                                            <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-5 relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCreateForm({ ...createForm, has_temp_room: false, temp_room_id: '' })}
+                                                    className="absolute top-4 right-4 text-xs px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-xl font-semibold hover:bg-red-50 transition-colors"
+                                                >
+                                                    ยกเลิก
+                                                </button>
+                                                {createForm.temp_room_id && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={moveCreateTempToMain}
+                                                        className="absolute top-4 right-20 text-xs px-3 py-1.5 bg-white text-emerald-700 border border-emerald-200 rounded-xl font-semibold hover:bg-emerald-50 transition-colors"
+                                                    >
+                                                        ตั้งเป็นห้องหลัก
+                                                    </button>
+                                                )}
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                                    <div>
+                                                        <label className={labelCls}>เริ่มเข้าพัก</label>
+                                                        <input
+                                                            type="date"
+                                                            className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
+                                                            value={createForm.temp_start_date}
+                                                            onChange={(e) => setCreateForm({ ...createForm, temp_start_date: e.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelCls}>ย้ายออก (ไปห้องหลัก)</label>
+                                                        <input
+                                                            type="date"
+                                                            className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
+                                                            value={createForm.temp_end_date}
+                                                            onChange={handleCreateTempEndDateChange}
+                                                        />
+                                                    </div>
+                                                    <div className="hidden md:block" />
+                                                </div>
+                                                <div className="space-y-4 mt-5">
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                        <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center text-[10px]">4</span>
+                                                        เลือกห้องพักชั่วคราว
+                                                    </p>
+                                                    {renderCreateTempRoomSelector()}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Warn if a temp room is selected but no main room chosen yet */}
+                                    {createForm.has_temp_room && createForm.temp_room_id && !createForm.main_room_id && (
+                                        <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                                            ⚠️ คุณเลือกห้องชั่วคราวแล้ว แต่ยังไม่ได้เลือกห้องหลัก — โปรดเลือกห้องหลักก่อนยืนยันการจอง
+                                        </div>
+                                    )}
+                                </form>
+
+                                <div className="space-y-6 bg-slate-50 border border-slate-200 rounded-[2rem] p-6 overflow-hidden">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">เลือกห้องพักหลัก</p>
+                                            <p className="text-sm text-slate-500">ดูห้องว่างในช่วงสัญญาได้ที่นี่</p>
+                                        </div>
                                         {createForm.main_room_id && (
                                             <button
                                                 type="button"
@@ -1285,6 +1428,7 @@ export default function BookingsPage() {
                                             </button>
                                         )}
                                     </div>
+
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
                                         <div>
                                             <label className={labelCls}>ตึก</label>
@@ -1339,124 +1483,131 @@ export default function BookingsPage() {
                                             </select>
                                         </div>
                                     </div>
-                                    {(() => {
-                                        const start = createForm.main_start_date || createForm.contract_start_date;
-                                        const end = createForm.main_end_date || createForm.contract_end_date;
-                                        const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
-                                        const availableRooms = rooms.filter(r => isRoomAvailable(r.id, start, end) && applyRoomFilters(r));
-                                        const isMatch = (prefVal: any, roomVal: any) => {
-                                            if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
-                                            return prefVal === roomVal;
-                                        };
-                                        const perfectMatchRooms = availableRooms.filter(r =>
-                                            isMatch(customerPref.room_type, r.room_type) &&
-                                            isMatch(customerPref.kitchen_type, r.kitchen_type) &&
-                                            isMatch(customerPref.view_preference, r.view_direction)
-                                        );
-                                        const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
 
-                                        if (availableRooms.length === 0) {
-                                            return (
-                                                <div className="flex items-center gap-3 bg-red-50 border border-red-200/60 rounded-2xl px-4 py-4 text-sm text-red-600 font-medium">
-                                                    <span className="text-xl">❌</span> ไม่มีห้องว่างในช่วงเวลานี้
-                                                </div>
+                                    {createForm.contract_start_date && createForm.contract_end_date ? (
+                                        (() => {
+                                            const start = createForm.main_start_date || createForm.contract_start_date;
+                                            const end = createForm.main_end_date || createForm.contract_end_date;
+                                            const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
+                                            const availableRooms = rooms.filter(r => isRoomAvailable(r.id, start, end) && applyRoomFilters(r));
+                                            const isMatch = (prefVal: any, roomVal: any) => {
+                                                if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
+                                                return prefVal === roomVal;
+                                            };
+                                            const perfectMatchRooms = availableRooms.filter(r =>
+                                                isMatch(customerPref.room_type, r.room_type) &&
+                                                isMatch(customerPref.kitchen_type, r.kitchen_type) &&
+                                                isMatch(customerPref.view_preference, r.view_direction)
                                             );
-                                        }
+                                            const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
 
-                                        const RoomCard = ({ room, isMatchRoom }: { room: any; isMatchRoom: boolean }) => {
-                                            const isSelected = createForm.main_room_id === room.id;
-                                            const fw = getRoomFreeWindow(room.id, start, end);
-                                            const fmtDate = (d: string) =>
-                                                (!d || d === '2000-01-01' || d === '2099-12-31')
-                                                    ? null
-                                                    : new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+                                            if (availableRooms.length === 0) {
+                                                return (
+                                                    <div className="flex items-center gap-3 bg-red-50 border border-red-200/60 rounded-2xl px-4 py-4 text-sm text-red-600 font-medium">
+                                                        <span className="text-xl">❌</span> ไม่มีห้องว่างในช่วงเวลานี้
+                                                    </div>
+                                                );
+                                            }
+
+                                            const RoomCard = ({ room, isMatchRoom }: { room: any; isMatchRoom: boolean }) => {
+                                                const isSelected = createForm.main_room_id === room.id;
+                                                const fw = getRoomFreeWindow(room.id, start, end);
+                                                const fmtDate = (d: string) =>
+                                                    (!d || d === '2000-01-01' || d === '2099-12-31')
+                                                        ? null
+                                                        : new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCreateForm({ ...createForm, main_room_id: createForm.main_room_id === room.id ? '' : room.id })}
+                                                        className={`relative text-left rounded-2xl p-4 border transition-all w-full ${isSelected
+                                                            ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20'
+                                                            : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50'
+                                                            }`}
+                                                    >
+                                                        {isMatchRoom && <span className="absolute top-2.5 right-2.5 text-[10px]">⭐</span>}
+                                                        <p className={`text-base font-bold mb-2 ${isSelected ? 'text-[#4F81FF]' : 'text-slate-800'}`}>
+                                                            ห้อง {room.room_number}
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-1.5 mb-2">
+                                                            {room.room_type && (
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
+                                                                    {room.room_type}
+                                                                </span>
+                                                            )}
+                                                            {room.view_direction && (
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
+                                                                    วิว{room.view_direction}
+                                                                </span>
+                                                            )}
+                                                            {room.kitchen_type && (
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
+                                                                    ครัว{room.kitchen_type}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className={`flex items-center gap-1 text-[10px] font-medium ${isSelected ? 'text-blue-500' : 'text-emerald-600'}`}>
+                                                            <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                            </svg>
+                                                            ว่าง: {fmtDate(fw.start) ?? 'ตั้งแต่ต้น'} — {fmtDate(fw.end) ?? 'ไม่มีกำหนด'}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            };
 
                                             return (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setCreateForm({ ...createForm, main_room_id: room.id })}
-                                                    className={`relative text-left rounded-2xl p-4 border transition-all w-full ${isSelected
-                                                        ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20'
-                                                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50'
-                                                        }`}
-                                                >
-                                                    {isMatchRoom && <span className="absolute top-2.5 right-2.5 text-[10px]">⭐</span>}
-                                                    <p className={`text-base font-bold mb-2 ${isSelected ? 'text-[#4F81FF]' : 'text-slate-800'}`}>
-                                                        ห้อง {room.room_number}
-                                                    </p>
-                                                    <div className="flex flex-wrap gap-1.5 mb-2">
-                                                        {room.room_type && (
-                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
-                                                                {room.room_type}
-                                                            </span>
-                                                        )}
-                                                        {room.view_direction && (
-                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
-                                                                วิว{room.view_direction}
-                                                            </span>
-                                                        )}
-                                                        {room.kitchen_type && (
-                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
-                                                                ครัว{room.kitchen_type}
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between text-xs text-slate-500">
+                                                        <span>ห้องว่าง <span className="font-bold text-slate-700">{availableRooms.length}</span> ห้อง</span>
+                                                        {perfectMatchRooms.length > 0 && (
+                                                            <span className="bg-amber-50 text-amber-700 border border-amber-200/60 px-3 py-1 rounded-full font-semibold text-[11px]">
+                                                                ⭐{perfectMatchRooms.length} ห้อง
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className={`flex items-center gap-1 text-[10px] font-medium ${isSelected ? 'text-blue-500' : 'text-emerald-600'}`}>
-                                                        <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                        </svg>
-                                                        ว่าง: {fmtDate(fw.start) ?? 'ตั้งแต่ต้น'} — {fmtDate(fw.end) ?? 'ไม่มีกำหนด'}
-                                                    </div>
-                                                </button>
-                                            );
-                                        };
-
-                                        return (
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between text-xs text-slate-500">
-                                                    <span>ห้องว่าง <span className="font-bold text-slate-700">{availableRooms.length}</span> ห้อง</span>
                                                     {perfectMatchRooms.length > 0 && (
-                                                        <span className="bg-amber-50 text-amber-700 border border-amber-200/60 px-3 py-1 rounded-full font-semibold text-[11px]">
-                                                            ⭐ ตรงสเปก {perfectMatchRooms.length} ห้อง
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {perfectMatchRooms.length > 0 && (
-                                                    <div>
-                                                        <p className="text-[11px] font-bold text-amber-600 mb-2">⭐ ตรงสเปกลูกค้า</p>
-                                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                                                            {perfectMatchRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={true} />)}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {otherRooms.length > 0 && (
-                                                    <div>
-                                                        <p className="text-[11px] font-bold text-slate-500 mb-2">🏢 ห้องว่างอื่นๆ</p>
-                                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                                                            {otherRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={false} />)}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {createForm.main_room_id && (() => {
-                                                    const room = rooms.find(r => r.id === createForm.main_room_id);
-                                                    return room ? (
-                                                        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200/60 rounded-2xl px-4 py-3">
-                                                            <div className="w-8 h-8 bg-[#4F81FF] rounded-xl flex items-center justify-center text-white text-sm shrink-0">🔑</div>
-                                                            <div>
-                                                                <p className="text-sm font-bold text-blue-800">ห้อง {room.room_number} — เลือกแล้ว</p>
-                                                                <p className="text-xs text-blue-600">
-                                                                    {[room.room_type, room.view_direction ? `วิว${room.view_direction}` : null, room.kitchen_type ? `ครัว${room.kitchen_type}` : null].filter(Boolean).join(' · ')}
-                                                                </p>
+                                                        <div>
+                                                            {/* <p className="text-[11px] font-bold text-amber-600 mb-2">⭐ ตรงสเปกลูกค้า</p> */}
+                                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                                                                {perfectMatchRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={true} />)}
                                                             </div>
                                                         </div>
-                                                    ) : null;
-                                                })()}
-                                            </div>
-                                        );
-                                    })()}
+                                                    )}
+                                                    {otherRooms.length > 0 && (
+                                                        <div>
+                                                            <p className="text-[11px] font-bold text-slate-500 mb-2">🏢 ห้องว่างอื่นๆ</p>
+                                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                                                                {otherRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={false} />)}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {createForm.main_room_id && (() => {
+                                                        const room = rooms.find(r => r.id === createForm.main_room_id);
+                                                        return room ? (
+                                                            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200/60 rounded-2xl px-4 py-3">
+                                                                <div className="w-8 h-8 bg-[#4F81FF] rounded-xl flex items-center justify-center text-white text-sm shrink-0">🔑</div>
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-blue-800">ห้อง {room.room_number} — เลือกแล้ว</p>
+                                                                    <p className="text-xs text-blue-600">
+                                                                        {[room.room_type, room.view_direction ? `วิว${room.view_direction}` : null, room.kitchen_type ? `ครัว${room.kitchen_type}` : null].filter(Boolean).join(' · ')}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        ) : null;
+                                                    })()}
+                                                </div>
+                                            );
+                                        })()
+                                    ) : (
+                                        <div className="rounded-2xl bg-white border border-slate-200 p-6 text-slate-600 text-sm">
+                                            กรุณาเลือกวันเริ่มต้นและวันสิ้นสุดสัญญาเพื่อดูรายการห้องว่าง
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </form>
+                            </div>
+                        </div>
 
                         {/* Modal footer */}
                         <div className="px-8 py-5 border-t border-slate-100 flex gap-4 shrink-0">
@@ -1586,13 +1737,12 @@ export default function BookingsPage() {
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                                     ระยะเวลาสัญญา & วันเข้าพัก
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
                                     <div>
-                                        <label className={labelCls}>วันเข้าพักจริง (Check-in)</label>
+                                        <label className={labelCls}>วันเข้าพักก่อนเริ่มสัญญา</label>
                                         <input type="date" className={inputCls}
                                             value={editForm.actual_check_in_date || ''}
-                                            onChange={(e) => setEditForm({ ...editForm, actual_check_in_date: e.target.value })}
-                                            required />
+                                            onChange={(e) => setEditForm({ ...editForm, actual_check_in_date: e.target.value })} />
                                     </div>
                                     <div>
                                         <label className={labelCls}>วันเริ่มสัญญา</label>
@@ -1607,6 +1757,12 @@ export default function BookingsPage() {
                                             value={editForm.contract_end_date || ''}
                                             disabled
                                             onChange={(e) => setEditForm({ ...editForm, contract_end_date: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className={labelCls}>วันเข้าพักหลังสิ้นสุดสัญญา</label>
+                                        <input type="date" className={inputCls}
+                                            value={editForm.actual_end_date || ''}
+                                            onChange={(e) => setEditForm({ ...editForm, actual_end_date: e.target.value })} />
                                     </div>
                                 </div>
                             </div>

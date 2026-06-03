@@ -244,13 +244,15 @@ export default function AllocateRoomPage() {
             await logAudit(profile, 'contracts', 'create', insertedContractId, 'จัดสรรห้องให้ waitlist และสร้างสัญญา', contractPayload);
         }
 
-        const { error: waitlistError } = await supabase.from('waitlists').update({ status: 'จัดสรรห้องแล้ว' }).eq('id', waitlistId);
-        if (!waitlistError) {
-            await logAudit(profile, 'waitlists', 'update', waitlistId, 'อัปเดตสถานะ waitlist เป็นจัดสรรห้องแล้ว', { status: 'จัดสรรห้องแล้ว' });
+        if (assignAs === 'main') {
+            const { error: waitlistError } = await supabase.from('waitlists').update({ status: 'จัดสรรห้องแล้ว' }).eq('id', waitlistId);
+            if (!waitlistError) {
+                await logAudit(profile, 'waitlists', 'update', waitlistId, 'อัปเดตสถานะ waitlist เป็นจัดสรรห้องแล้ว', { status: 'จัดสรรห้องแล้ว' });
+            }
         }
 
-        alert(`✅ จัดสรร${assignAs === 'main' ? 'ห้องหลัก' : 'ห้องชั่วคราว'} และสร้างสัญญาสำเร็จ!`);
-        router.push('/bookings');
+        alert(`✅ จัดสรร${assignAs === 'main' ? 'ห้องหลัก' : 'ห้องชั่วคราว'} และสร้างสัญญาสำเร็จ!` + (assignAs === 'temp' ? ' รายการ waitlist จะยังไม่ปิดจนกว่าจะเลือกห้องหลัก' : ''));
+        router.push(assignAs === 'main' ? '/bookings' : '/waitlists');
     };
 
     if (authLoading || loading) return <div className="p-10 text-center text-gray-500">กำลังโหลดข้อมูล...</div>;

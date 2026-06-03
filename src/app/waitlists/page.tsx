@@ -98,7 +98,7 @@ export default function BookingsPage() {
         if (newType === 'One Bedroom') {
             newView = 'ทิศตะวันออก';
         } else if (newType === 'Triple Bedroom') {
-            newView = 'ทิศตะวันตก';
+            newView = newView || 'ทิศตะวันตก';
         } else {
             // หากไม่มีค่าเดิม ให้ตั้งค่าเริ่มต้นเป็นทิศตะวันออก
             newView = newView || 'ทิศตะวันออก';
@@ -248,7 +248,7 @@ export default function BookingsPage() {
     }, [items, startDate]);
 
     const isKitchenDisabled = ['One Bedroom', 'Triple Bedroom', 'One Bedroom Suite'].includes(formData.room_type);
-    const isViewDisabled = formData.room_type === 'One Bedroom' || formData.room_type === 'Triple Bedroom';
+    const isViewDisabled = formData.room_type === 'One Bedroom';
 
     const formatDateTH = (dateStr?: string | null) => {
         if (!dateStr) return '-';
@@ -453,15 +453,11 @@ export default function BookingsPage() {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ทิศที่ต้องการ</label>
                                     {formData.room_type === 'One Bedroom' ? (
-                                        <select disabled={isViewDisabled} className={`w-full ${isViewDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800'} border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all`} value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
+                                        <select disabled className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all cursor-not-allowed" value="ทิศตะวันออก">
                                             <option value="ทิศตะวันออก">ทิศตะวันออก</option>
                                         </select>
-                                    ) : formData.room_type === 'Triple Bedroom' ? (
-                                        <select disabled={isViewDisabled} className={`w-full ${isViewDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800'} border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all`} value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
-                                            <option value="ทิศตะวันตก">ทิศตะวันตก</option>
-                                        </select>
                                     ) : (
-                                        <select disabled={isViewDisabled} className={`w-full ${isViewDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800'} border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer`} value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
+                                        <select className="w-full bg-slate-50 text-slate-800 border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer" value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
                                             <option value="ทิศตะวันออก">ทิศตะวันออก</option>
                                             <option value="ทิศตะวันตก">ทิศตะวันตก</option>
                                             <option value="ไม่ระบุ">ไม่ระบุ</option>

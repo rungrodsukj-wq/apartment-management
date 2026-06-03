@@ -62,7 +62,9 @@ export default function BookingsPage() {
         temp_end_date: '',
         status: 'active',
         monthly_rent: '',
+        parent_contract_id: null,
     });
+    const [isShortTermContract, setIsShortTermContract] = useState(false);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const [cancelContractId, setCancelContractId] = useState<string | null>(null);
     const [cancelEndDate, setCancelEndDate] = useState(formatDateInput(new Date()));
@@ -396,6 +398,7 @@ export default function BookingsPage() {
             status: newStatus,
             parent_contract_id: oldContract.id // เก็บรหัสสัญญาเก่าไว้เพื่อเอาไปบันทึก
         });
+        setIsShortTermContract(false);
 
         // 3. เปิด Modal สร้างการจอง
         setIsCreateModalOpen(true);
@@ -622,10 +625,12 @@ export default function BookingsPage() {
             alert('❌ วันเริ่มต้นสัญญาต้องเป็นวันที่ 1 ของเดือน');
             return;
         }
-        const expectedEnd = addDays(addYears(createForm.contract_start_date, 1), -1);
-        if (createForm.contract_end_date !== expectedEnd) {
-            alert('❌ สัญญาต้องมีระยะเวลา 1 ปี');
-            return;
+        if (!isShortTermContract) {
+            const expectedEnd = addDays(addYears(createForm.contract_start_date, 1), -1);
+            if (createForm.contract_end_date !== expectedEnd) {
+                alert('❌ สัญญาต้องมีระยะเวลา 1 ปี');
+                return;
+            }
         }
         const effectiveMainStart = createForm.main_start_date || createForm.contract_start_date;
         const effectiveMainEnd = createForm.main_end_date || createForm.contract_end_date;
@@ -635,10 +640,6 @@ export default function BookingsPage() {
         }
         if (createForm.actual_check_in_date && createForm.contract_start_date && new Date(createForm.actual_check_in_date) > new Date(createForm.contract_start_date)) {
             alert('❌ วันเข้าพักก่อนเริ่มสัญญาต้องไม่เกินวันเริ่มสัญญา');
-            return;
-        }
-        if (createForm.actual_end_date && createForm.contract_end_date && new Date(createForm.actual_end_date) < new Date(createForm.contract_end_date)) {
-            alert('❌ วันเข้าพักหลังสิ้นสุดสัญญาต้องไม่ต่ำกว่าวันสิ้นสุดสัญญา');
             return;
         }
         if (createForm.has_temp_room && !createForm.temp_room_id) {
@@ -683,6 +684,7 @@ export default function BookingsPage() {
             const newId = data?.[0]?.id ?? null;
             if (newId) await logAudit(profile, 'contracts', 'create', newId, 'สร้างสัญญาเช่าใหม่', payload);
             setIsCreateModalOpen(false);
+            setIsShortTermContract(false);
             setCreateForm({
                 tenant_name: '',
                 actual_check_in_date: '',
@@ -1248,7 +1250,10 @@ export default function BookingsPage() {
                                 <p className="text-sm text-slate-500 mt-0.5">ระบุข้อมูลผู้เช่าและห้องพัก</p>
                             </div>
                             <button
-                                onClick={() => setIsCreateModalOpen(false)}
+                                onClick={() => {
+                                    setIsCreateModalOpen(false);
+                                    setIsShortTermContract(false);
+                                }}
                                 className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
                             >
                                 ✕
@@ -1305,23 +1310,36 @@ export default function BookingsPage() {
                                                     onChange={(e) => setCreateForm({ ...createForm, actual_check_in_date: e.target.value })}
                                                 />
                                             </div>
-                                            <div>
-                                                <label className={labelCls}>วันสิ้นสุดสัญญา (1 ปี)</label>
+                                            <div className="lg:col-span-2">
+                                                <label className={labelCls}>วันสิ้นสุดสัญญา{isShortTermContract ? '' : ' (1 ปี)'}</label>
                                                 <input
                                                     type="date"
                                                     className={inputCls}
                                                     value={createForm.contract_end_date}
-                                                    readOnly
+                                                    onChange={(e) => {
+                                                        if (isShortTermContract) {
+                                                            setCreateForm({ ...createForm, contract_end_date: e.target.value });
+                                                        }
+                                                    }}
+                                                    readOnly={!isShortTermContract}
+                                                    required
                                                 />
-                                            </div>
-                                            <div>
-                                                <label className={labelCls}>วันเข้าพักหลังสิ้นสุดสัญญา</label>
-                                                <input
-                                                    type="date"
-                                                    className={inputCls}
-                                                    value={createForm.actual_end_date}
-                                                    onChange={(e) => setCreateForm({ ...createForm, actual_end_date: e.target.value })}
-                                                />
+                                                {createForm.parent_contract_id && (
+                                                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsShortTermContract(prev => !prev)}
+                                                            className={`px-4 py-2 rounded-2xl text-sm font-semibold transition ${isShortTermContract ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                                                        >
+                                                            สัญญาระยะสั้น
+                                                        </button>
+                                                        <p className="text-xs text-slate-500">
+                                                            {isShortTermContract
+                                                                ? 'สามารถแก้วันสิ้นสุดสัญญาได้เองแล้ว'
+                                                                : 'กดเพื่อเปิดการแก้วันที่สิ้นสุดสัญญาสำหรับการต่อสัญญา'}
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
@@ -1628,7 +1646,10 @@ export default function BookingsPage() {
                         <div className="px-8 py-5 border-t border-slate-100 flex gap-4 shrink-0">
                             <button
                                 type="button"
-                                onClick={() => setIsCreateModalOpen(false)}
+                                onClick={() => {
+                                    setIsCreateModalOpen(false);
+                                    setIsShortTermContract(false);
+                                }}
                                 className="flex-1 px-6 py-3.5 text-sm font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all"
                             >
                                 ยกเลิก

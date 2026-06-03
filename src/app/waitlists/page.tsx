@@ -335,17 +335,8 @@ export default function BookingsPage() {
                 <h2 className="text-lg font-bold text-[#0A2647] mb-4">รายการล่าสุด</h2>
 
                 <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm grid grid-cols-1 lg:grid-cols-[repeat(6,minmax(0,1fr))] gap-3 mb-6 items-center">
-                    <div className="flex items-center gap-3 col-span-1 lg:col-span-1">
-                        <label className="text-sm font-bold text-slate-600">ชั้น</label>
-                        <select value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full">
-                            <option value="">ทุกชั้น</option>
-                            {uniqueFloors.map((floor, i) => (
-                                <option key={i} value={String(floor)}>ชั้น {floor}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="flex items-center gap-3 col-span-1 lg:col-span-1">
-                        <label className="text-sm font-bold text-slate-600">ประเภทห้อง</label>
+                    <div className="flex items-center gap-3 col-span-2 lg:col-span-2">
+                        <label className="text-sm font-bold text-slate-600 whitespace-nowrap">ประเภทห้อง</label>
                         <select value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full">
                             <option value="">ทุกประเภทห้อง</option>
                             {uniqueRoomTypes.map((type, i) => (

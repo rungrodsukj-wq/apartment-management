@@ -37,6 +37,9 @@ export default function RenewalCheckPage() {
     // Month filter: how many months ahead to look
     const [monthsAhead, setMonthsAhead] = useState(3);
 
+    // Search filter: room number or tenant name
+    const [searchQuery, setSearchQuery] = useState('');
+
     // Intention filter: filter by renewal intention status
     const [intentionFilter, setIntentionFilter] = useState<Intention | 'all'>('all');
 
@@ -101,6 +104,13 @@ export default function RenewalCheckPage() {
                 }
                 return intention === intentionFilter;
             })
+            .filter(c => {
+                const query = searchQuery.trim().toLowerCase();
+                if (!query) return true;
+                const roomNumber = String(getRoom(c.main_room_id)?.room_number ?? '').toLowerCase();
+                const tenantName = String(c.tenant_name ?? '').toLowerCase();
+                return roomNumber.includes(query) || tenantName.includes(query);
+            })
             .sort((a, b) => {
                 const roomA = getRoom(a.main_room_id)?.room_number ?? '';
                 const roomB = getRoom(b.main_room_id)?.room_number ?? '';
@@ -111,7 +121,7 @@ export default function RenewalCheckPage() {
                 }
                 return String(roomA).localeCompare(String(roomB), undefined, { numeric: true, sensitivity: 'base' });
             });
-    }, [contracts, monthsAhead, rooms, intentions, intentionFilter]);
+    }, [contracts, monthsAhead, rooms, intentions, intentionFilter, searchQuery]);
 
     const upsertIntention = async (contractId: string, roomId: string, tenantName: string, intention: Intention, note?: string) => {
         setSaving(contractId);
@@ -219,7 +229,7 @@ export default function RenewalCheckPage() {
         return (
             <div
                 key={contract.id}
-                className={`bg-white rounded-2xl border border-slate-100 border-l-[6px] ${urgencyColor} shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 p-5 flex flex-col gap-4`}
+                className={`bg-white rounded-2xl border border-slate-100 border-l-[6px] ${urgencyColor} shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 p-4 flex flex-col gap-3`}
             >
                 <div className="flex flex-col sm:flex-row sm:items-start gap-5">
                     <div className="flex items-center gap-3">
@@ -364,50 +374,6 @@ export default function RenewalCheckPage() {
     return (
         <div className="min-h-full flex flex-col bg-transparent">
             <div className="flex-1 p-8 md:p-10 max-w-7xl mx-auto w-full">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-8">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white rounded-2xl p-2 shrink-0 border border-slate-100 shadow-sm">
-                        <span className="text-sm font-bold text-slate-600 px-2">แสดงสัญญาที่หมดภายใน:</span>
-                        <select
-                            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-[#4F81FF]/50 cursor-pointer transition-all"
-                            value={monthsAhead}
-                            onChange={e => setMonthsAhead(Number(e.target.value))}
-                        >
-                            <option value={1}>1 เดือน</option>
-                            <option value={2}>2 เดือน</option>
-                            <option value={3}>3 เดือน</option>
-                            <option value={4}>4 เดือน</option>
-                            <option value={6}>6 เดือน</option>
-                        </select>
-                    </div>
-
-                {/* Intention Filter */}
-                <div className="flex flex-wrap gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
-                    {[
-                        { value: 'all' as const, label: 'ทั้งหมด', icon: '📋' },
-                        { value: 'pending' as const, label: 'รอตอบกลับ', icon: '⏳' },
-                        { value: 'renew' as const, label: 'ต่อสัญญาห้องเดิม', icon: '✅' },
-                        { value: 'not_renew' as const, label: 'ไม่ต่อสัญญา', icon: '🚪' },
-                    ].map(filter => {
-                        const isActive = intentionFilter === filter.value;
-                        return (
-                            <button
-                                key={filter.value}
-                                type="button"
-                                onClick={() => setIntentionFilter(filter.value)}
-                                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                                    isActive
-                                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border-2 border-blue-600'
-                                        : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-blue-400 hover:text-blue-600'
-                                }`}
-                            >
-                                {filter.icon} {filter.label}
-                            </button>
-                        );
-                    })}
-                </div>
-                </div>
-
                 {/* Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
                     {[
@@ -424,6 +390,62 @@ export default function RenewalCheckPage() {
                             </div>
                         </div>
                     ))}
+                </div>
+                {/* Header */}
+                <div className="grid gap-3 lg:grid-cols-[minmax(260px,420px)_1fr] mb-4">
+                    <div className="flex flex-wrap items-center gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
+                        <span className="text-sm font-semibold text-slate-600 px-2">แสดงสัญญาที่หมดภายใน:</span>
+                        <select
+                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-[#4F81FF]/30 cursor-pointer transition-all"
+                            value={monthsAhead}
+                            onChange={e => setMonthsAhead(Number(e.target.value))}
+                        >
+                            <option value={1}>1 เดือน</option>
+                            <option value={2}>2 เดือน</option>
+                            <option value={3}>3 เดือน</option>
+                            <option value={4}>4 เดือน</option>
+                            <option value={6}>6 เดือน</option>
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
+                        <span className="text-sm font-semibold text-slate-600">ค้นหา</span>
+                        <input
+                            type="search"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder="ค้นหาห้องหรือชื่อผู้เช่า"
+                            className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+                        />
+                    </div>
+                </div>
+
+                {/* Intention Filter */}
+                <div className="flex flex-wrap gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
+                    {[
+                        { value: 'all' as const, label: 'ทั้งหมด', icon: '📋' },
+                        { value: 'not_asked' as const, label: 'ยังไม่สอบถาม', icon: '❓' },
+                        { value: 'pending' as const, label: 'รอตอบกลับ', icon: '⏳' },
+                        { value: 'renew' as const, label: 'ต่อสัญญาห้องเดิม', icon: '✅' },
+                        { value: 'renew_no_room' as const, label: 'ต่อสัญญาไม่ระบุห้อง', icon: '📝' },
+                        { value: 'not_renew' as const, label: 'ไม่ต่อสัญญา', icon: '🚪' },
+                    ].map(filter => {
+                        const isActive = intentionFilter === filter.value;
+                        return (
+                            <button
+                                key={filter.value}
+                                type="button"
+                                onClick={() => setIntentionFilter(filter.value)}
+                                className={`px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                                    isActive
+                                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border-2 border-blue-600'
+                                        : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-blue-400 hover:text-blue-600'
+                                }`}
+                            >
+                                {filter.icon} {filter.label}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {loading ? (

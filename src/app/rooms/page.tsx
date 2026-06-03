@@ -397,7 +397,7 @@ export default function RoomsPage() {
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all"
                                         value={formData.room_number}
                                         onChange={(e) => setFormData({ ...formData, room_number: e.target.value })}
-                                        placeholder="เช่น 101, A205"
+                                        placeholder="เช่น L201, S205"
                                     />
                                     <p className="text-xs text-slate-400 mt-1.5">* ระบบจะคำนวณและบันทึก "ชั้น" ให้อัตโนมัติจากหมายเลขห้อง</p>
                                 </div>

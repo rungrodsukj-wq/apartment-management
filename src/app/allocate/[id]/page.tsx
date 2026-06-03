@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
@@ -17,6 +17,7 @@ interface Waitlist {
     end_date: string;
     status: string;
     special_request?: string;
+    allocation_note?: string;
     monthly_rent?: number;
 }
 
@@ -55,11 +56,13 @@ export default function AllocateRoomPage() {
 
     const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
     const [assignAs, setAssignAs] = useState<'main' | 'temp'>('main');
+    const [tempContractId, setTempContractId] = useState<string | null>(null);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(true);
     const [actualCheckInDate, setActualCheckInDate] = useState<string>('');
     const [tempEndDate, setTempEndDate] = useState<string>('');
+    const [tempStartDate, setTempStartDate] = useState<string>('');
 
     useEffect(() => {
         if (waitlist) {
@@ -70,6 +73,11 @@ export default function AllocateRoomPage() {
     useEffect(() => {
         fetchData();
     }, [waitlistId]);
+
+    const tempEditRef = useRef<HTMLDivElement | null>(null);
+    const scrollToTempEdit = () => {
+        if (tempEditRef.current) tempEditRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
 
     useEffect(() => {
         if (assignAs === 'temp' && selectedRoomId && waitlist) {
@@ -95,6 +103,22 @@ export default function AllocateRoomPage() {
         setLoading(true);
         const { data: wData } = await supabase.from('waitlists').select('*').eq('id', waitlistId).single();
         if (wData) setWaitlist(wData);
+
+        // load any existing contract for this waitlist (to allow editing temp dates)
+        const { data: existingContract } = await supabase.from('contracts').select('id,main_room_id,main_start_date,main_end_date,temp_room_id,temp_start_date,temp_end_date').eq('waitlist_id', waitlistId).maybeSingle();
+        if (existingContract) {
+            setTempContractId(existingContract.id ?? null);
+            if (existingContract.temp_room_id) {
+                setSelectedRoomId(existingContract.temp_room_id);
+                setAssignAs('temp');
+                setTempStartDate(existingContract.temp_start_date || '');
+                setTempEndDate(existingContract.temp_end_date || '');
+            }
+            if (existingContract.main_room_id) {
+                setSelectedRoomId(existingContract.main_room_id);
+                setAssignAs('main');
+            }
+        }
 
         const { data: rData } = await supabase.from('rooms').select('*').order('room_number');
         if (rData) setRooms(rData);
@@ -210,7 +234,7 @@ export default function AllocateRoomPage() {
             ? getNextAvailableDate(selectedRoomId, waitlist.start_date)
             : actualCheckInDate;
 
-        const contractPayload: any = {
+        const basePayload: any = {
             waitlist_id: waitlistId,
             tenant_name: waitlist.name,
             actual_check_in_date: actualCheckInDate,
@@ -220,33 +244,70 @@ export default function AllocateRoomPage() {
             monthly_rent: waitlist.monthly_rent || null,
         };
 
-        if (assignAs === 'main') {
-            contractPayload.main_room_id = selectedRoomId;
-            contractPayload.main_start_date = finalMainStartDate;
-            contractPayload.main_end_date = waitlist.end_date;
-        } else {
-            contractPayload.temp_room_id = selectedRoomId;
-            contractPayload.temp_start_date = actualCheckInDate;
-            contractPayload.temp_end_date = tempEndDate;
-        }
-
-        const { data: contractData, error: contractError } = await supabase.from('contracts').insert([contractPayload]).select('id');
-
-        if (contractError) {
-            alert('เกิดข้อผิดพลาดในการสร้างสัญญา: ' + contractError.message);
-            setIsSubmitting(false);
-            return;
-        }
-
-        const insertedContractId = contractData?.[0]?.id ?? null;
-        if (insertedContractId) {
-            await logAudit(profile, 'contracts', 'create', insertedContractId, 'จัดสรรห้องให้ waitlist และสร้างสัญญา', contractPayload);
-        }
+        let insertedContractId: string | null = null;
 
         if (assignAs === 'main') {
+            // If there's an existing contract for this waitlist, update it to include main room
+            if (tempContractId) {
+                const updatePayload: any = { main_room_id: selectedRoomId, main_start_date: finalMainStartDate, main_end_date: waitlist.end_date, status: 'active' };
+                const { error: updateErr } = await supabase.from('contracts').update(updatePayload).eq('id', tempContractId);
+                if (updateErr) {
+                    alert('เกิดข้อผิดพลาดในการอัปเดตสัญญา: ' + updateErr.message);
+                    setIsSubmitting(false);
+                    return;
+                }
+                insertedContractId = tempContractId;
+                await logAudit(profile, 'contracts', 'update', tempContractId, 'อัปเดตสัญญา เพิ่มห้องหลักให้กับสัญญาที่มีอยู่', updatePayload);
+            } else {
+                const contractPayload = { ...basePayload, main_room_id: selectedRoomId, main_start_date: finalMainStartDate, main_end_date: waitlist.end_date };
+                const { data: contractData, error: contractError } = await supabase.from('contracts').insert([contractPayload]).select('id');
+                if (contractError) {
+                    alert('เกิดข้อผิดพลาดในการสร้างสัญญา: ' + contractError.message);
+                    setIsSubmitting(false);
+                    return;
+                }
+                insertedContractId = contractData?.[0]?.id ?? null;
+                if (insertedContractId) await logAudit(profile, 'contracts', 'create', insertedContractId, 'จัดสรรห้องให้ waitlist และสร้างสัญญา', contractPayload);
+            }
+
             const { error: waitlistError } = await supabase.from('waitlists').update({ status: 'จัดสรรห้องแล้ว' }).eq('id', waitlistId);
             if (!waitlistError) {
                 await logAudit(profile, 'waitlists', 'update', waitlistId, 'อัปเดตสถานะ waitlist เป็นจัดสรรห้องแล้ว', { status: 'จัดสรรห้องแล้ว' });
+            }
+
+        } else {
+            // temp allocation: update existing temp contract if present, else create
+            const tempFields: any = { temp_room_id: selectedRoomId, temp_start_date: (tempStartDate || actualCheckInDate), temp_end_date: tempEndDate };
+            if (tempContractId) {
+                const { error: updateErr } = await supabase.from('contracts').update(tempFields).eq('id', tempContractId);
+                if (updateErr) {
+                    alert('เกิดข้อผิดพลาดในการอัปเดตสัญญาชั่วคราว: ' + updateErr.message);
+                    setIsSubmitting(false);
+                    return;
+                }
+                insertedContractId = tempContractId;
+                await logAudit(profile, 'contracts', 'update', tempContractId, 'อัปเดตสัญญาชั่วคราว (temp) สำหรับ waitlist', tempFields);
+            } else {
+                const { data: contractData, error: contractError } = await supabase.from('contracts').insert([{ ...basePayload, ...tempFields }]).select('id');
+                if (contractError) {
+                    alert('เกิดข้อผิดพลาดในการสร้างสัญญา: ' + contractError.message);
+                    setIsSubmitting(false);
+                    return;
+                }
+                insertedContractId = contractData?.[0]?.id ?? null;
+                if (insertedContractId) await logAudit(profile, 'contracts', 'create', insertedContractId, 'จัดสรรห้องชั่วคราวให้ waitlist และสร้างสัญญา (ชั่วคราว)', { ...basePayload, ...tempFields });
+                setTempContractId(insertedContractId);
+            }
+
+            if (insertedContractId) {
+                const room = rooms.find(r => r.id === selectedRoomId);
+                const roomLabel = room ? `ห้อง ${room.room_number}` : selectedRoomId;
+                const note = `จัดสรรห้องชั่วคราว: ${roomLabel}`;
+                const { error: wlErr } = await supabase.from('waitlists').update({ status: 'จัดสรรชั่วคราว', allocation_note: note }).eq('id', waitlistId);
+                if (!wlErr) {
+                    await logAudit(profile, 'waitlists', 'update', waitlistId, 'อัปเดตสถานะ waitlist เป็นจัดสรรชั่วคราว และเพิ่มโน้ต (allocation_note)', { status: 'จัดสรรชั่วคราว', allocation_note: note, contract_id: insertedContractId });
+                    setWaitlist({ ...waitlist, status: 'จัดสรรชั่วคราว', allocation_note: note });
+                }
             }
         }
 
@@ -321,6 +382,9 @@ export default function AllocateRoomPage() {
             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col gap-4">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                     <div>
+                        {waitlist.allocation_note && (
+                            <div className="mb-2 text-sm font-semibold text-amber-800 bg-amber-100 px-3 py-1 rounded-lg inline-block">{waitlist.allocation_note}</div>
+                        )}
                         <h1 className="text-2xl font-bold text-gray-900 mb-1">จัดสรรห้องให้คุณ {waitlist.name}</h1>
                         <p className="text-sm text-gray-500">เลือกห้องพักที่ตรงกับเงื่อนไขการจองด้านล่าง</p>
                     </div>
@@ -341,6 +405,9 @@ export default function AllocateRoomPage() {
                             <span className="text-blue-400 block text-[10px] uppercase font-bold">ช่วงเวลาที่ต้องการ</span>
                             <span className="font-bold text-blue-700">{new Date(waitlist.start_date).toLocaleDateString('th-TH')} - {new Date(waitlist.end_date).toLocaleDateString('th-TH')}</span>
                         </div>
+                        {tempContractId && (
+                            <button onClick={scrollToTempEdit} className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">แก้ไขการจัดสรรชั่วคราว</button>
+                        )}
                     </div>
                 </div>
 
@@ -541,6 +608,41 @@ export default function AllocateRoomPage() {
                                         * กำหนดการตามสัญญาคือ {new Date(waitlist.start_date).toLocaleDateString('th-TH')}
                                     </p>
                                 </div>
+
+                                {/* If there's an existing temp contract, allow editing its dates here */}
+                                {tempContractId && (
+                                    <div ref={tempEditRef} className="bg-amber-50 p-4 rounded-xl border border-amber-100 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-sm font-bold text-amber-800">แก้ไขการจัดสรรชั่วคราวที่มีอยู่</div>
+                                            <div className="text-xs text-amber-700">Contract: {tempContractId}</div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-xs font-medium text-amber-700">วันที่เริ่ม (Temp start)</label>
+                                                <input type="date" className="w-full border border-amber-200 rounded-xl p-2 mt-1" value={tempStartDate} onChange={(e) => setTempStartDate(e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-medium text-amber-700">วันที่สิ้นสุด (Temp end)</label>
+                                                <input type="date" className="w-full border border-amber-200 rounded-xl p-2 mt-1" value={tempEndDate} onChange={(e) => setTempEndDate(e.target.value)} />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={async () => {
+                                                if (!tempContractId) return;
+                                                setIsSubmitting(true);
+                                                const upd = { temp_start_date: tempStartDate || actualCheckInDate, temp_end_date: tempEndDate };
+                                                const { error } = await supabase.from('contracts').update(upd).eq('id', tempContractId);
+                                                if (error) {
+                                                    alert('ไม่สามารถอัปเดตสัญญาชั่วคราวได้: ' + error.message);
+                                                } else {
+                                                    await logAudit(profile, 'contracts', 'update', tempContractId, 'แก้ไขวันที่สัญญาชั่วคราว', upd);
+                                                    alert('อัปเดตวันที่สัญญาชั่วคราวเรียบร้อย');
+                                                }
+                                                setIsSubmitting(false);
+                                            }} className="px-4 py-2 bg-amber-600 text-white rounded-xl">บันทึกการแก้ไขชั่วคราว</button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* 3. รูปแบบการจัดสรร (Radio Cards) */}
                                 <div className="space-y-3 pt-2">

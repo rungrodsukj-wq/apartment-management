@@ -36,9 +36,10 @@ export default function LoginPage() {
           {/* Logo / Brand Header */}
           <div className="flex flex-col items-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-[#0A2647] flex items-center justify-center text-white text-2xl font-bold mb-4 shadow-lg shadow-[#0a2647]/20">
-              A
+              S
             </div>
-            <h2 className="text-2xl font-bold text-[#0A2647]">Apartment Management</h2>
+            <h2 className=" text-2xl font-bold text-[#0A2647]">SALAYA ONE</h2>
+            <h2 className="text-sm text-2xl font-bold text-[#0A2647]">PREMIUM SERVICED APARTMENT</h2>
             <p className="text-slate-400 text-sm mt-1">เข้าสู่ระบบเพื่อจัดการหอพักของคุณ</p>
           </div>
 

@@ -37,6 +37,9 @@ export default function RenewalCheckPage() {
     // Month filter: how many months ahead to look
     const [monthsAhead, setMonthsAhead] = useState(3);
 
+    // Intention filter: filter by renewal intention status
+    const [intentionFilter, setIntentionFilter] = useState<Intention | 'all'>('all');
+
     // Modals state
     const [noteModal, setNoteModal] = useState<{ contractId: string; roomId: string; tenantName: string; currentNote: string } | null>(null);
     const [noteInput, setNoteInput] = useState('');
@@ -68,6 +71,10 @@ export default function RenewalCheckPage() {
 
     const getRoom = (roomId: string) => rooms.find(r => r.id === roomId);
 
+    const getIntention = (contractId: string): any | null => {
+        return intentions.find(i => i.contract_id === contractId) || null;
+    };
+
     // Filter contracts that expire within X months
     const expiringContracts = useMemo(() => {
         const today = new Date();
@@ -82,6 +89,12 @@ export default function RenewalCheckPage() {
                 end.setHours(0, 0, 0, 0);
                 return end >= today && end <= cutoff;
             })
+            .filter(c => {
+                // Apply intention filter
+                if (intentionFilter === 'all') return true;
+                const intention = getIntention(c.id)?.intention || 'pending';
+                return intention === intentionFilter;
+            })
             .sort((a, b) => {
                 const roomA = getRoom(a.main_room_id)?.room_number ?? '';
                 const roomB = getRoom(b.main_room_id)?.room_number ?? '';
@@ -92,11 +105,7 @@ export default function RenewalCheckPage() {
                 }
                 return String(roomA).localeCompare(String(roomB), undefined, { numeric: true, sensitivity: 'base' });
             });
-    }, [contracts, monthsAhead, rooms]);
-
-    const getIntention = (contractId: string): any | null => {
-        return intentions.find(i => i.contract_id === contractId) || null;
-    };
+    }, [contracts, monthsAhead, rooms, intentions, intentionFilter]);
 
     const upsertIntention = async (contractId: string, roomId: string, tenantName: string, intention: Intention, note?: string) => {
         setSaving(contractId);
@@ -356,6 +365,32 @@ export default function RenewalCheckPage() {
                             <option value={6}>6 เดือน</option>
                         </select>
                     </div>
+
+                {/* Intention Filter */}
+                <div className="flex flex-wrap gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
+                    {[
+                        { value: 'all' as const, label: 'ทั้งหมด', icon: '📋' },
+                        { value: 'pending' as const, label: 'รอตอบกลับ', icon: '⏳' },
+                        { value: 'renew' as const, label: 'ต่อสัญญา', icon: '✅' },
+                        { value: 'not_renew' as const, label: 'ไม่ต่อสัญญา', icon: '🚪' },
+                    ].map(filter => {
+                        const isActive = intentionFilter === filter.value;
+                        return (
+                            <button
+                                key={filter.value}
+                                type="button"
+                                onClick={() => setIntentionFilter(filter.value)}
+                                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                                    isActive
+                                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border-2 border-blue-600'
+                                        : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-blue-400 hover:text-blue-600'
+                                }`}
+                            >
+                                {filter.icon} {filter.label}
+                            </button>
+                        );
+                    })}
+                </div>
                 </div>
 
                 {/* Stats */}

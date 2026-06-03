@@ -235,6 +235,17 @@ export default function BookingsPage() {
     const isKitchenDisabled = ['One Bedroom', 'Triple Bedroom', 'One Bedroom Suite'].includes(formData.room_type);
     const isViewDisabled = formData.room_type === 'One Bedroom' || formData.room_type === 'Triple Bedroom';
 
+    const formatDateTH = (dateStr?: string | null) => {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        if (Number.isNaN(date.getTime())) return '-';
+        return new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        }).format(date);
+    };
+
     return (
         <div className="min-h-full flex flex-col bg-transparent">
             {/* Content Area */}
@@ -306,7 +317,7 @@ export default function BookingsPage() {
                                     <div className="md:col-span-3">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ระยะเวลาสัญญา</p>
                                         <p className="text-xs text-slate-700 font-medium bg-slate-50 inline-block px-3 py-1.5 rounded-lg border border-slate-100">
-                                            {new Date(item.start_date).toLocaleDateString('en-GB')} - {new Date(item.end_date).toLocaleDateString('en-GB')}
+                                            {formatDateTH(item.start_date)} - {formatDateTH(item.end_date)}
                                         </p>
                                     </div>
                                 </div>
@@ -453,11 +464,13 @@ export default function BookingsPage() {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">เริ่มสัญญา (เริ่มวันที่ 1 เสมอ)</label>
                                     <input type="date" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all" value={formData.start_date} onChange={handleStartDateChange} />
+                                    <p className="mt-2 text-xs text-slate-500">{formData.start_date ? formatDateTH(formData.start_date) : 'วันที่ไทยจะแสดงเมื่อเลือกวันเริ่มต้น'}</p>
                                 </div>
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">สิ้นสุดสัญญา (อัตโนมัติ 1 ปี)</label>
                                     <input type="date" required className="w-full bg-slate-100 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-500 outline-none cursor-not-allowed" value={formData.end_date} readOnly />
+                                    <p className="mt-2 text-xs text-slate-500">{formData.end_date ? formatDateTH(formData.end_date) : 'วันที่ไทยจะแสดงเมื่อวันเริ่มต้นถูกเลือกแล้ว'}</p>
                                 </div>
 
                                 <div className="col-span-2">

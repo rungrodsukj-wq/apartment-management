@@ -273,6 +273,22 @@ export default function BookingsPage() {
         );
     };
 
+    const calculateRelativeShiftedDate = (oldReference: string, targetDate: string, newReference: string) => {
+        if (!oldReference || !targetDate || !newReference) return targetDate;
+
+        const oldRefDate = parseDateFromYYYYMMDD(oldReference);
+        const target = parseDateFromYYYYMMDD(targetDate);
+        const newRefDate = parseDateFromYYYYMMDD(newReference);
+
+        if (Number.isNaN(oldRefDate.getTime()) || Number.isNaN(target.getTime()) || Number.isNaN(newRefDate.getTime())) {
+            return targetDate;
+        }
+
+        const deltaDays = Math.round((target.getTime() - oldRefDate.getTime()) / (1000 * 60 * 60 * 24));
+        newRefDate.setDate(newRefDate.getDate() + deltaDays);
+        return formatDateInput(newRefDate);
+    };
+
     const handleCreateStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value;
         if (!raw) {
@@ -291,14 +307,19 @@ export default function BookingsPage() {
         const [year, month] = raw.split('-');
         const startDate = `${year}-${month}-01`;
         const newEndDate = addDays(addYears(startDate, 1), -1);
+
         setCreateForm({
             ...createForm,
             contract_start_date: startDate,
             contract_end_date: newEndDate,
             main_start_date: startDate,
             main_end_date: newEndDate,
-            actual_check_in_date: createForm.actual_check_in_date || startDate,
-            actual_end_date: createForm.actual_end_date || newEndDate,
+            actual_check_in_date: createForm.actual_check_in_date
+                ? calculateRelativeShiftedDate(createForm.contract_start_date, createForm.actual_check_in_date, startDate)
+                : startDate,
+            actual_end_date: createForm.actual_end_date
+                ? calculateRelativeShiftedDate(createForm.contract_end_date, createForm.actual_end_date, newEndDate)
+                : newEndDate,
         });
     };
 
@@ -737,9 +758,9 @@ export default function BookingsPage() {
 
     const formatDateTH = (dateStr: string) => {
         if (!dateStr || dateStr === '2000-01-01' || dateStr === '2099-12-31') return null;
-        return new Date(dateStr).toLocaleDateString('th-TH', {
-            day: 'numeric', month: 'short', year: '2-digit'
-        });
+        return new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
+            day: 'numeric', month: 'short', year: 'numeric'
+        }).format(new Date(dateStr));
     };
 
     const getStatusBadge = (status: string) => {
@@ -874,10 +895,7 @@ export default function BookingsPage() {
         const RoomCard = ({ room, isMatchRoom }: { room: any; isMatchRoom: boolean }) => {
             const isSelected = createForm.temp_room_id === room.id;
             const fw = getRoomFreeWindow(room.id, start, end);
-            const fmtDate = (d: string) =>
-                (!d || d === '2000-01-01' || d === '2099-12-31')
-                    ? null
-                    : new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+            const fmtDate = (d: string) => formatDateTH(d);
 
             return (
                 <button
@@ -1239,7 +1257,7 @@ export default function BookingsPage() {
 
                         {/* Modal body */}
                         <div className="p-8 overflow-y-auto flex-1">
-                            <div className="grid gap-8 xl:grid-cols-[0.7fr_1fr]">
+                            <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
                                 <form id="create-contract-form" onSubmit={handleCreateContract} className="space-y-6">
 
                                     {/* Section 1: ชื่อ + วันที่ */}
@@ -1512,10 +1530,7 @@ export default function BookingsPage() {
                                             const RoomCard = ({ room, isMatchRoom }: { room: any; isMatchRoom: boolean }) => {
                                                 const isSelected = createForm.main_room_id === room.id;
                                                 const fw = getRoomFreeWindow(room.id, start, end);
-                                                const fmtDate = (d: string) =>
-                                                    (!d || d === '2000-01-01' || d === '2099-12-31')
-                                                        ? null
-                                                        : new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+                                                const fmtDate = (d: string) => formatDateTH(d);
 
                                                 return (
                                                     <button

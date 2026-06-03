@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import { canAccessPage } from "../lib/permissions";
 import SidebarNav from "../components/SidebarNav";
+import Image from "next/image";
 
 interface ClientLayoutWrapperProps {
   children: React.ReactNode;
@@ -177,8 +178,14 @@ export default function ClientLayoutWrapper({
           {/* Logo & Close Button */}
           <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100 mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#1e2538] rounded-2xl flex items-center justify-center shadow-md">
-                <span className="text-white font-extrabold text-xl">S</span>
+              <div className="w-15 h-20 relative">
+                <Image
+                  src="/logo/salaya-one-logo.png"
+                  alt="Salaya One"
+                  fill
+                  className="object-contain"
+                  priority
+                />
               </div>
               {(!sidebarCollapsed || isMobileOpen) && (
                 <div className="flex flex-col">

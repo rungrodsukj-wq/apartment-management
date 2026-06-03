@@ -65,12 +65,12 @@ export default function RoomsPage() {
             }
         }
 
-        if (formData.room_type === 'Triple Bedroom') {
-            if (newView !== 'ทิศตะวันตก') {
-                newView = 'ทิศตะวันตก';
+        if (formData.room_type === 'One Bedroom') {
+            if (newView !== 'ทิศตะวันออก') {
+                newView = 'ทิศตะวันออก';
                 changed = true;
             }
-        } else {
+        } else if (formData.room_type === 'One Bedroom Suite') {
             if (newView === 'ทิศตะวันตก') {
                 newView = 'ทิศตะวันออก';
                 changed = true;
@@ -429,14 +429,10 @@ export default function RoomsPage() {
                                         value={formData.view_direction}
                                         onChange={(e) => setFormData({ ...formData, view_direction: e.target.value })}
                                     >
-                                        {formData.room_type === 'Triple Bedroom' ? (
+                                                <>
+                                            <option value="ทิศตะวันออก">ทิศตะวันออก</option>
                                             <option value="ทิศตะวันตก">ทิศตะวันตก</option>
-                                        ) : (
-                                            <>
-                                                <option value="ทิศตะวันออก">ทิศตะวันออก</option>
-                                                <option value="ทิศตะวันตก">ทิศตะวันตก</option>
-                                            </>
-                                        )}
+                                        </>
                                     </select>
                                 </div>
                             </div>

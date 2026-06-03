@@ -13,6 +13,8 @@ interface Waitlist {
     name: string;
     room_type: string;
     kitchen_type: string;
+    building?: string | null;
+    floor?: number | null;
     view_preference: string;
     start_date: string;
     end_date: string;
@@ -37,7 +39,11 @@ export default function BookingsPage() {
 
     // Start date filter for waitlist (single date)
     const [startDate, setStartDate] = useState<string | null>(null);
-
+    const [filterBuilding, setFilterBuilding] = useState('');
+    const [filterFloor, setFilterFloor] = useState('');
+    const [filterRoomType, setFilterRoomType] = useState('');
+    const [filterKitchen, setFilterKitchen] = useState('');
+    const [filterView, setFilterView] = useState('');
 
     const [formData, setFormData] = useState({
         name: '',
@@ -235,17 +241,51 @@ export default function BookingsPage() {
         }
     }
 
+    const uniqueBuildings = useMemo(
+        () => Array.from(new Set(items.map(item => item.building || '').filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)),
+        [items]
+    );
+
+    const uniqueFloors = useMemo(
+        () => Array.from(new Set(items.map(item => item.floor).filter((f): f is number => f !== null && f !== undefined))).sort((a, b) => Number(a) - Number(b)),
+        [items]
+    );
+
+    const uniqueRoomTypes = useMemo(
+        () => Array.from(new Set(items.map(item => item.room_type).filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b))),
+        [items]
+    );
+
+    const uniqueKitchens = useMemo(
+        () => Array.from(new Set(items.map(item => item.kitchen_type).filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b))),
+        [items]
+    );
+
+    const uniqueViews = useMemo(
+        () => Array.from(new Set(items.map(item => item.view_preference).filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b))),
+        [items]
+    );
+
     const filteredItems = useMemo(() => {
-        if (!startDate) return items;
         return items.filter(item => {
-            if (!item.start_date) return false;
-            const s = new Date(item.start_date);
-            s.setHours(0,0,0,0);
-            const target = new Date(startDate);
-            target.setHours(0,0,0,0);
-            return s.getTime() === target.getTime();
+            if (startDate) {
+                if (!item.start_date) return false;
+                const s = new Date(item.start_date);
+                s.setHours(0,0,0,0);
+                const target = new Date(startDate);
+                target.setHours(0,0,0,0);
+                if (s.getTime() !== target.getTime()) return false;
+            }
+
+            if (filterBuilding && item.building !== filterBuilding) return false;
+            if (filterFloor && String(item.floor ?? '') !== filterFloor) return false;
+            if (filterRoomType && item.room_type !== filterRoomType) return false;
+            if (filterKitchen && item.kitchen_type !== filterKitchen) return false;
+            if (filterView && item.view_preference !== filterView) return false;
+
+            return true;
         });
-    }, [items, startDate]);
+    }, [items, startDate, filterBuilding, filterFloor, filterRoomType, filterKitchen, filterView]);
 
     const isKitchenDisabled = ['One Bedroom', 'Triple Bedroom', 'One Bedroom Suite'].includes(formData.room_type);
     const isViewDisabled = formData.room_type === 'One Bedroom';
@@ -293,6 +333,45 @@ export default function BookingsPage() {
                 </div>
 
                 <h2 className="text-lg font-bold text-[#0A2647] mb-4">รายการล่าสุด</h2>
+
+                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm grid grid-cols-1 lg:grid-cols-[repeat(6,minmax(0,1fr))] gap-3 mb-6 items-center">
+                    <div className="flex items-center gap-3 col-span-1 lg:col-span-1">
+                        <label className="text-sm font-bold text-slate-600">ชั้น</label>
+                        <select value={filterFloor} onChange={(e) => setFilterFloor(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full">
+                            <option value="">ทุกชั้น</option>
+                            {uniqueFloors.map((floor, i) => (
+                                <option key={i} value={String(floor)}>ชั้น {floor}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-3 col-span-1 lg:col-span-1">
+                        <label className="text-sm font-bold text-slate-600">ประเภทห้อง</label>
+                        <select value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full">
+                            <option value="">ทุกประเภทห้อง</option>
+                            {uniqueRoomTypes.map((type, i) => (
+                                <option key={i} value={type}>{type}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-3 col-span-1 lg:col-span-1">
+                        <label className="text-sm font-bold text-slate-600">ครัว</label>
+                        <select value={filterKitchen} onChange={(e) => setFilterKitchen(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full">
+                            <option value="">ทุกประเภทครัว</option>
+                            {uniqueKitchens.map((kitchen, i) => (
+                                <option key={i} value={kitchen}>{kitchen}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-3 col-span-1 lg:col-span-1">
+                        <label className="text-sm font-bold text-slate-600">ทิศ</label>
+                        <select value={filterView} onChange={(e) => setFilterView(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full">
+                            <option value="">ทุกทิศ (View)</option>
+                            {uniqueViews.map((view, i) => (
+                                <option key={i} value={view}>{view}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
 
                 <div className="bg-white rounded-2xl p-2 border border-slate-100 shadow-sm flex items-center gap-4 mb-6">
                     <div className="flex items-center gap-3">

@@ -22,7 +22,7 @@ const getDaysUntil = (dateStr: string) => {
     return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-type Intention = 'pending' | 'renew' | 'not_renew';
+type Intention = 'pending' | 'not_asked' | 'renew' | 'renew_no_room' | 'not_renew';
 
 export default function RenewalCheckPage() {
     const router = useRouter();
@@ -93,6 +93,12 @@ export default function RenewalCheckPage() {
                 // Apply intention filter
                 if (intentionFilter === 'all') return true;
                 const intention = getIntention(c.id)?.intention || 'pending';
+                if (intentionFilter === 'pending') {
+                    return intention === 'pending' || intention === 'not_asked';
+                }
+                if (intentionFilter === 'renew') {
+                    return intention === 'renew' || intention === 'renew_no_room';
+                }
                 return intention === intentionFilter;
             })
             .sort((a, b) => {
@@ -147,6 +153,9 @@ export default function RenewalCheckPage() {
         if (intention === 'renew') {
             router.push(`/bookings?renewContractId=${contractId}`);
         }
+        if (intention === 'renew_no_room') {
+            router.push('/waitlists?quickAction=newWaitlist');
+        }
     };
 
     const handleSaveNote = async () => {
@@ -164,16 +173,21 @@ export default function RenewalCheckPage() {
 
     const intentionConfig: Record<Intention, { label: string; color: string; bg: string; border: string; icon: string; btnHover: string }> = {
         pending: { label: 'รอตอบกลับ', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', icon: '⏳', btnHover: 'hover:bg-amber-500 hover:text-white hover:border-amber-500' },
-        renew: { label: 'ต่อสัญญา', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300', icon: '✅', btnHover: 'hover:bg-emerald-500 hover:text-white hover:border-emerald-500' },
+        not_asked: { label: 'ยังไม่สอบถาม', color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-300', icon: '❓', btnHover: 'hover:bg-slate-500 hover:text-white hover:border-slate-500' },
+        renew: { label: 'ต่อสัญญาห้องเดิม', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300', icon: '✅', btnHover: 'hover:bg-emerald-500 hover:text-white hover:border-emerald-500' },
+        renew_no_room: { label: 'ต่อสัญญาไม่ระบุห้อง', color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-300', icon: '📝', btnHover: 'hover:bg-sky-500 hover:text-white hover:border-sky-500' },
         not_renew: { label: 'ไม่ต่อสัญญา', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-300', icon: '🚪', btnHover: 'hover:bg-red-500 hover:text-white hover:border-red-500' },
     };
 
     const stats = useMemo(() => {
         const pending = expiringContracts.filter(c => {
             const i = getIntention(c.id);
-            return !i || i.intention === 'pending';
+            return !i || i.intention === 'pending' || i.intention === 'not_asked';
         }).length;
-        const renew = expiringContracts.filter(c => getIntention(c.id)?.intention === 'renew').length;
+        const renew = expiringContracts.filter(c => {
+            const intention = getIntention(c.id)?.intention;
+            return intention === 'renew' || intention === 'renew_no_room';
+        }).length;
         const notRenew = expiringContracts.filter(c => getIntention(c.id)?.intention === 'not_renew').length;
         return { pending, renew, notRenew, total: expiringContracts.length };
     }, [expiringContracts, intentions]);
@@ -268,14 +282,15 @@ export default function RenewalCheckPage() {
                 <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-100 mt-1">
                     {userCanEdit ? (
                         <>
-                            {(['pending', 'renew', 'not_renew'] as Intention[]).map((action) => {
+                            {(['not_asked', 'pending', 'renew', 'renew_no_room', 'not_renew'] as Intention[]).map((action) => {
                                 const isCurrent = currentIntention === action;
                                 const actionCfg = intentionConfig[action];
 
                                 let activeClasses = "";
                                 if (isCurrent) {
-                                    if (action === 'pending') activeClasses = "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-200";
+                                    if (action === 'pending' || action === 'not_asked') activeClasses = "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-200";
                                     if (action === 'renew') activeClasses = "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-200";
+                                    if (action === 'renew_no_room') activeClasses = "bg-sky-500 text-white border-sky-500 shadow-md shadow-sky-200";
                                     if (action === 'not_renew') activeClasses = "bg-red-500 text-white border-red-500 shadow-md shadow-red-200";
                                 } else {
                                     activeClasses = `bg-white text-slate-500 border-slate-200 ${actionCfg.btnHover}`;
@@ -371,7 +386,7 @@ export default function RenewalCheckPage() {
                     {[
                         { value: 'all' as const, label: 'ทั้งหมด', icon: '📋' },
                         { value: 'pending' as const, label: 'รอตอบกลับ', icon: '⏳' },
-                        { value: 'renew' as const, label: 'ต่อสัญญา', icon: '✅' },
+                        { value: 'renew' as const, label: 'ต่อสัญญาห้องเดิม', icon: '✅' },
                         { value: 'not_renew' as const, label: 'ไม่ต่อสัญญา', icon: '🚪' },
                     ].map(filter => {
                         const isActive = intentionFilter === filter.value;
@@ -459,8 +474,9 @@ export default function RenewalCheckPage() {
                                 type="button"
                                 onClick={() => upsertIntention(confirmModal.contractId, confirmModal.roomId, confirmModal.tenantName, confirmModal.intention)}
                                 className={`flex-1 px-4 py-3 text-sm font-bold text-white rounded-xl shadow-lg transition-colors ${confirmModal.intention === 'renew' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30' :
-                                    confirmModal.intention === 'not_renew' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' :
-                                        'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30'
+                                    confirmModal.intention === 'renew_no_room' ? 'bg-sky-500 hover:bg-sky-600 shadow-sky-500/30' :
+                                        confirmModal.intention === 'not_renew' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' :
+                                            'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30'
                                     }`}
                             >
                                 ยืนยัน

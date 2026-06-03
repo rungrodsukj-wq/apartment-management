@@ -990,7 +990,7 @@ export default function DashboardPage() {
                         <span className="text-xs font-semibold text-slate-500">ค่าเช่ารายเดือน</span>
                       </div>
                       <span className="text-xs font-extrabold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-xl">
-                        {c.monthly_rent ? `${c.monthly_rent.toLocaleString('th-TH')} บาท` : '-'}
+                        {c.monthly_rent != null ? `${Number(c.monthly_rent).toLocaleString('th-TH')} บาท` : '-'}
                       </span>
                     </div>
                   </div>

@@ -112,7 +112,7 @@ export default function AvailableRoomsPage() {
     const lockedRoomIds = useMemo(() => {
         const locked = new Set<string>();
         for (const intent of intentions) {
-            if (intent.intention === 'pending' || intent.intention === 'renew') {
+            if (intent.intention === 'pending' || intent.intention === 'not_asked' || intent.intention === 'renew' || intent.intention === 'renew_no_room') {
                 // Find the associated contract to check its end date overlaps our check window
                 const contract = contracts.find(c => c.id === intent.contract_id);
                 if (contract && contract.main_room_id) {

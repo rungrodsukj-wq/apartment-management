@@ -1,7 +1,7 @@
 //src/app/waitlists/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
@@ -34,6 +34,9 @@ export default function BookingsPage() {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+
+    // Start date filter for waitlist (single date)
+    const [startDate, setStartDate] = useState<string | null>(null);
 
 
     const [formData, setFormData] = useState({
@@ -232,6 +235,18 @@ export default function BookingsPage() {
         }
     }
 
+    const filteredItems = useMemo(() => {
+        if (!startDate) return items;
+        return items.filter(item => {
+            if (!item.start_date) return false;
+            const s = new Date(item.start_date);
+            s.setHours(0,0,0,0);
+            const target = new Date(startDate);
+            target.setHours(0,0,0,0);
+            return s.getTime() === target.getTime();
+        });
+    }, [items, startDate]);
+
     const isKitchenDisabled = ['One Bedroom', 'Triple Bedroom', 'One Bedroom Suite'].includes(formData.room_type);
     const isViewDisabled = formData.room_type === 'One Bedroom' || formData.room_type === 'Triple Bedroom';
 
@@ -244,6 +259,13 @@ export default function BookingsPage() {
             month: 'short',
             year: 'numeric'
         }).format(date);
+    };
+
+    const formatDateDMY = (dateStr?: string | null) => {
+        if (!dateStr) return '-';
+        const d = new Date(dateStr);
+        if (Number.isNaN(d.getTime())) return '-';
+        return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
     };
 
     return (
@@ -265,18 +287,45 @@ export default function BookingsPage() {
                         <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl">📋</div>
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">คิวรอจัดสรร</p>
-                            <p className="text-2xl font-bold text-[#0A2647]">{items.length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
+                            <p className="text-2xl font-bold text-[#0A2647]">{filteredItems.length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
                         </div>
                     </div>
                 </div>
 
                 <h2 className="text-lg font-bold text-[#0A2647] mb-4">รายการล่าสุด</h2>
 
+                <div className="bg-white rounded-2xl p-2 border border-slate-100 shadow-sm flex items-center gap-4 mb-6">
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-600">วันที่เริ่มสัญญา</label>
+                        <input
+                            type="date"
+                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none"
+                            value={startDate ?? ''}
+                            onChange={e => {
+                                const v = e.target.value;
+                                if (!v) return setStartDate(null);
+                                // enforce day = 01
+                                const [y, m] = v.split('-');
+                                setStartDate(`${y}-${m}-01`);
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => { setStartDate(null); }}
+                            className="ml-2 bg-white text-slate-600 border border-slate-200 px-3 py-2 rounded-xl text-sm"
+                        >ล้าง</button>
+                    </div>
+
+                    <div className="ml-auto text-sm text-slate-500">
+                        {startDate ? formatDateDMY(startDate) : 'ยังไม่เลือกวันที่'}
+                    </div>
+                </div>
+
                 {loading ? (
                     <div className="flex justify-center p-20"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-[#4F81FF]"></div></div>
                 ) : (
                     <div className="flex flex-col gap-3">
-                        {items.map((item) => (
+                        {filteredItems.map((item) => (
                             <div key={item.id} className="bg-white rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4 md:gap-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.06)] border border-slate-100 transition-all group">
 
                                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 font-bold text-lg hidden md:flex">
@@ -337,7 +386,7 @@ export default function BookingsPage() {
                                 )}
                             </div>
                         ))}
-                        {items.length === 0 && (
+                        {filteredItems.length === 0 && (
                             <div className="text-center py-20 text-slate-400 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
                                 <div className="text-5xl mb-4">📭</div>
                                 <p className="font-medium text-lg text-slate-600">ยังไม่มีรายการจอง</p>

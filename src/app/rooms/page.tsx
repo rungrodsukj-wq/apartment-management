@@ -118,8 +118,16 @@ export default function RoomsPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // 2. ลอจิกดึงตัวเลขชั้นจากหมายเลขห้อง
+        // 2. ลอจิกดึงตัวเลขชั้นและ building จากหมายเลขห้อง
         let calculatedFloor = null;
+        let calculatedBuilding = null;
+
+        // ดึง building (ตัวอักษรที่อยู่หน้า) เช่น "S204" -> "S", "L202" -> "L"
+        const buildingMatch = formData.room_number.match(/^[A-Za-z]+/);
+        if (buildingMatch) {
+            calculatedBuilding = buildingMatch[0];
+        }
+
         // ดึงเฉพาะตัวเลขออกมา เช่น "L202" จะได้ "202", "S1005" จะได้ "1005"
         const numberMatch = formData.room_number.match(/\d+/); 
         
@@ -134,10 +142,11 @@ export default function RoomsPage() {
             }
         }
 
-        // 3. รวมค่า floor เข้าไปในข้อมูลที่จะส่งไป Database
+        // 3. รวมค่า floor และ building เข้าไปในข้อมูลที่จะส่งไป Database
         const payload = {
             ...formData,
-            floor: calculatedFloor
+            floor: calculatedFloor,
+            building: calculatedBuilding
         };
 
         if (editId) {

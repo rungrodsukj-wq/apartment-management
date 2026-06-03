@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 
-// 🌟 อัปเดต Interface ให้มีฟิลด์สำหรับ Filter
 interface Room {
   id: string;
   room_number: string;
@@ -33,6 +32,7 @@ interface Contract {
   actual_check_in_date?: string;
   monthly_rent?: number;
 }
+
 interface Block {
   type: 'MAIN' | 'TEMP' | 'MOVE';
   name: string;
@@ -57,7 +57,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [selectedBlockForDetail, setSelectedBlockForDetail] = useState<Block | null>(null);
 
-  // 🌟 State สำหรับตัวกรอง
+  // State สำหรับตัวกรอง
   const [filterBuilding, setFilterBuilding] = useState('');
   const [filterFloor, setFilterFloor] = useState('');
   const [filterRoomType, setFilterRoomType] = useState('');
@@ -72,7 +72,7 @@ export default function DashboardPage() {
   const [searchStartDate, setSearchStartDate] = useState(defaultStart.toISOString().split('T')[0]);
   const [searchEndDate, setSearchEndDate] = useState(defaultEnd.toISOString().split('T')[0]);
 
-  // 🌟 States สำหรับโหมดตัวเลือกวันที่ (รายปี, รายเดือน, กำหนดเอง)
+  // States สำหรับโหมดตัวเลือกวันที่ (รายปี, รายเดือน, กำหนดเอง)
   const [filterMode, setFilterMode] = useState<'custom' | 'yearly' | 'monthly'>('yearly');
   const [startYear, setStartYear] = useState(new Date().getFullYear());
   const [endYear, setEndYear] = useState(new Date().getFullYear() + 1);
@@ -118,11 +118,6 @@ export default function DashboardPage() {
   const startX = useRef(0);
   const scrollLeft = useRef(0);
 
-  const occupancyScrollContainerRef = useRef<HTMLDivElement>(null);
-  const isOccupancyDragging = useRef(false);
-  const occupancyStartX = useRef(0);
-  const occupancyScrollLeft = useRef(0);
-
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -160,32 +155,6 @@ export default function DashboardPage() {
     const x = e.pageX - el.offsetLeft;
     const walk = (x - startX.current) * 1.5;
     el.scrollLeft = scrollLeft.current - walk;
-  };
-
-  const handleOccupancyMouseDown = (e: React.MouseEvent) => {
-    const el = occupancyScrollContainerRef.current;
-    if (!el) return;
-    isOccupancyDragging.current = true;
-    occupancyStartX.current = e.pageX - el.offsetLeft;
-    occupancyScrollLeft.current = el.scrollLeft;
-    el.style.cursor = 'grabbing';
-  };
-
-  const handleOccupancyMouseLeaveOrUp = () => {
-    const el = occupancyScrollContainerRef.current;
-    if (!el) return;
-    isOccupancyDragging.current = false;
-    el.style.cursor = 'grab';
-  };
-
-  const handleOccupancyMouseMove = (e: React.MouseEvent) => {
-    if (!isOccupancyDragging.current) return;
-    e.preventDefault();
-    const el = occupancyScrollContainerRef.current;
-    if (!el) return;
-    const x = e.pageX - el.offsetLeft;
-    const walk = (x - occupancyStartX.current) * 1.5;
-    el.scrollLeft = occupancyScrollLeft.current - walk;
   };
 
   useEffect(() => {
@@ -250,14 +219,12 @@ export default function DashboardPage() {
     setLoading(false);
   }
 
-  // 🌟 ประมวลผลข้อมูลสำหรับ Dropdown อัตโนมัติจากห้องที่มี
   const uniqueBuildings = Array.from(new Set(rooms.map(r => r.building).filter(Boolean)));
   const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor).filter(Boolean))).sort((a, b) => Number(a) - Number(b));
   const uniqueKitchens = Array.from(new Set(rooms.map(r => r.kitchen_type).filter(Boolean)));
   const uniqueRoomTypes = Array.from(new Set(rooms.map(r => r.room_type).filter(Boolean)));
   const uniqueViews = Array.from(new Set(rooms.map(r => r.view_direction).filter(Boolean)));
 
-  // 🌟 ฟิลเตอร์ห้องตาม State ที่ผู้ใช้เลือก
   const filteredRooms = rooms.filter(room => {
     const matchBuilding = filterBuilding === '' || room.building === filterBuilding;
     const matchFloor = filterFloor === '' || String(room.floor || '') === filterFloor;
@@ -571,7 +538,11 @@ export default function DashboardPage() {
             <div className="text-emerald-100 font-medium text-sm mb-1">ห้องว่างช่วงที่เลือก</div>
             <div className="text-4xl font-extrabold">{loading ? '-' : stats.totalVacant} <span className="text-base font-medium opacity-80">ห้อง</span></div>
           </div>
-          <div className="absolute -bottom-4 -right-4 text-7xl opacity-20">✨</div>
+          <div className="absolute -bottom-4 -right-4 opacity-20">
+            <svg className="w-20 h-20 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4M4 19h4M13 12l3 3-3 3M19 3l-3 3 3 3M11 5l1.5 1.5L11 8l-1.5-1.5L11 5z" />
+            </svg>
+          </div>
         </div>
 
         <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center justify-between">
@@ -579,7 +550,11 @@ export default function DashboardPage() {
             <div className="text-sm font-bold text-sky-500 mb-1">ว่าง: ครัวหน้า</div>
             <div className="text-3xl font-extrabold text-[#0A2647]">{loading ? '-' : stats.frontKitchen}</div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-500 flex items-center justify-center text-xl">🍳</div>
+          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-500 flex items-center justify-center">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
         </div>
 
         <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center justify-between">
@@ -587,7 +562,11 @@ export default function DashboardPage() {
             <div className="text-sm font-bold text-indigo-500 mb-1">ว่าง: ครัวหลัง</div>
             <div className="text-3xl font-extrabold text-[#0A2647]">{loading ? '-' : stats.backKitchen}</div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center text-xl">🔪</div>
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4h12m0 0a2 2 0 100-4m0 4a2 2 0 110-4M6 14V6a2 2 0 012-2h8a2 2 0 012 2v8" />
+            </svg>
+          </div>
         </div>
 
         <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-rose-100 flex flex-col justify-between relative overflow-hidden group">
@@ -607,7 +586,14 @@ export default function DashboardPage() {
       {/* Monthly Occupancy Rate Section */}
       <section className="bg-white border border-slate-100 rounded-[2rem] shadow-[0_8px_30px_-4px_rgba(0,0,0,0.04)] p-6">
         <h2 className="font-bold text-[#0A2647] text-lg mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <span className="flex items-center gap-2"><span className="p-1.5 bg-blue-50 rounded-lg text-[#4F81FF]">📈</span> อัตราการเข้าพักและการจองรายเดือน</span>
+          <span className="flex items-center gap-2">
+            <span className="p-1.5 bg-blue-50 rounded-lg text-[#4F81FF] flex items-center justify-center">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </span>
+            อัตราการเข้าพักและการจองรายเดือน
+          </span>
           <span className="text-sm text-slate-500">Occupancy Rate + Booking Rate</span>
         </h2>
         {loading ? (
@@ -688,27 +674,6 @@ export default function DashboardPage() {
                 </svg>
               </div>
             </div>
-
-            {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {occupancyData.map((data, idx) => (
-                <div key={idx} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-sm font-bold text-slate-700">{data.monthLabel}</div>
-                    <div className="text-xs text-slate-500">จอง {data.bookingCount} ห้อง</div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <div className="text-sm text-slate-500">อัตราการเข้าพัก</div>
-                      <div className="mt-2 text-2xl font-extrabold text-[#4F81FF]">{data.occupancyRate.toFixed(1)}%</div>
-                    </div>
-                    <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <div className="text-sm text-slate-500">อัตราการจอง</div>
-                      <div className="mt-2 text-2xl font-extrabold text-[#F59E0B]">{data.bookingRate.toFixed(1)}%</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div> */}
           </div>
         )}
       </section>
@@ -716,7 +681,7 @@ export default function DashboardPage() {
       {/* Gantt Chart Section */}
       <section className="bg-white border border-slate-100 rounded-[2rem] shadow-[0_8px_30px_-4px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col">
 
-        {/* 🌟 Room Filters Bar */}
+        {/* Room Filters Bar */}
         <div className="p-4 px-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center gap-4 z-20">
           <span className="text-sm font-bold text-slate-500 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
@@ -749,7 +714,12 @@ export default function DashboardPage() {
         <div className="p-4 px-6 border-b border-slate-100 bg-white flex flex-wrap gap-4 justify-between items-center z-20">
           <div className="flex items-center gap-6">
             <h2 className="font-bold text-[#0A2647] text-lg flex items-center gap-2">
-              <span className="p-1.5 bg-indigo-50 rounded-lg text-indigo-500">📊</span> ผังตารางห้องพัก
+              <span className="p-1.5 bg-indigo-50 rounded-lg text-indigo-500 flex items-center justify-center">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" />
+                </svg>
+              </span>
+              ผังตารางห้องพัก
             </h2>
 
             <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
@@ -790,7 +760,6 @@ export default function DashboardPage() {
                 เลขห้อง
               </div>
               <div className="divide-y divide-slate-100 bg-white">
-                {/* 🌟 เปลี่ยนมา map จาก filteredRooms */}
                 {filteredRooms.map(room => (
                   <div key={room.id} className="h-12 flex items-center justify-center font-bold text-sm text-[#0A2647] hover:bg-blue-50/50 transition-colors bg-white">
                     {room.room_number}
@@ -829,7 +798,6 @@ export default function DashboardPage() {
 
               {/* Rooms Rows */}
               <div className="divide-y divide-slate-100/60 relative">
-                {/* 🌟 เปลี่ยนมา map จาก filteredRooms */}
                 {filteredRooms.map(room => {
                   const roomBlocks = getBlocksForRoom(room.id);
                   return (
@@ -844,12 +812,13 @@ export default function DashboardPage() {
                         if (block.end < startDate || block.start > endDate) return null;
 
                         return (
+                          /* 🌟 ย้ายคอมเมนต์แจ้งเตือนมาอยู่ตำแหน่งที่ถูกต้องนอกแท็กเปิดเรียบร้อยแล้ว */
                           <button
                             key={idx}
                             type="button"
                             onClick={() => setSelectedBlockForDetail(block)}
                             style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
-                            className={`absolute top-1.5 bottom-1.5 rounded-lg shadow-sm text-[10px] font-medium text-white flex items-center px-2.5 cursor-pointer transition-all hover:brightness-110 hover:shadow-md hover:z-20 border border-white/10 text-left outline-none focus:ring-1 focus:ring-white/50
+                            className={`absolute top-1.5 bottom-1.5 rounded-lg shadow-sm text-xs font-bold text-white flex items-center px-2.5 cursor-pointer transition-all hover:brightness-110 hover:shadow-md hover:z-20 border border-white/10 text-left outline-none focus:ring-1 focus:ring-white/50
                               ${block.isCancelled
                                 ? 'bg-slate-200 !text-slate-500 line-through decoration-red-400/80 decoration-2 border-slate-300 border-dashed'
                                 : block.type === 'TEMP'
@@ -876,7 +845,6 @@ export default function DashboardPage() {
                     </div>
                   );
                 })}
-                {/* 🌟 กรณีค้นหาแล้วไม่เจอ */}
                 {filteredRooms.length === 0 && (
                   <div className="p-10 text-center text-slate-400 font-medium bg-slate-50/50">
                     ไม่พบห้องพักที่ตรงกับตัวกรองที่คุณเลือก
@@ -945,8 +913,10 @@ export default function DashboardPage() {
               <div className="p-8 space-y-6 overflow-y-auto">
                 {/* Visual Header */}
                 <div className="flex items-center gap-5 bg-slate-50 border border-slate-100 rounded-3xl p-5">
-                  <div className="w-16 h-16 bg-[#4F81FF] text-white rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-blue-500/20">
-                    👤
+                  <div className="w-16 h-16 bg-[#4F81FF] text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-xl font-bold text-[#0A2647] truncate" title={c.tenant_name}>คุณ {c.tenant_name}</h3>
@@ -964,7 +934,11 @@ export default function DashboardPage() {
                     {/* ระยะเวลาสัญญาหลัก */}
                     <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-base">📅</span>
+                        <span className="flex items-center justify-center text-slate-500">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </span>
                         <span className="text-xs font-semibold text-slate-500">ระยะเวลาสัญญาหลัก</span>
                       </div>
                       <span className="text-xs font-bold text-slate-800">
@@ -975,7 +949,11 @@ export default function DashboardPage() {
                     {/* วันที่เช็คอินจริง */}
                     <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-base">🔑</span>
+                        <span className="flex items-center justify-center text-slate-500">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a3 3 0 11-6 0 3 3 0 016 0zm0 0v7a3 3 0 01-3 3H9v-2h2v-2H9v-2h6z" />
+                          </svg>
+                        </span>
                         <span className="text-xs font-semibold text-slate-500">วันเช็คอินจริง</span>
                       </div>
                       <span className="text-xs font-bold text-slate-800">
@@ -986,7 +964,11 @@ export default function DashboardPage() {
                     {/* ค่าเช่ารายเดือน */}
                     <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-base">💵</span>
+                        <span className="flex items-center justify-center text-slate-500">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </span>
                         <span className="text-xs font-semibold text-slate-500">ค่าเช่ารายเดือน</span>
                       </div>
                       <span className="text-xs font-extrabold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-xl">

@@ -95,13 +95,11 @@ export default function RenewalCheckPage() {
             .filter(c => {
                 // Apply intention filter
                 if (intentionFilter === 'all') return true;
-                const intention = getIntention(c.id)?.intention || 'pending';
-                if (intentionFilter === 'pending') {
-                    return intention === 'pending' || intention === 'not_asked';
-                }
-                if (intentionFilter === 'renew') {
-                    return intention === 'renew' || intention === 'renew_no_room';
-                }
+                
+                // กำหนดค่าเริ่มต้นเป็น 'pending' หากยังไม่มีข้อมูลบันทึกในฐานข้อมูล (ตามโค้ดเดิมของคุณ)
+                const intention = getIntention(c.id)?.intention || 'pending'; 
+                
+                // เทียบค่าตรง ๆ กับฟิลเตอร์ที่เลือกได้เลย
                 return intention === intentionFilter;
             })
             .filter(c => {
@@ -181,25 +179,88 @@ export default function RenewalCheckPage() {
         setNoteModal(null);
     };
 
-    const intentionConfig: Record<Intention, { label: string; color: string; bg: string; border: string; icon: string; btnHover: string }> = {
-        pending: { label: 'รอตอบกลับ', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', icon: '⏳', btnHover: 'hover:bg-amber-500 hover:text-white hover:border-amber-500' },
-        not_asked: { label: 'ยังไม่สอบถาม', color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-300', icon: '❓', btnHover: 'hover:bg-slate-500 hover:text-white hover:border-slate-500' },
-        renew: { label: 'ต่อสัญญาห้องเดิม', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300', icon: '✅', btnHover: 'hover:bg-emerald-500 hover:text-white hover:border-emerald-500' },
-        renew_no_room: { label: 'ต่อสัญญาไม่ระบุห้อง', color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-300', icon: '📝', btnHover: 'hover:bg-sky-500 hover:text-white hover:border-sky-500' },
-        not_renew: { label: 'ไม่ต่อสัญญา', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-300', icon: '🚪', btnHover: 'hover:bg-red-500 hover:text-white hover:border-red-500' },
+    const intentionConfig: Record<Intention, { label: string; color: string; bg: string; border: string; icon: (props?: { className?: string }) => React.ReactNode; btnHover: string }> = {
+        pending: { 
+            label: 'รอตอบกลับ', 
+            color: 'text-amber-700', 
+            bg: 'bg-amber-50', 
+            border: 'border-amber-300', 
+            icon: (props) => (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={props?.className}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+            ), 
+            btnHover: 'hover:bg-amber-500 hover:text-white hover:border-amber-500' 
+        },
+        not_asked: { 
+            label: 'ยังไม่สอบถาม', 
+            color: 'text-slate-700', 
+            bg: 'bg-slate-50', 
+            border: 'border-slate-300', 
+            icon: (props) => (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={props?.className}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                </svg>
+            ), 
+            btnHover: 'hover:bg-slate-500 hover:text-white hover:border-slate-500' 
+        },
+        renew: { 
+            label: 'ต่อสัญญาห้องเดิม', 
+            color: 'text-emerald-700', 
+            bg: 'bg-emerald-50', 
+            border: 'border-emerald-300', 
+            icon: (props) => (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={props?.className}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+            ), 
+            btnHover: 'hover:bg-emerald-500 hover:text-white hover:border-emerald-500' 
+        },
+        renew_no_room: { 
+            label: 'ต่อสัญญาไม่ระบุห้อง', 
+            color: 'text-sky-700', 
+            bg: 'bg-sky-50', 
+            border: 'border-sky-300', 
+            icon: (props) => (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={props?.className}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+            ), 
+            btnHover: 'hover:bg-sky-500 hover:text-white hover:border-sky-500' 
+        },
+        not_renew: { 
+            label: 'ไม่ต่อสัญญา', 
+            color: 'text-red-700', 
+            bg: 'bg-red-50', 
+            border: 'border-red-300', 
+            icon: (props) => (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={props?.className}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
+                </svg>
+            ), 
+            btnHover: 'hover:bg-red-500 hover:text-white hover:border-red-500' 
+        },
     };
 
     const stats = useMemo(() => {
+        // 1. นับเฉพาะ "รอตอบกลับ" (รวมถึงห้องที่ยังไม่มีประวัติให้ถือว่ารอตอบกลับเบื้องต้น หรือเปลี่ยนเป็น 0 ถ้ายึดตามจริง)
         const pending = expiringContracts.filter(c => {
             const i = getIntention(c.id);
-            return !i || i.intention === 'pending' || i.intention === 'not_asked';
+            return !i || i.intention === 'pending';
         }).length;
+
+        // 2. เพิ่มตัวแปรนับ "ยังไม่สอบถาม" แยกออกมา
+        const notAsked = expiringContracts.filter(c => getIntention(c.id)?.intention === 'not_asked').length;
+
         const renew = expiringContracts.filter(c => {
             const intention = getIntention(c.id)?.intention;
             return intention === 'renew' || intention === 'renew_no_room';
         }).length;
+        
         const notRenew = expiringContracts.filter(c => getIntention(c.id)?.intention === 'not_renew').length;
-        return { pending, renew, notRenew, total: expiringContracts.length };
+        
+        // อย่าลืมส่งคืนค่า notAsked ออกไปด้วย
+        return { pending, notAsked, renew, notRenew, total: expiringContracts.length };
     }, [expiringContracts, intentions]);
 
     const grouped = useMemo(() => {
@@ -250,7 +311,7 @@ export default function RenewalCheckPage() {
                         <div className="flex items-center gap-3 flex-wrap">
                             <h3 className="text-lg font-bold text-slate-800">{contract.tenant_name}</h3>
                             <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border shadow-sm ${cfg.bg} ${cfg.color} ${cfg.border}`}>
-                                {cfg.icon} {cfg.label}
+                                {cfg.icon({ className: 'w-3.5 h-3.5 shrink-0' })} {cfg.label}
                             </span>
                             {isSaving && (
                                 <span className="text-[11px] font-medium text-slate-400 animate-pulse bg-slate-100 px-2 py-1 rounded-full">
@@ -261,15 +322,21 @@ export default function RenewalCheckPage() {
 
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
                             {room && (
-                                <span className="flex items-center gap-1">
-                                    <span className="opacity-70">🏢</span> {room.room_type || '-'} · {room.kitchen_type || '-'} · ชั้น {room.floor || '-'}
+                                <span className="flex items-center gap-1.5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 opacity-70">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75H21m-3.75 3.75H21" />
+                                    </svg>
+                                    {room.room_type || '-'} · {room.kitchen_type || '-'} · ชั้น {room.floor || '-'}
                                 </span>
                             )}
                         </div>
 
                         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
-                            <span className="flex items-center gap-1">
-                                <span className="opacity-70">📅</span> {formatDateTH(contract.contract_start_date)} → {formatDateTH(contract.contract_end_date)}
+                            <span className="flex items-center gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 opacity-70">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" />
+                                </svg>
+                                {formatDateTH(contract.contract_start_date)} → {formatDateTH(contract.contract_end_date)}
                             </span>
                             <span className={`font-bold px-2 py-0.5 rounded-md ${days < 0 ? 'bg-red-50 text-red-600' :
                                 days <= 30 ? 'bg-orange-50 text-orange-600' :
@@ -281,8 +348,11 @@ export default function RenewalCheckPage() {
                         </div>
 
                         {intention?.note && (
-                            <div className="mt-3 text-sm text-slate-600 bg-slate-50/80 rounded-xl px-4 py-2.5 border border-slate-100 relative before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:bg-slate-300 before:rounded-r-md">
-                                <span className="mr-1.5">📝</span> {intention.note}
+                            <div className="mt-3 text-sm text-slate-600 bg-slate-50/80 rounded-xl px-4 py-2.5 border border-slate-100 relative before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:bg-slate-300 before:rounded-r-md flex items-start gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 mt-0.5 text-slate-400 shrink-0">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                </svg>
+                                <span>{intention.note}</span>
                             </div>
                         )}
                     </div>
@@ -321,9 +391,10 @@ export default function RenewalCheckPage() {
                                                 });
                                             }
                                         }}
-                                        className={`flex-1 min-w-[105px] px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all duration-200 ${activeClasses} disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        className={`inline-flex items-center justify-center gap-1.5 flex-1 min-w-[105px] px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all duration-200 ${activeClasses} disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
-                                        {actionCfg.icon} {actionCfg.label}
+                                        {actionCfg.icon({ className: 'w-4 h-4 shrink-0' })}
+                                        <span>{actionCfg.label}</span>
                                     </button>
                                 );
                             })}
@@ -335,15 +406,18 @@ export default function RenewalCheckPage() {
                                     setNoteModal({ contractId: contract.id, roomId: contract.main_room_id, tenantName: contract.tenant_name, currentNote: intention?.note || '' });
                                     setNoteInput(intention?.note || '');
                                 }}
-                                className="px-4 py-2.5 rounded-xl text-sm font-semibold border-2 border-slate-200 text-slate-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 disabled:opacity-50"
+                                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 border-slate-200 text-slate-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 disabled:opacity-50"
                                 title="เพิ่มหมายเหตุ"
                             >
-                                📝 หมายเหตุ
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                </svg>
+                                <span>หมายเหตุ</span>
                             </button>
                         </>
                     ) : (
                         <div className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${cfg.bg} ${cfg.color} ${cfg.border}`}>
-                            {cfg.icon} {cfg.label}
+                            {cfg.icon({ className: 'w-3.5 h-3.5 shrink-0' })} {cfg.label}
                         </div>
                     )}
                 </div>
@@ -351,12 +425,12 @@ export default function RenewalCheckPage() {
         );
     };
 
-    const renderGroup = (title: string, icon: string, color: string, list: any[]) => {
+    const renderGroup = (title: string, icon: React.ReactNode, color: string, list: any[]) => {
         if (list.length === 0) return null;
         return (
             <div className="mb-10">
                 <div className={`flex items-center gap-3 mb-5`}>
-                    <div className="w-8 h-8 rounded-full bg-white shadow-sm border border-slate-100 flex items-center justify-center text-lg">
+                    <div className="w-8 h-8 rounded-full bg-white shadow-sm border border-slate-100 flex items-center justify-center">
                         {icon}
                     </div>
                     <h2 className={`text-lg font-bold ${color}`}>{title}</h2>
@@ -375,23 +449,35 @@ export default function RenewalCheckPage() {
         <div className="min-h-full flex flex-col bg-transparent">
             <div className="flex-1 p-8 md:p-10 max-w-7xl mx-auto w-full">
                 {/* Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-8">
                     {[
-                        { label: 'ใกล้หมดทั้งหมด', value: stats.total, icon: '📋', iconBg: 'bg-slate-100 text-slate-600' },
-                        { label: 'รอตอบกลับ', value: stats.pending, icon: '⏳', iconBg: 'bg-amber-100 text-amber-600' },
-                        { label: 'ต่อสัญญา', value: stats.renew, icon: '✅', iconBg: 'bg-emerald-100 text-emerald-600' },
-                        { label: 'ไม่ต่อสัญญา', value: stats.notRenew, icon: '🚪', iconBg: 'bg-red-100 text-red-600' },
+                        { 
+                            label: 'ใกล้หมดทั้งหมด', 
+                            value: stats.total, 
+                            icon: (
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.03 0 1.9.693 2.166 1.638m-7.377 0A48.536 48.536 0 0 1 12 3m0 0c-1.135 0-2.098.845-2.192 1.976a48.414 48.414 0 0 0-.123 1.829V16.5A2.25 2.25 0 0 0 12 18.75h.75m-3-15h.008v.008H9.75v-.008Zm0 3h.008v.008H9.75V6.75Z" />
+                                </svg>
+                            ), 
+                            iconBg: 'bg-slate-100 text-slate-600' 
+                        },
+                        // 👇 เพิ่มบรรทัดนี้เข้าไป
+                        { label: 'ยังไม่สอบถาม', value: stats.notAsked, icon: intentionConfig.not_asked.icon({ className: 'w-6 h-6' }), iconBg: 'bg-slate-100 text-slate-700' },
+                        { label: 'รอตอบกลับ', value: stats.pending, icon: intentionConfig.pending.icon({ className: 'w-6 h-6' }), iconBg: 'bg-amber-100 text-amber-600' },
+                        { label: 'ต่อสัญญา', value: stats.renew, icon: intentionConfig.renew.icon({ className: 'w-6 h-6' }), iconBg: 'bg-emerald-100 text-emerald-600' },
+                        { label: 'ไม่ต่อสัญญา', value: stats.notRenew, icon: intentionConfig.not_renew.icon({ className: 'w-6 h-6' }), iconBg: 'bg-red-100 text-red-600' },
                     ].map(s => (
                         <div key={s.label} className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5 transition-transform hover:-translate-y-1 duration-300">
-                            <div className={`w-14 h-14 rounded-2xl ${s.iconBg} flex items-center justify-center text-2xl shrink-0 shadow-sm`}>{s.icon}</div>
+                            <div className={`w-14 h-14 rounded-2xl ${s.iconBg} flex items-center justify-center shrink-0 shadow-sm`}>{s.icon}</div>
                             <div>
-                                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{s.label}</p>
+                                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{s.label}</p>
                                 <p className="text-2xl font-bold text-[#0A2647]">{s.value} <span className="text-xs font-medium text-slate-500">รายการ</span></p>
                             </div>
                         </div>
                     ))}
                 </div>
-                {/* Header */}
+
+                {/* Header Filters */}
                 <div className="grid gap-3 lg:grid-cols-[minmax(260px,420px)_1fr] mb-4">
                     <div className="flex flex-wrap items-center gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
                         <span className="text-sm font-semibold text-slate-600 px-2">แสดงสัญญาที่หมดภายใน:</span>
@@ -409,7 +495,7 @@ export default function RenewalCheckPage() {
                     </div>
 
                     <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
-                        <span className="text-sm font-semibold text-slate-600">ค้นหา</span>
+                        <span className="text-sm font-semibold text-slate-600 pl-2">ค้นหา</span>
                         <input
                             type="search"
                             value={searchQuery}
@@ -423,12 +509,20 @@ export default function RenewalCheckPage() {
                 {/* Intention Filter */}
                 <div className="flex flex-wrap gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
                     {[
-                        { value: 'all' as const, label: 'ทั้งหมด', icon: '📋' },
-                        { value: 'not_asked' as const, label: 'ยังไม่สอบถาม', icon: '❓' },
-                        { value: 'pending' as const, label: 'รอตอบกลับ', icon: '⏳' },
-                        { value: 'renew' as const, label: 'ต่อสัญญาห้องเดิม', icon: '✅' },
-                        { value: 'renew_no_room' as const, label: 'ต่อสัญญาไม่ระบุห้อง', icon: '📝' },
-                        { value: 'not_renew' as const, label: 'ไม่ต่อสัญญา', icon: '🚪' },
+                        { 
+                            value: 'all' as const, 
+                            label: 'ทั้งหมด', 
+                            icon: (
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.03 0 1.9.693 2.166 1.638m-7.377 0A48.536 48.536 0 0 1 12 3m0 0c-1.135 0-2.098.845-2.192 1.976a48.414 48.414 0 0 0-.123 1.829V16.5A2.25 2.25 0 0 0 12 18.75h.75m-3-15h.008v.008H9.75v-.008Zm0 3h.008v.008H9.75V6.75Z" />
+                                </svg>
+                            ) 
+                        },
+                        { value: 'not_asked' as const, label: 'ยังไม่สอบถาม', icon: intentionConfig.not_asked.icon({ className: 'w-4 h-4' }) },
+                        { value: 'pending' as const, label: 'รอตอบกลับ', icon: intentionConfig.pending.icon({ className: 'w-4 h-4' }) },
+                        { value: 'renew' as const, label: 'ต่อสัญญาห้องเดิม', icon: intentionConfig.renew.icon({ className: 'w-4 h-4' }) },
+                        { value: 'renew_no_room' as const, label: 'ต่อสัญญาไม่ระบุห้อง', icon: intentionConfig.renew_no_room.icon({ className: 'w-4 h-4' }) },
+                        { value: 'not_renew' as const, label: 'ไม่ต่อสัญญา', icon: intentionConfig.not_renew.icon({ className: 'w-4 h-4' }) },
                     ].map(filter => {
                         const isActive = intentionFilter === filter.value;
                         return (
@@ -436,35 +530,70 @@ export default function RenewalCheckPage() {
                                 key={filter.value}
                                 type="button"
                                 onClick={() => setIntentionFilter(filter.value)}
-                                className={`px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
                                     isActive
                                         ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border-2 border-blue-600'
                                         : 'bg-white text-slate-600 border-2 border-slate-200 hover:border-blue-400 hover:text-blue-600'
                                 }`}
                             >
-                                {filter.icon} {filter.label}
+                                {filter.icon}
+                                <span>{filter.label}</span>
                             </button>
                         );
                     })}
                 </div>
 
+                {/* Main Content Area */}
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center p-32 space-y-4">
+                    <div className="flex flex-col items-center justify-center p-33 space-y-4">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-blue-600"></div>
                         <p className="text-slate-400 font-medium animate-pulse">กำลังโหลดข้อมูล...</p>
                     </div>
                 ) : expiringContracts.length === 0 ? (
                     <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-20 text-center flex flex-col items-center">
-                        <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-5xl mb-6">🎉</div>
+                        <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 mb-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 21l-.813-5.096L3 15l5.096-.813L9 9l.813 5.187L15 15l-5.187.904ZM18.063 5.25l-.563 3.5-3.5.563 3.5.562.563 3.5 3.5-3.5.562-.563-3.5-.563-.562-3.5Zm-11.25 1.5-.313 2.125-2.125.313 2.125.312.313 2.125 2.125-2.125.312-.313-2.125-.313-.312-2.125Z" />
+                            </svg>
+                        </div>
                         <p className="font-extrabold text-2xl text-slate-800">ไม่มีสัญญาที่ใกล้หมดในช่วงนี้</p>
                         <p className="text-slate-500 mt-2">ลองเปลี่ยนช่วงเวลาค้นหาด้านบน เพื่อดูสัญญาในอนาคต</p>
                     </div>
                 ) : (
                     <div className="space-y-2">
-                        {renderGroup('เลยกำหนด (Overdue)', '🔴', 'text-red-600', grouped.overdue)}
-                        {renderGroup('ด่วน — หมดภายใน 30 วัน', '🟠', 'text-orange-600', grouped.urgent)}
-                        {renderGroup('เร็วๆ นี้ — หมดภายใน 60 วัน', '🟡', 'text-amber-600', grouped.soon)}
-                        {renderGroup('กำลังจะหมด — เกิน 60 วัน', '🔵', 'text-blue-600', grouped.upcoming)}
+                        {renderGroup(
+                            'เลยกำหนด (Overdue)', 
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-red-500">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                            </svg>, 
+                            'text-red-600', 
+                            grouped.overdue
+                        )}
+                        {renderGroup(
+                            'ด่วน — หมดภายใน 30 วัน', 
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-orange-500">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
+                            </svg>, 
+                            'text-orange-600', 
+                            grouped.urgent
+                        )}
+                        {renderGroup(
+                            'เร็วๆ นี้ — หมดภายใน 60 วัน', 
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-amber-500">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>, 
+                            'text-amber-600', 
+                            grouped.soon
+                        )}
+                        {renderGroup(
+                            'กำลังจะหมด — เกิน 60 วัน', 
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-blue-500">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                            </svg>, 
+                            'text-blue-600', 
+                            grouped.upcoming
+                        )}
                     </div>
                 )}
             </div>
@@ -474,8 +603,8 @@ export default function RenewalCheckPage() {
                 <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden scale-in-95 duration-200">
                         <div className="p-8 text-center">
-                            <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center text-4xl mb-5 ${intentionConfig[confirmModal.intention].bg}`}>
-                                {intentionConfig[confirmModal.intention].icon}
+                            <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-5 ${intentionConfig[confirmModal.intention].bg} ${intentionConfig[confirmModal.intention].color}`}>
+                                {intentionConfig[confirmModal.intention].icon({ className: 'w-10 h-10' })}
                             </div>
                             <h2 className="text-xl font-bold text-slate-800 mb-2">ยืนยันการเปลี่ยนสถานะ</h2>
                             <p className="text-slate-500 text-sm leading-relaxed">

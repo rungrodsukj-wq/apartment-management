@@ -154,7 +154,7 @@ export default function RenewalCheckPage() {
             router.push(`/bookings?renewContractId=${contractId}`);
         }
         if (intention === 'renew_no_room') {
-            router.push('/waitlists?quickAction=newWaitlist');
+            router.push(`/waitlists?quickAction=newWaitlist&tenantName=${encodeURIComponent(tenantName)}&contractId=${contractId}`);
         }
     };
 

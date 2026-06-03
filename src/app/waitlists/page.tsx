@@ -66,7 +66,60 @@ export default function BookingsPage() {
 
     useEffect(() => {
         if (isEditable && searchParams.get('quickAction') === 'newWaitlist') {
-            handleAddNew();
+            const tenantName = searchParams.get('tenantName');
+            const contractId = searchParams.get('contractId');
+            
+            const initializeForm = async () => {
+                let newData = { 
+                    name: '', 
+                    room_type: 'One Bedroom',
+                    kitchen_type: 'ครัวหลัง', 
+                    view_preference: 'ทิศตะวันออก',
+                    bed_size: '3.5 ฟุต', 
+                    preferred_floors: [],
+                    start_date: '', 
+                    end_date: '', 
+                    special_request: '',
+                    monthly_rent: ''
+                };
+                
+                if (tenantName) {
+                    newData.name = decodeURIComponent(tenantName);
+                }
+                
+                if (contractId) {
+                    // ดึง contract จาก database
+                    const { data: contractData } = await supabase
+                        .from('contracts')
+                        .select('*')
+                        .eq('id', contractId)
+                        .single();
+                    
+                    if (contractData?.contract_end_date) {
+                        // ตั้ง start_date = วันถัดจากวันที่สัญญาหมด
+                        const endDate = new Date(contractData.contract_end_date);
+                        const startDate = new Date(endDate);
+                        startDate.setDate(startDate.getDate() + 1);
+                        const startDateStr = startDate.toISOString().split('T')[0];
+                        
+                        // คำนวณ end_date ให้เป็น 1 ปีหลังจาก start_date
+                        const calcEndDate = new Date(startDate);
+                        calcEndDate.setFullYear(startDate.getFullYear() + 1);
+                        calcEndDate.setDate(calcEndDate.getDate() - 1);
+                        const endDateStr = calcEndDate.toISOString().split('T')[0];
+                        
+                        newData.start_date = startDateStr;
+                        newData.end_date = endDateStr;
+                    }
+                }
+                
+                // อัปเดต formData และเปิด modal พร้อมกัน
+                setEditingId(null);
+                setFormData(newData);
+                setIsModalOpen(true);
+            };
+            
+            initializeForm();
         }
     }, [searchParams, isEditable]);
 
@@ -179,7 +232,19 @@ export default function BookingsPage() {
     };
 
     const handleAddNew = () => {
-        closeModal();
+        setEditingId(null);
+        setFormData({
+            name: '', 
+            room_type: 'One Bedroom',
+            kitchen_type: 'ครัวหลัง', 
+            view_preference: 'ทิศตะวันออก',
+            bed_size: '3.5 ฟุต', 
+            preferred_floors: [],
+            start_date: '', 
+            end_date: '', 
+            special_request: '',
+            monthly_rent: ''
+        });
         setIsModalOpen(true);
     };
 

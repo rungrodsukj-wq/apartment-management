@@ -39,7 +39,6 @@ interface Contract {
     move_start_date?: string;
     move_end_date?: string;
     actual_check_in_date?: string;
-    actual_end_date?: string;
     contract_start_date?: string;
     contract_end_date?: string;
 }
@@ -102,7 +101,7 @@ export default function AllocateRoomPage() {
 
         const { data: cData } = await supabase
             .from('contracts')
-            .select('main_room_id, main_start_date, main_end_date, temp_room_id, temp_start_date, temp_end_date, move_to_room_id, move_start_date, move_end_date, actual_check_in_date, actual_end_date, contract_start_date, contract_end_date')
+            .select('main_room_id, main_start_date, main_end_date, temp_room_id, temp_start_date, temp_end_date, move_to_room_id, move_start_date, move_end_date, actual_check_in_date, contract_start_date, contract_end_date')
             .neq('status', 'cancelled');
         if (cData) setAllContracts(cData);
 
@@ -115,7 +114,7 @@ export default function AllocateRoomPage() {
         contracts.forEach(c => {
             if (c.main_room_id === roomId) {
                 const s = c.main_start_date || c.actual_check_in_date || c.contract_start_date;
-                const e = c.actual_end_date || c.main_end_date || c.contract_end_date;
+                const e = c.contract_end_date || c.main_end_date;
                 if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
             }
             if (c.temp_room_id === roomId) {
@@ -125,7 +124,7 @@ export default function AllocateRoomPage() {
             }
             if (c.move_to_room_id === roomId) {
                 const s = c.move_start_date;
-                const e = c.actual_end_date || c.move_end_date || c.contract_end_date;
+                const e = c.contract_end_date || c.move_end_date;
                 if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
             }
         });

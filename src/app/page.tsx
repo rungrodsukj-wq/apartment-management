@@ -17,7 +17,6 @@ interface Contract {
   id: string;
   tenant_name: string;
   status: string;
-  actual_end_date?: string;
   main_room_id: string;
   main_start_date: string;
   main_end_date: string;
@@ -193,12 +192,9 @@ export default function DashboardPage() {
 
     const occupiedRoomIds = new Set<string>();
     contractsData?.forEach(c => {
-      const isCancelled = c.status === 'cancelled';
-      const actualEnd = isCancelled && c.actual_end_date ? c.actual_end_date : null;
-
-      const mainEnd = actualEnd || c.main_end_date;
-      const tempEnd = actualEnd || c.temp_end_date;
-      const moveEnd = actualEnd || c.move_end_date;
+      const mainEnd = c.contract_end_date || c.main_end_date;
+      const tempEnd = c.contract_end_date || c.temp_end_date;
+      const moveEnd = c.contract_end_date || c.move_end_date;
 
       if (c.main_room_id && c.main_start_date && mainEnd && isDateOverlapping(c.main_start_date, mainEnd, searchStartDate, searchEndDate)) occupiedRoomIds.add(c.main_room_id);
       if (c.temp_room_id && c.temp_start_date && tempEnd && isDateOverlapping(c.temp_start_date, tempEnd, searchStartDate, searchEndDate)) occupiedRoomIds.add(c.temp_room_id);
@@ -256,13 +252,13 @@ export default function DashboardPage() {
       const bookedRooms = new Set<string>();
 
       allContracts.forEach(c => {
-        if (c.status === 'cancelled' && !c.actual_end_date) return;
+        if (c.status === 'cancelled' && !c.contract_end_date) return;
 
-        const actualEnd = c.status === 'cancelled' && c.actual_end_date ? c.actual_end_date : null;
+        const cancelledEnd = c.status === 'cancelled' ? c.contract_end_date : null;
 
         if (c.main_room_id && c.main_start_date) {
           const startBlock = new Date(c.main_start_date);
-          const endBlock = new Date(actualEnd || c.main_end_date);
+          const endBlock = new Date(cancelledEnd || c.main_end_date);
           if (startBlock <= monthEnd && endBlock >= monthStart) {
             occupiedRooms.add(c.main_room_id);
           }
@@ -272,7 +268,7 @@ export default function DashboardPage() {
         }
         if (c.temp_room_id && c.temp_start_date && c.temp_end_date) {
           const startBlock = new Date(c.temp_start_date);
-          const endBlock = new Date(actualEnd || c.temp_end_date);
+          const endBlock = new Date(cancelledEnd || c.temp_end_date);
           if (startBlock <= monthEnd && endBlock >= monthStart) {
             occupiedRooms.add(c.temp_room_id);
           }
@@ -282,7 +278,7 @@ export default function DashboardPage() {
         }
         if (c.move_to_room_id && c.move_start_date && c.move_end_date) {
           const startBlock = new Date(c.move_start_date);
-          const endBlock = new Date(actualEnd || c.move_end_date);
+          const endBlock = new Date(cancelledEnd || c.move_end_date);
           if (startBlock <= monthEnd && endBlock >= monthStart) {
             occupiedRooms.add(c.move_to_room_id);
           }
@@ -361,26 +357,26 @@ export default function DashboardPage() {
 
     allContracts.forEach(c => {
       const isCancelled = c.status === 'cancelled';
-      const actualEnd = c.actual_end_date ? new Date(c.actual_end_date) : null;
+      const cancelledEnd = c.contract_end_date ? new Date(c.contract_end_date) : null;
 
       if (c.main_room_id === roomId && c.main_start_date && c.main_end_date) {
         const start = new Date(c.main_start_date);
         const defaultEnd = new Date(c.main_end_date);
-        const end = (isCancelled && actualEnd) ? actualEnd : defaultEnd;
+        const end = (isCancelled && cancelledEnd) ? cancelledEnd : defaultEnd;
         if (start <= end) blocks.push({ type: 'MAIN', name: c.tenant_name, start, end, isCancelled, contract: c });
       }
 
       if (c.temp_room_id === roomId && c.temp_start_date && c.temp_end_date) {
         const start = new Date(c.temp_start_date);
         const defaultEnd = new Date(c.temp_end_date);
-        const end = (isCancelled && actualEnd) ? actualEnd : defaultEnd;
+        const end = (isCancelled && cancelledEnd) ? cancelledEnd : defaultEnd;
         if (start <= end) blocks.push({ type: 'TEMP', name: c.tenant_name, start, end, isCancelled, contract: c });
       }
 
       if (c.move_to_room_id === roomId && c.move_start_date && c.move_end_date) {
         const start = new Date(c.move_start_date);
         const defaultEnd = new Date(c.move_end_date);
-        const end = (isCancelled && actualEnd) ? actualEnd : defaultEnd;
+        const end = (isCancelled && cancelledEnd) ? cancelledEnd : defaultEnd;
         if (start <= end) blocks.push({ type: 'MOVE', name: c.tenant_name, start, end, isCancelled, contract: c });
       }
     });

@@ -50,7 +50,6 @@ export default function BookingsPage() {
     const [createForm, setCreateForm] = useState<any>({
         tenant_name: '',
         actual_check_in_date: '',
-        actual_end_date: '',
         contract_start_date: '',
         contract_end_date: '',
         main_room_id: '',
@@ -301,7 +300,6 @@ export default function BookingsPage() {
                 main_start_date: '',
                 main_end_date: '',
                 actual_check_in_date: createForm.actual_check_in_date || '',
-                actual_end_date: createForm.actual_end_date || '',
             });
             return;
         }
@@ -319,9 +317,6 @@ export default function BookingsPage() {
             actual_check_in_date: createForm.actual_check_in_date
                 ? calculateRelativeShiftedDate(createForm.contract_start_date, createForm.actual_check_in_date, startDate)
                 : startDate,
-            actual_end_date: createForm.actual_end_date
-                ? calculateRelativeShiftedDate(createForm.contract_end_date, createForm.actual_end_date, newEndDate)
-                : newEndDate,
         });
     };
 
@@ -329,7 +324,6 @@ export default function BookingsPage() {
         setEditForm({
             ...contract,
             has_temp_room: !!contract.temp_room_id,
-            actual_end_date: contract.actual_end_date || contract.contract_end_date || '',
         });
         setEditRoomPicker(null);
         setIsEditModalOpen(true);
@@ -347,13 +341,13 @@ export default function BookingsPage() {
 
         const { error } = await supabase
             .from('contracts')
-            .update({ status: 'cancelled', actual_end_date: cancelEndDate })
+            .update({ status: 'cancelled', contract_end_date: cancelEndDate })
             .eq('id', cancelContractId);
 
         if (error) {
             alert('เกิดข้อผิดพลาดในการยกเลิก: ' + error.message);
         } else {
-            await logAudit(profile, 'contracts', 'update', cancelContractId, 'ยกเลิกสัญญา', { status: 'cancelled', actual_end_date: cancelEndDate });
+            await logAudit(profile, 'contracts', 'update', cancelContractId, 'ยกเลิกสัญญา', { status: 'cancelled', contract_end_date: cancelEndDate });
             setIsCancelModalOpen(false);
             setCancelContractId(null);
             setCancelTenantName('');
@@ -385,7 +379,6 @@ export default function BookingsPage() {
         setCreateForm({
             tenant_name: oldContract.tenant_name,
             actual_check_in_date: newStartDateStr,
-            actual_end_date: newEndDateStr,
             contract_start_date: newStartDateStr,
             contract_end_date: newEndDateStr,
             main_room_id: oldContract.main_room_id, // เซ็ตค่าเริ่มต้นเป็นห้องเดิมไว้ก่อน
@@ -560,10 +553,6 @@ export default function BookingsPage() {
             alert('❌ วันเข้าพักก่อนเริ่มสัญญาต้องไม่เกินวันเริ่มสัญญา');
             return;
         }
-        if (editForm.actual_end_date && editForm.contract_end_date && new Date(editForm.actual_end_date) < new Date(editForm.contract_end_date)) {
-            alert('❌ วันเข้าพักหลังสิ้นสุดสัญญาต้องไม่ต่ำกว่าวันสิ้นสุดสัญญา');
-            return;
-        }
 
         const updatePayload = {
             tenant_name: editForm.tenant_name,
@@ -571,7 +560,6 @@ export default function BookingsPage() {
             contract_start_date: normalizeDate(editForm.contract_start_date),
             contract_end_date: normalizeDate(editForm.contract_end_date),
             actual_check_in_date: normalizeDate(editForm.actual_check_in_date || editForm.contract_start_date),
-            actual_end_date: normalizeDate(editForm.actual_end_date || editForm.contract_end_date),
             main_room_id: editForm.main_room_id || null,
             main_start_date: normalizeDate(editForm.main_start_date),
             main_end_date: normalizeDate(editForm.main_end_date),
@@ -658,7 +646,6 @@ export default function BookingsPage() {
         const payload: any = {
             tenant_name: createForm.tenant_name.trim(),
             actual_check_in_date: normalizeDate(createForm.actual_check_in_date || createForm.contract_start_date),
-            actual_end_date: normalizeDate(createForm.actual_end_date || createForm.contract_end_date),
             contract_start_date: normalizeDate(createForm.contract_start_date),
             contract_end_date: normalizeDate(createForm.contract_end_date),
             main_room_id: createForm.main_room_id || null,
@@ -688,7 +675,6 @@ export default function BookingsPage() {
             setCreateForm({
                 tenant_name: '',
                 actual_check_in_date: '',
-                actual_end_date: '',
                 contract_start_date: '',
                 contract_end_date: '',
                 main_room_id: '',
@@ -1793,12 +1779,6 @@ export default function BookingsPage() {
                                             value={editForm.contract_end_date || ''}
                                             disabled
                                             onChange={(e) => setEditForm({ ...editForm, contract_end_date: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className={labelCls}>วันเข้าพักหลังสิ้นสุดสัญญา</label>
-                                        <input type="date" className={inputCls}
-                                            value={editForm.actual_end_date || ''}
-                                            onChange={(e) => setEditForm({ ...editForm, actual_end_date: e.target.value })} />
                                     </div>
                                 </div>
                             </div>

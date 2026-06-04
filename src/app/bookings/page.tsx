@@ -1,7 +1,7 @@
 // src/app/bookings/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -72,8 +72,17 @@ export default function BookingsPage() {
     const [roomFilters, setRoomFilters] = useState({
         building: '',
         floor: '',
+        room_type: '',
         kitchen: '',
         view: '',
+        search: '',
+    });
+    const [listFilters, setListFilters] = useState({
+        building: '',
+        room_type: '',
+        kitchen: '',
+        view: '',
+        search: '',
     });
 
     const [waitlists, setWaitlists] = useState<any[]>([]);
@@ -81,14 +90,29 @@ export default function BookingsPage() {
 
     const buildingOptions = Array.from(new Set(rooms.map((r: any) => r.building).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b));
     const floorOptions = Array.from(new Set(rooms.map((r: any) => r.floor != null ? String(r.floor) : '').filter(Boolean))).sort((a, b) => Number(a) - Number(b));
+    const roomTypeOptions = Array.from(new Set(rooms.map((r: any) => r.room_type).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b));
     const kitchenOptions = Array.from(new Set(rooms.map((r: any) => r.kitchen_type).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b));
     const viewOptions = Array.from(new Set(rooms.map((r: any) => r.view_direction).filter(Boolean))).sort((a: string, b: string) => a.localeCompare(b));
 
     const applyRoomFilters = (room: any) => {
         if (roomFilters.building && room.building !== roomFilters.building) return false;
         if (roomFilters.floor && String(room.floor) !== roomFilters.floor) return false;
+        if (roomFilters.room_type && room.room_type !== roomFilters.room_type) return false;
         if (roomFilters.kitchen && room.kitchen_type !== roomFilters.kitchen) return false;
         if (roomFilters.view && room.view_direction !== roomFilters.view) return false;
+        if (roomFilters.search) {
+            const query = roomFilters.search.toLowerCase().trim();
+            if (query) {
+                const matches = [
+                    room.room_number ? String(room.room_number).toLowerCase() : '',
+                    room.room_type ? String(room.room_type).toLowerCase() : '',
+                    room.kitchen_type ? String(room.kitchen_type).toLowerCase() : '',
+                    room.view_direction ? String(room.view_direction).toLowerCase() : '',
+                    room.building ? String(room.building).toLowerCase() : '',
+                ];
+                if (!matches.some((value) => value.includes(query))) return false;
+            }
+        }
         return true;
     };
 
@@ -189,6 +213,38 @@ export default function BookingsPage() {
         }
         return contract.main_room_id || '';
     };
+
+    const filteredContracts = useMemo(() => {
+        return contracts.filter((contract) => {
+            const currentRoomId = getCurrentRoomId(contract);
+            const room = rooms.find((r: any) => r.id === currentRoomId) || null;
+
+            if (listFilters.building && room?.building !== listFilters.building) return false;
+            if (listFilters.room_type && room?.room_type !== listFilters.room_type) return false;
+            if (listFilters.kitchen && room?.kitchen_type !== listFilters.kitchen) return false;
+            if (listFilters.view && room?.view_direction !== listFilters.view) return false;
+
+            if (listFilters.search.trim()) {
+                const query = listFilters.search.trim().toLowerCase();
+                const values = [
+                    contract.tenant_name || '',
+                    contract.status || '',
+                    room?.room_number ? String(room.room_number) : '',
+                    room?.room_type || '',
+                    room?.kitchen_type || '',
+                    room?.view_direction || '',
+                    room?.building || '',
+                    room?.floor != null ? String(room.floor) : ''
+                ].map((value) => value.toLowerCase());
+
+                if (!values.some((value) => value.includes(query))) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }, [contracts, rooms, listFilters]);
 
     const handleRoomClick = (roomId: string) => {
         const room = rooms.find(r => r.id === roomId);
@@ -994,15 +1050,15 @@ export default function BookingsPage() {
                     <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
                         <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl">📋</div>
                         <div>
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">สัญญาทั้งหมด</p>
-                            <p className="text-2xl font-bold text-[#0A2647]">{contracts.length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">สัญญาที่กรองแล้ว</p>
+                            <p className="text-2xl font-bold text-[#0A2647]">{filteredContracts.length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
                         </div>
                     </div>
                     <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
                         <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl">✅</div>
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">สัญญา Active</p>
-                            <p className="text-2xl font-bold text-[#0A2647]">{contracts.filter(c => c.status === 'active').length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
+                            <p className="text-2xl font-bold text-[#0A2647]">{filteredContracts.filter(c => c.status === 'active').length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
                         </div>
                     </div>
                     <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
@@ -1010,7 +1066,7 @@ export default function BookingsPage() {
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">ต้องดำเนินการ</p>
                             <p className="text-2xl font-bold text-[#0A2647]">
-                                {contracts.filter(c => !c.main_room_id && c.status !== 'cancelled').length}{' '}
+                                {filteredContracts.filter(c => !c.main_room_id && c.status !== 'cancelled').length}{' '}
                                 <span className="text-sm font-medium text-slate-500">รายการ</span>
                             </p>
                         </div>
@@ -1019,13 +1075,80 @@ export default function BookingsPage() {
 
                 <h2 className="text-lg font-bold text-[#0A2647] mb-4">รายการสัญญา</h2>
 
+                <div className="bg-white rounded-3xl p-5 mb-6 border border-slate-100 shadow-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        <div>
+                            <label className={labelCls}>ตึก</label>
+                            <select
+                                className={inputCls}
+                                value={listFilters.building}
+                                onChange={(e) => setListFilters({ ...listFilters, building: e.target.value })}
+                            >
+                                <option value="">ทุกตึก</option>
+                                {buildingOptions.map((value) => (
+                                    <option key={value} value={value}>{value}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelCls}>ประเภทห้อง</label>
+                            <select
+                                className={inputCls}
+                                value={listFilters.room_type}
+                                onChange={(e) => setListFilters({ ...listFilters, room_type: e.target.value })}
+                            >
+                                <option value="">ทุกประเภทห้อง</option>
+                                {roomTypeOptions.map((value) => (
+                                    <option key={value} value={value}>{value}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelCls}>ครัว</label>
+                            <select
+                                className={inputCls}
+                                value={listFilters.kitchen}
+                                onChange={(e) => setListFilters({ ...listFilters, kitchen: e.target.value })}
+                            >
+                                <option value="">ทุกประเภทครัว</option>
+                                {kitchenOptions.map((value) => (
+                                    <option key={value} value={value}>{value}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelCls}>ทิศ</label>
+                            <select
+                                className={inputCls}
+                                value={listFilters.view}
+                                onChange={(e) => setListFilters({ ...listFilters, view: e.target.value })}
+                            >
+                                <option value="">ทุกทิศ (View)</option>
+                                {viewOptions.map((value) => (
+                                    <option key={value} value={value}>{value}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelCls}>ค้นหา</label>
+                            <input
+                                type="text"
+                                className={inputCls}
+                                placeholder="ค้นหา ชื่อผู้เช่า หรือ ห้อง"
+                                value={listFilters.search}
+                                onChange={(e) => setListFilters({ ...listFilters, search: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 {loading ? (
                     <div className="flex justify-center p-20">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-4 border-[#4F81FF]"></div>
                     </div>
                 ) : (
                     <div className="flex flex-col gap-4">
-                        {contracts.map((contract) => {
+                        {filteredContracts.map((contract) => {
                             const needsTempRoom = contract.actual_check_in_date &&
                                 contract.main_start_date &&
                                 new Date(contract.actual_check_in_date) < new Date(contract.main_start_date) &&
@@ -1451,7 +1574,7 @@ export default function BookingsPage() {
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-5">
                                         <div>
                                             <label className={labelCls}>ตึก</label>
                                             <select
@@ -1479,30 +1602,40 @@ export default function BookingsPage() {
                                             </select>
                                         </div>
                                         <div>
+                                            <label className={labelCls}>ประเภทห้อง</label>
+                                            <select
+                                                className={inputCls}
+                                                value={roomFilters.room_type}
+                                                onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
+                                            >
+                                                <option value="">-- ทุกประเภทห้อง --</option>
+                                                {roomTypeOptions.map((value) => (
+                                                    <option key={value} value={value}>{value}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
                                             <label className={labelCls}>ประเภทครัว</label>
                                             <select
                                                 className={inputCls}
                                                 value={roomFilters.kitchen}
                                                 onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
                                             >
-                                                <option value="">-- ทุกประเภท --</option>
+                                                <option value="">-- ทุกประเภทครัว --</option>
                                                 {kitchenOptions.map((value) => (
                                                     <option key={value} value={value}>{value}</option>
                                                 ))}
                                             </select>
                                         </div>
                                         <div>
-                                            <label className={labelCls}>วิว</label>
-                                            <select
+                                            <label className={labelCls}>ค้นหา</label>
+                                            <input
+                                                type="text"
                                                 className={inputCls}
-                                                value={roomFilters.view}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, view: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกวิว --</option>
-                                                {viewOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
+                                                placeholder="ค้นหาเลขห้อง หรือ ประเภท"
+                                                value={roomFilters.search}
+                                                onChange={(e) => setRoomFilters({ ...roomFilters, search: e.target.value })}
+                                            />
                                         </div>
                                     </div>
 
@@ -2003,7 +2136,7 @@ export default function BookingsPage() {
                         <div className="p-8 overflow-y-auto flex-1 space-y-5">
                             {editRoomPicker === 'temp' && (
                                 <div className="space-y-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                                         <div>
                                             <label className={labelCls}>ตึก</label>
                                             <select
@@ -2031,30 +2164,40 @@ export default function BookingsPage() {
                                             </select>
                                         </div>
                                         <div>
+                                            <label className={labelCls}>ประเภทห้อง</label>
+                                            <select
+                                                className={inputCls}
+                                                value={roomFilters.room_type}
+                                                onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
+                                            >
+                                                <option value="">-- ทุกประเภทห้อง --</option>
+                                                {roomTypeOptions.map((value) => (
+                                                    <option key={value} value={value}>{value}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
                                             <label className={labelCls}>ประเภทครัว</label>
                                             <select
                                                 className={inputCls}
                                                 value={roomFilters.kitchen}
                                                 onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
                                             >
-                                                <option value="">-- ทุกประเภท --</option>
+                                                <option value="">-- ทุกประเภทครัว --</option>
                                                 {kitchenOptions.map((value) => (
                                                     <option key={value} value={value}>{value}</option>
                                                 ))}
                                             </select>
                                         </div>
                                         <div>
-                                            <label className={labelCls}>วิว</label>
-                                            <select
+                                            <label className={labelCls}>ค้นหา</label>
+                                            <input
+                                                type="text"
                                                 className={inputCls}
-                                                value={roomFilters.view}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, view: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกวิว --</option>
-                                                {viewOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
+                                                placeholder="ค้นหาเลขห้อง หรือ ประเภท"
+                                                value={roomFilters.search}
+                                                onChange={(e) => setRoomFilters({ ...roomFilters, search: e.target.value })}
+                                            />
                                         </div>
                                     </div>
                                     {renderRoomButtonGrid(
@@ -2090,7 +2233,7 @@ export default function BookingsPage() {
                                         const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
                                         return (
                                             <>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                                                     <div>
                                                         <label className={labelCls}>ตึก</label>
                                                         <select
@@ -2118,30 +2261,40 @@ export default function BookingsPage() {
                                                         </select>
                                                     </div>
                                                     <div>
+                                                        <label className={labelCls}>ประเภทห้อง</label>
+                                                        <select
+                                                            className={inputCls}
+                                                            value={roomFilters.room_type}
+                                                            onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
+                                                        >
+                                                            <option value="">-- ทุกประเภทห้อง --</option>
+                                                            {roomTypeOptions.map((value) => (
+                                                                <option key={value} value={value}>{value}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
                                                         <label className={labelCls}>ประเภทครัว</label>
                                                         <select
                                                             className={inputCls}
                                                             value={roomFilters.kitchen}
                                                             onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
                                                         >
-                                                            <option value="">-- ทุกประเภท --</option>
+                                                            <option value="">-- ทุกประเภทครัว --</option>
                                                             {kitchenOptions.map((value) => (
                                                                 <option key={value} value={value}>{value}</option>
                                                             ))}
                                                         </select>
                                                     </div>
                                                     <div>
-                                                        <label className={labelCls}>วิว</label>
-                                                        <select
+                                                        <label className={labelCls}>ค้นหา</label>
+                                                        <input
+                                                            type="text"
                                                             className={inputCls}
-                                                            value={roomFilters.view}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, view: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกวิว --</option>
-                                                            {viewOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
+                                                            placeholder="ค้นหาเลขห้อง หรือ ประเภท"
+                                                            value={roomFilters.search}
+                                                            onChange={(e) => setRoomFilters({ ...roomFilters, search: e.target.value })}
+                                                        />
                                                     </div>
                                                 </div>
                                                 {perfectMatchRooms.length > 0 && (
@@ -2183,7 +2336,7 @@ export default function BookingsPage() {
                                         const availableRooms = rooms.filter(r => isRoomAvailable(r.id, editForm.move_start_date, editForm.move_end_date, editForm.id) && applyRoomFilters(r));
                                         return availableRooms.length > 0 ? (
                                             <>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                                                     <div>
                                                         <label className={labelCls}>ตึก</label>
                                                         <select
@@ -2211,30 +2364,40 @@ export default function BookingsPage() {
                                                         </select>
                                                     </div>
                                                     <div>
+                                                        <label className={labelCls}>ประเภทห้อง</label>
+                                                        <select
+                                                            className={inputCls}
+                                                            value={roomFilters.room_type}
+                                                            onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
+                                                        >
+                                                            <option value="">-- ทุกประเภทห้อง --</option>
+                                                            {roomTypeOptions.map((value) => (
+                                                                <option key={value} value={value}>{value}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
                                                         <label className={labelCls}>ประเภทครัว</label>
                                                         <select
                                                             className={inputCls}
                                                             value={roomFilters.kitchen}
                                                             onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
                                                         >
-                                                            <option value="">-- ทุกประเภท --</option>
+                                                            <option value="">-- ทุกประเภทครัว --</option>
                                                             {kitchenOptions.map((value) => (
                                                                 <option key={value} value={value}>{value}</option>
                                                             ))}
                                                         </select>
                                                     </div>
                                                     <div>
-                                                        <label className={labelCls}>วิว</label>
-                                                        <select
+                                                        <label className={labelCls}>ค้นหา</label>
+                                                        <input
+                                                            type="text"
                                                             className={inputCls}
-                                                            value={roomFilters.view}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, view: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกวิว --</option>
-                                                            {viewOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
+                                                            placeholder="ค้นหาเลขห้อง หรือ ประเภท"
+                                                            value={roomFilters.search}
+                                                            onChange={(e) => setRoomFilters({ ...roomFilters, search: e.target.value })}
+                                                        />
                                                     </div>
                                                 </div>
                                                 {renderRoomButtonGrid(availableRooms, editForm.move_to_room_id, (roomId) => {

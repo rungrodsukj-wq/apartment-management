@@ -54,6 +54,18 @@ export default function RenewalCheckPage() {
         tenantName: string;
         intention: Intention;
     } | null>(null);
+    const [notRenewMoveOutDate, setNotRenewMoveOutDate] = useState('');
+    const [notRenewDateError, setNotRenewDateError] = useState<string | null>(null);
+
+    const getContractById = (contractId: string) => contracts.find(c => c.id === contractId);
+    const isMoveOutDateValid = (date: string, maxDate: string) => {
+        if (!date || !maxDate) return false;
+        const parsed = new Date(date);
+        const max = new Date(maxDate);
+        parsed.setHours(0, 0, 0, 0);
+        max.setHours(0, 0, 0, 0);
+        return parsed.getTime() <= max.getTime();
+    };
 
     useEffect(() => {
         fetchData();
@@ -121,9 +133,88 @@ export default function RenewalCheckPage() {
             });
     }, [contracts, monthsAhead, rooms, intentions, intentionFilter, searchQuery]);
 
-    const upsertIntention = async (contractId: string, roomId: string, tenantName: string, intention: Intention, note?: string) => {
+    const deleteRenewalChildContracts = async (parentContractId: string) => {
+        const { data: childContracts, error: fetchError } = await supabase
+            .from('contracts')
+            .select('id')
+            .eq('parent_contract_id', parentContractId);
+        if (fetchError) {
+            alert('เกิดข้อผิดพลาดเมื่อค้นหาสัญญาต่ออายุเพื่อจะลบ: ' + fetchError.message);
+            return false;
+        }
+        if (!childContracts || childContracts.length === 0) return true;
+
+        const childIds = childContracts.map((c: any) => c.id);
+        const { error: deleteError } = await supabase
+            .from('contracts')
+            .delete()
+            .in('id', childIds);
+        if (deleteError) {
+            alert('เกิดข้อผิดพลาดเมื่อพยายามลบสัญญาต่ออายุที่สร้างไว้: ' + deleteError.message);
+            return false;
+        }
+
+        for (const child of childContracts) {
+            if (child?.id) {
+                await logAudit(profile, 'contracts', 'delete', child.id, 'ลบสัญญาต่ออายุที่สร้างไว้เมื่อเปลี่ยนความตั้งใจ', null);
+            }
+        }
+        return true;
+    };
+
+    const deleteRenewalWaitlists = async (contractId: string) => {
+        const { error } = await supabase
+            .from('waitlists')
+            .delete()
+            .eq('contract_id', contractId);
+        if (error) {
+            alert('เกิดข้อผิดพลาดเมื่อพยายามลบ waitlist ที่สร้างจาก renewal_no_room: ' + error.message);
+            return false;
+        }
+        return true;
+    };
+
+    const upsertIntention = async (contractId: string, roomId: string, tenantName: string, intention: Intention, note?: string, plannedMoveOutDate?: string) => {
         setSaving(contractId);
+
+        if (intention === 'not_renew' && plannedMoveOutDate) {
+            const contract = getContractById(contractId);
+            if (contract) {
+                const fieldToUpdate = contract.move_end_date ? 'move_end_date' : 'main_end_date';
+                const contractUpdate: Record<string, string> = { [fieldToUpdate]: plannedMoveOutDate };
+                const { error: contractError } = await supabase
+                    .from('contracts')
+                    .update(contractUpdate)
+                    .eq('id', contractId);
+                if (contractError) {
+                    alert('เกิดข้อผิดพลาดเมื่อบันทึกวันที่คาดว่าจะย้ายออก: ' + contractError.message);
+                    setSaving(null);
+                    return;
+                }
+                await logAudit(profile, 'contracts', 'update', contractId, 'ปรับวันที่คาดว่าจะย้ายออก', describeChanges(contractUpdate));
+            }
+        }
+
         const existing = getIntention(contractId);
+        const shouldRemoveCreatedRenewalContract = existing &&
+            (existing.intention === 'renew' || existing.intention === 'renew_no_room') &&
+            (intention !== 'renew' && intention !== 'renew_no_room');
+
+        if (shouldRemoveCreatedRenewalContract) {
+            if (existing.intention === 'renew_no_room') {
+                const deletedWaitlist = await deleteRenewalWaitlists(contractId);
+                if (!deletedWaitlist) {
+                    setSaving(null);
+                    return;
+                }
+            }
+
+            const deletedContract = await deleteRenewalChildContracts(contractId);
+            if (!deletedContract) {
+                setSaving(null);
+                return;
+            }
+        }
 
         if (existing) {
             const updatePayload = { intention, note: note ?? existing.note, updated_at: new Date().toISOString() };
@@ -133,6 +224,8 @@ export default function RenewalCheckPage() {
                 .eq('id', existing.id);
             if (error) {
                 alert('เกิดข้อผิดพลาด: ' + error.message);
+                setSaving(null);
+                return;
             } else {
                 await logAudit(profile, 'renewal_intentions', 'update', existing.id, 'อัปเดตความตั้งใจต่อสัญญา', describeChanges(updatePayload));
             }
@@ -146,15 +239,15 @@ export default function RenewalCheckPage() {
                 .select('id');
             if (error) {
                 alert('เกิดข้อผิดพลาด: ' + error.message);
+                setSaving(null);
+                return;
             } else {
                 const newId = data?.[0]?.id ?? null;
                 if (newId) await logAudit(profile, 'renewal_intentions', 'create', newId, 'เพิ่มความตั้งใจต่อสัญญา', payload);
             }
         }
 
-        // Refresh intentions
-        const { data } = await supabase.from('renewal_intentions').select('*');
-        if (data) setIntentions(data);
+        await fetchData();
         setSaving(null);
         setConfirmModal(null); // ปิด popup หลังบันทึกสำเร็จ
 
@@ -386,6 +479,10 @@ export default function RenewalCheckPage() {
                                                     tenantName: contract.tenant_name,
                                                     intention: action
                                                 });
+                                                if (action === 'not_renew') {
+                                                    setNotRenewMoveOutDate(contract.move_end_date || contract.main_end_date || contract.contract_end_date || '');
+                                                    setNotRenewDateError(null);
+                                                }
                                             }
                                         }}
                                         className={`inline-flex items-center justify-center gap-1.5 flex-1 min-w-[105px] px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all duration-200 ${activeClasses} disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -610,10 +707,34 @@ export default function RenewalCheckPage() {
                                 เป็น <span className={`font-bold ${intentionConfig[confirmModal.intention].color}`}>"{intentionConfig[confirmModal.intention].label}"</span> ใช่หรือไม่?
                             </p>
                         </div>
+                        {confirmModal.intention === 'not_renew' && (
+                            <div className="px-8 pb-4 pt-2">
+                                <label className="block text-left text-sm font-semibold text-slate-700 mb-2">วันที่คาดว่าจะย้ายออก</label>
+                                <input
+                                    type="date"
+                                    value={notRenewMoveOutDate}
+                                    onChange={(e) => {
+                                        setNotRenewMoveOutDate(e.target.value);
+                                        setNotRenewDateError(null);
+                                    }}
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-200"
+                                    min="2000-01-01"
+                                />
+                                <p className="mt-2 text-xs text-slate-500">
+                                    วันที่ต้องไม่เกินวันที่สัญญาสิ้นสุด ({formatDateTH(getContractById(confirmModal.contractId)?.contract_end_date || getContractById(confirmModal.contractId)?.main_end_date || getContractById(confirmModal.contractId)?.move_end_date || '')})
+                                </p>
+                                {notRenewDateError && (
+                                    <p className="mt-2 text-xs text-red-600 font-semibold">{notRenewDateError}</p>
+                                )}
+                            </div>
+                        )}
                         <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
                             <button
                                 type="button"
-                                onClick={() => setConfirmModal(null)}
+                                onClick={() => {
+                                    setConfirmModal(null);
+                                    setNotRenewDateError(null);
+                                }}
                                 className="flex-1 px-4 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
                             >
                                 ยกเลิก
@@ -636,6 +757,21 @@ export default function RenewalCheckPage() {
                                         const cid = confirmModal.contractId;
                                         setConfirmModal(null);
                                         router.push(`/waitlists?quickAction=newWaitlist&tenantName=${encodeURIComponent(tenant)}&contractId=${cid}`);
+                                        return;
+                                    }
+
+                                    if (confirmModal.intention === 'not_renew') {
+                                        const contract = getContractById(confirmModal.contractId);
+                                        const maxDate = contract?.contract_end_date || contract?.main_end_date || contract?.move_end_date || '';
+                                        if (!notRenewMoveOutDate) {
+                                            setNotRenewDateError('กรุณาระบุวันที่คาดว่าจะย้ายออก');
+                                            return;
+                                        }
+                                        if (!isMoveOutDateValid(notRenewMoveOutDate, maxDate)) {
+                                            setNotRenewDateError('วันที่ต้องไม่เกินวันที่สัญญาสิ้นสุด');
+                                            return;
+                                        }
+                                        upsertIntention(confirmModal.contractId, confirmModal.roomId, confirmModal.tenantName, confirmModal.intention, undefined, notRenewMoveOutDate);
                                         return;
                                     }
 

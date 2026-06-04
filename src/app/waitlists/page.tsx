@@ -24,7 +24,7 @@ interface Waitlist {
     preferred_floors: number[]; // เพิ่มฟิลด์ชั้นที่ต้องการเป็น Array
     monthly_rent?: number; // เพิ่มราคาค่าเช่าต่อเดือน
     status?: string;
-    created_at?: string;
+    contract_id?: string | null;
     queue_number?: number;
 }
 
@@ -37,15 +37,13 @@ export default function BookingsPage() {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-
-    // Start date filter for waitlist (single date)
-    const [startDate, setStartDate] = useState<string | null>(null);
     const [filterBuilding, setFilterBuilding] = useState('');
     const [filterFloor, setFilterFloor] = useState('');
     const [filterRoomType, setFilterRoomType] = useState('');
     const [filterKitchen, setFilterKitchen] = useState('');
     const [filterView, setFilterView] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [startDate, setStartDate] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -284,6 +282,10 @@ export default function BookingsPage() {
                 fetchWaitlist();
             }
         } else {
+            const contractId = searchParams.get('contractId');
+            if (contractId) {
+                (payload as any).contract_id = contractId;
+            }
             const { data, error } = await supabase.from('waitlists').insert([payload]).select('id');
             if (error) {
                 alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
@@ -292,7 +294,6 @@ export default function BookingsPage() {
                 if (newId) await logAudit(profile, 'waitlists', 'create', newId, 'เพิ่มรายการจอง', payload);
                 // หากเข้ามาจาก renewal-check พร้อม contractId ให้บันทึกความตั้งใจว่า
                 // เป็น 'renew_no_room' (ผู้เช่าต้องการต่อแต่ยังไม่ระบุห้อง)
-                const contractId = searchParams.get('contractId');
                 if (contractId) {
                     try {
                         const { data: existing } = await supabase.from('renewal_intentions').select('*').eq('contract_id', contractId).limit(1);

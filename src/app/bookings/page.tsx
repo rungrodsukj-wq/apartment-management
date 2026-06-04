@@ -266,6 +266,21 @@ export default function BookingsPage() {
             return `${roomNumber}|${building}|${floor}`;
         };
 
+        const statusPriority: Record<string, number> = {
+            active: 0,
+            upcoming: 1,
+            completed: 2,
+            cancelled: 3,
+        };
+
+        const getEffectiveStatus = (contract: any) => {
+            if (contract.status === 'cancelled') return 'cancelled';
+            if (contract.actual_check_in_date && contract.actual_check_in_date > formatDateInput(new Date())) {
+                return 'upcoming';
+            }
+            return contract.status;
+        };
+
         return [...contractsToSort].sort((a, b) => {
             const roomA = getCurrentRoomId(a);
             const roomB = getCurrentRoomId(b);
@@ -274,14 +289,8 @@ export default function BookingsPage() {
             if (keyA < keyB) return -1;
             if (keyA > keyB) return 1;
 
-            const statusPriority: Record<string, number> = {
-                active: 0,
-                upcoming: 1,
-                completed: 2,
-                cancelled: 3,
-            };
-            const statusA = statusPriority[a.status] ?? 4;
-            const statusB = statusPriority[b.status] ?? 4;
+            const statusA = statusPriority[getEffectiveStatus(a)] ?? 4;
+            const statusB = statusPriority[getEffectiveStatus(b)] ?? 4;
             if (statusA !== statusB) return statusA - statusB;
 
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();

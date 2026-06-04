@@ -290,6 +290,30 @@ export default function BookingsPage() {
             } else {
                 const newId = data?.[0]?.id ?? null;
                 if (newId) await logAudit(profile, 'waitlists', 'create', newId, 'เพิ่มรายการจอง', payload);
+                // หากเข้ามาจาก renewal-check พร้อม contractId ให้บันทึกความตั้งใจว่า
+                // เป็น 'renew_no_room' (ผู้เช่าต้องการต่อแต่ยังไม่ระบุห้อง)
+                const contractId = searchParams.get('contractId');
+                if (contractId) {
+                    try {
+                        const { data: existing } = await supabase.from('renewal_intentions').select('*').eq('contract_id', contractId).limit(1);
+                        const today = new Date();
+                        const surveyMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+
+                        if (existing && existing.length > 0) {
+                            const upd = { intention: 'renew_no_room', note: existing[0].note ?? '', updated_at: new Date().toISOString() };
+                            const { error: upErr } = await supabase.from('renewal_intentions').update(upd).eq('id', existing[0].id);
+                            if (!upErr) await logAudit(profile, 'renewal_intentions', 'update', existing[0].id, 'อัปเดตความตั้งใจเป็น renew_no_room (หลังเพิ่ม waitlist)', describeChanges(upd));
+                        } else {
+                            const rec = { contract_id: contractId, room_id: null, tenant_name: payload.name, intention: 'renew_no_room', survey_month: surveyMonth, note: '' };
+                            const { data: ins, error: insErr } = await supabase.from('renewal_intentions').insert([rec]).select('id');
+                            const newIntId = ins?.[0]?.id ?? null;
+                            if (!insErr && newIntId) await logAudit(profile, 'renewal_intentions', 'create', newIntId, 'เพิ่มความตั้งใจเป็น renew_no_room (หลังเพิ่ม waitlist)', rec);
+                        }
+                    } catch (e) {
+                        console.warn('Failed to upsert renewal intention after waitlist create', e);
+                    }
+                }
+
                 closeModal();
                 fetchWaitlist();
             }

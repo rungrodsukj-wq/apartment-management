@@ -745,6 +745,33 @@ export default function BookingsPage() {
                 parent_contract_id: null, // เพิ่มตรงนี้
             });
             fetchData();
+            // หากการสร้างสัญญานี้มาจาก flow การต่อสัญญา (มี parent_contract_id)
+            // ให้บันทึกความตั้งใจเป็น 'renew' สำหรับสัญญาเดิม
+            if (payload.parent_contract_id) {
+                try {
+                    const parentId = payload.parent_contract_id;
+                    const { data: existing } = await supabase.from('renewal_intentions').select('*').eq('contract_id', parentId).limit(1);
+                    const today = new Date();
+                    const surveyMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+
+                    if (existing && existing.length > 0) {
+                        const upd = { intention: 'renew', note: existing[0].note ?? '', updated_at: new Date().toISOString() };
+                        const { error: upErr } = await supabase.from('renewal_intentions').update(upd).eq('id', existing[0].id);
+                        if (!upErr) await logAudit(profile, 'renewal_intentions', 'update', existing[0].id, 'อัปเดตความตั้งใจต่อสัญญาเป็น renew (หลังสร้างสัญญาใหม่)', describeChanges(upd));
+                    } else {
+                        const rec = { contract_id: parentId, room_id: null, tenant_name: payload.tenant_name, intention: 'renew', survey_month: surveyMonth, note: '' };
+                        const { data: ins, error: insErr } = await supabase.from('renewal_intentions').insert([rec]).select('id');
+                        const newIntId = ins?.[0]?.id ?? null;
+                        if (!insErr && newIntId) await logAudit(profile, 'renewal_intentions', 'create', newIntId, 'เพิ่มความตั้งใจต่อสัญญาเป็น renew (หลังสร้างสัญญาใหม่)', rec);
+                    }
+
+                    // รีเฟรช intentions ในหน้านี้ด้วย
+                    const { data: iData } = await supabase.from('renewal_intentions').select('*');
+                    if (iData) setIntentions(iData);
+                } catch (e) {
+                    console.warn('Failed to upsert renewal intention after create', e);
+                }
+            }
         }
     };
 

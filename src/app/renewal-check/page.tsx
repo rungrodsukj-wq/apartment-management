@@ -158,12 +158,9 @@ export default function RenewalCheckPage() {
         setSaving(null);
         setConfirmModal(null); // ปิด popup หลังบันทึกสำเร็จ
 
-        if (intention === 'renew') {
-            router.push(`/bookings?renewContractId=${contractId}`);
-        }
-        if (intention === 'renew_no_room') {
-            router.push(`/waitlists?quickAction=newWaitlist&tenantName=${encodeURIComponent(tenantName)}&contractId=${contractId}`);
-        }
+        // NOTE: navigation for renew / renew_no_room is handled by the caller
+        // (we don't navigate here so that status changes only after a new
+        // contract is actually created elsewhere in the app)
     };
 
     const handleSaveNote = async () => {
@@ -623,7 +620,28 @@ export default function RenewalCheckPage() {
                             </button>
                             <button
                                 type="button"
-                                onClick={() => upsertIntention(confirmModal.contractId, confirmModal.roomId, confirmModal.tenantName, confirmModal.intention)}
+                                onClick={() => {
+                                    if (!confirmModal) return;
+                                    // For renew actions, navigate to the creation flow but
+                                    // do NOT change the intention here — the status should
+                                    // be updated only after a new contract is created.
+                                    if (confirmModal.intention === 'renew') {
+                                        const cid = confirmModal.contractId;
+                                        setConfirmModal(null);
+                                        router.push(`/bookings?renewContractId=${cid}`);
+                                        return;
+                                    }
+                                    if (confirmModal.intention === 'renew_no_room') {
+                                        const tenant = confirmModal.tenantName;
+                                        const cid = confirmModal.contractId;
+                                        setConfirmModal(null);
+                                        router.push(`/waitlists?quickAction=newWaitlist&tenantName=${encodeURIComponent(tenant)}&contractId=${cid}`);
+                                        return;
+                                    }
+
+                                    // Other intentions: upsert immediately
+                                    upsertIntention(confirmModal.contractId, confirmModal.roomId, confirmModal.tenantName, confirmModal.intention);
+                                }}
                                 className={`flex-1 px-4 py-3 text-sm font-bold text-white rounded-xl shadow-lg transition-colors ${confirmModal.intention === 'renew' ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30' :
                                     confirmModal.intention === 'renew_no_room' ? 'bg-sky-500 hover:bg-sky-600 shadow-sky-500/30' :
                                         confirmModal.intention === 'not_renew' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' :

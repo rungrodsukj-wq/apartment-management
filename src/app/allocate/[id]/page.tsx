@@ -226,17 +226,25 @@ export default function AllocateRoomPage() {
         return `ว่าง : ${fromStr} - ${untilStr}`;
     };
 
+    const getSearchStartDate = () => {
+        if (assignAs === 'main' && tempContractId && tempEndDate) {
+            return tempEndDate;
+        }
+        return waitlist?.start_date ?? '';
+    };
+
     const handleAllocate = async () => {
         if (!selectedRoomId || !waitlist) return;
         setIsSubmitting(true);
 
-        const { availableFrom } = getRoomAvailability(selectedRoomId, waitlist.start_date);
-        const reqStart = new Date(waitlist.start_date);
+        const referenceStart = assignAs === 'main' && tempContractId && tempEndDate ? tempEndDate : waitlist.start_date;
+        const { availableFrom } = getRoomAvailability(selectedRoomId, referenceStart);
+        const reqStart = new Date(referenceStart);
         const isLate = reqStart < availableFrom;
 
         const finalMainStartDate = isLate
-            ? getNextAvailableDate(selectedRoomId, waitlist.start_date)
-            : actualCheckInDate;
+            ? getNextAvailableDate(selectedRoomId, referenceStart)
+            : (assignAs === 'main' && tempContractId && tempEndDate ? referenceStart : actualCheckInDate);
 
         const basePayload: any = {
             waitlist_id: waitlistId,
@@ -333,6 +341,8 @@ export default function AllocateRoomPage() {
 
     if (!waitlist) return <div className="p-10 text-center text-gray-500">ไม่พบข้อมูลการจอง...</div>;
 
+    const searchStartDate = getSearchStartDate();
+
     const matchedRooms = rooms.filter(r =>
         (!waitlist.room_type || waitlist.room_type === 'ไม่ระบุ' || r.room_type === waitlist.room_type) &&
         (!waitlist.kitchen_type || waitlist.kitchen_type === 'ไม่ระบุ' || r.kitchen_type === waitlist.kitchen_type) &&
@@ -344,8 +354,8 @@ export default function AllocateRoomPage() {
     const availableLaterMatches: Room[] = [];
 
     matchedRooms.forEach(room => {
-        const { availableFrom, availableUntil } = getRoomAvailability(room.id, waitlist.start_date);
-        const reqStart = new Date(waitlist.start_date);
+        const { availableFrom, availableUntil } = getRoomAvailability(room.id, searchStartDate);
+        const reqStart = new Date(searchStartDate);
         const reqEnd = new Date(waitlist.end_date);
 
         if (reqStart < availableFrom) {
@@ -359,8 +369,8 @@ export default function AllocateRoomPage() {
 
     const otherRooms = rooms.filter(r => !matchedRooms.some(m => m.id === r.id));
     const alternativeMatches = otherRooms.filter(r => {
-        const { availableFrom } = getRoomAvailability(r.id, waitlist.start_date);
-        const reqStart = new Date(waitlist.start_date);
+        const { availableFrom } = getRoomAvailability(r.id, searchStartDate);
+        const reqStart = new Date(searchStartDate);
         return reqStart >= availableFrom;
     });
 
@@ -369,8 +379,8 @@ export default function AllocateRoomPage() {
     let expireDateStr = '';
 
     if (selectedRoomId) {
-        const { availableFrom, availableUntil } = getRoomAvailability(selectedRoomId, waitlist.start_date);
-        const reqStart = new Date(waitlist.start_date);
+        const { availableFrom, availableUntil } = getRoomAvailability(selectedRoomId, searchStartDate);
+        const reqStart = new Date(searchStartDate);
         const reqEnd = new Date(waitlist.end_date);
 
         if (reqStart < availableFrom) {
@@ -449,7 +459,7 @@ export default function AllocateRoomPage() {
                                         <span>🧭 {room.view_direction}</span>
                                     </div>
                                     <div className="text-xs font-semibold text-gray-600 mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex items-center gap-1.5 w-full">
-                                        📅 {getRoomAvailabilityText(room.id, waitlist.start_date)}
+                                        📅 {getRoomAvailabilityText(room.id, searchStartDate)}
                                     </div>
                                 </div>
                             )) : (
@@ -487,7 +497,7 @@ export default function AllocateRoomPage() {
                                                 <span>🧭 {room.view_direction}</span>
                                             </div>
                                             <div className="text-xs font-semibold text-yellow-800 mt-3 bg-yellow-50 p-2 rounded-lg border border-yellow-100 inline-flex items-center gap-1.5 w-full">
-                                                📅 {getRoomAvailabilityText(room.id, waitlist.start_date)}
+                                                📅 {getRoomAvailabilityText(room.id, searchStartDate)}
                                             </div>
                                         </div>
                                     );
@@ -522,7 +532,7 @@ export default function AllocateRoomPage() {
                                             <span>🧭 {room.view_direction}</span>
                                         </div>
                                         <div className="text-xs font-semibold text-orange-800 mt-3 bg-orange-50/50 p-2 rounded-lg border border-orange-100 inline-flex items-center gap-1.5 w-full">
-                                            📅 {getRoomAvailabilityText(room.id, waitlist.start_date)}
+                                            📅 {getRoomAvailabilityText(room.id, searchStartDate)}
                                         </div>
                                     </div>
                                 );
@@ -556,7 +566,7 @@ export default function AllocateRoomPage() {
                                         <span className={waitlist.view_preference && waitlist.view_preference !== 'ไม่ระบุ' && waitlist.view_preference !== room.view_direction ? 'text-red-500' : ''}>🧭 {room.view_direction}</span>
                                     </div>
                                     <div className="text-xs font-semibold text-gray-600 mt-3 bg-white p-2 rounded-lg border border-gray-200 inline-flex items-center gap-1.5 w-full">
-                                        📅 {getRoomAvailabilityText(room.id, waitlist.start_date)}
+                                        📅 {getRoomAvailabilityText(room.id, searchStartDate)}
                                     </div>
                                 </div>
                             )) : (

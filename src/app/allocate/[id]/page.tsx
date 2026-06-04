@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
@@ -63,6 +63,7 @@ export default function AllocateRoomPage() {
     const [actualCheckInDate, setActualCheckInDate] = useState<string>('');
     const [tempEndDate, setTempEndDate] = useState<string>('');
     const [tempStartDate, setTempStartDate] = useState<string>('');
+    const [isEditingTempModal, setIsEditingTempModal] = useState(false);
 
     useEffect(() => {
         if (waitlist) {
@@ -74,9 +75,12 @@ export default function AllocateRoomPage() {
         fetchData();
     }, [waitlistId]);
 
-    const tempEditRef = useRef<HTMLDivElement | null>(null);
-    const scrollToTempEdit = () => {
-        if (tempEditRef.current) tempEditRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const openTempEditModal = () => {
+        setIsEditingTempModal(true);
+    };
+
+    const closeTempEditModal = () => {
+        setIsEditingTempModal(false);
     };
 
     useEffect(() => {
@@ -406,7 +410,7 @@ export default function AllocateRoomPage() {
                             <span className="font-bold text-blue-700">{new Date(waitlist.start_date).toLocaleDateString('th-TH')} - {new Date(waitlist.end_date).toLocaleDateString('th-TH')}</span>
                         </div>
                         {tempContractId && (
-                            <button onClick={scrollToTempEdit} className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">แก้ไขการจัดสรรชั่วคราว</button>
+                            <button onClick={openTempEditModal} className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm hover:bg-amber-100 transition-colors">แก้ไขการจัดสรรชั่วคราว</button>
                         )}
                     </div>
                 </div>
@@ -609,40 +613,7 @@ export default function AllocateRoomPage() {
                                     </p>
                                 </div>
 
-                                {/* If there's an existing temp contract, allow editing its dates here */}
-                                {tempContractId && (
-                                    <div ref={tempEditRef} className="bg-amber-50 p-4 rounded-xl border border-amber-100 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="text-sm font-bold text-amber-800">แก้ไขการจัดสรรชั่วคราวที่มีอยู่</div>
-                                            <div className="text-xs text-amber-700">Contract: {tempContractId}</div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="text-xs font-medium text-amber-700">วันที่เริ่ม (Temp start)</label>
-                                                <input type="date" className="w-full border border-amber-200 rounded-xl p-2 mt-1" value={tempStartDate} onChange={(e) => setTempStartDate(e.target.value)} />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs font-medium text-amber-700">วันที่สิ้นสุด (Temp end)</label>
-                                                <input type="date" className="w-full border border-amber-200 rounded-xl p-2 mt-1" value={tempEndDate} onChange={(e) => setTempEndDate(e.target.value)} />
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={async () => {
-                                                if (!tempContractId) return;
-                                                setIsSubmitting(true);
-                                                const upd = { temp_start_date: tempStartDate || actualCheckInDate, temp_end_date: tempEndDate };
-                                                const { error } = await supabase.from('contracts').update(upd).eq('id', tempContractId);
-                                                if (error) {
-                                                    alert('ไม่สามารถอัปเดตสัญญาชั่วคราวได้: ' + error.message);
-                                                } else {
-                                                    await logAudit(profile, 'contracts', 'update', tempContractId, 'แก้ไขวันที่สัญญาชั่วคราว', upd);
-                                                    alert('อัปเดตวันที่สัญญาชั่วคราวเรียบร้อย');
-                                                }
-                                                setIsSubmitting(false);
-                                            }} className="px-4 py-2 bg-amber-600 text-white rounded-xl">บันทึกการแก้ไขชั่วคราว</button>
-                                        </div>
-                                    </div>
-                                )}
+
 
                                 {/* 3. รูปแบบการจัดสรร (Radio Cards) */}
                                 <div className="space-y-3 pt-2">
@@ -786,6 +757,74 @@ export default function AllocateRoomPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Modal สำหรับแก้ไขการจัดสรรชั่วคราว */}
+            {isEditingTempModal && tempContractId && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                            <h2 className="text-lg font-bold text-gray-900">แก้ไขการจัดสรรชั่วคราวที่มีอยู่</h2>
+                            <button onClick={closeTempEditModal} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                                <p className="text-xs text-amber-700 font-bold">Contract ID</p>
+                                <p className="text-sm text-amber-900 font-mono mt-1">{tempContractId}</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-800 mb-2">📅 วันที่เริ่ม (Temp Start)</label>
+                                <input
+                                    type="date"
+                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                                    value={tempStartDate}
+                                    onChange={(e) => setTempStartDate(e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-800 mb-2">📅 วันที่สิ้นสุด (Temp End)</label>
+                                <input
+                                    type="date"
+                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                                    value={tempEndDate}
+                                    onChange={(e) => setTempEndDate(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
+                            <button
+                                onClick={closeTempEditModal}
+                                className="flex-1 px-4 py-2.5 text-sm font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!tempContractId) return;
+                                    setIsSubmitting(true);
+                                    const upd = { temp_start_date: tempStartDate || actualCheckInDate, temp_end_date: tempEndDate };
+                                    const { error } = await supabase.from('contracts').update(upd).eq('id', tempContractId);
+                                    if (error) {
+                                        alert('ไม่สามารถอัปเดตสัญญาชั่วคราวได้: ' + error.message);
+                                    } else {
+                                        await logAudit(profile, 'contracts', 'update', tempContractId, 'แก้ไขวันที่สัญญาชั่วคราว', upd);
+                                        alert('อัปเดตวันที่สัญญาชั่วคราวเรียบร้อย');
+                                        closeTempEditModal();
+                                    }
+                                    setIsSubmitting(false);
+                                }}
+                                disabled={isSubmitting}
+                                className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-amber-600 rounded-xl hover:bg-amber-700 disabled:bg-amber-300 transition-colors"
+                            >
+                                {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -580,8 +580,7 @@ export default function AllocateRoomPage() {
 
                 {/* แผงควบคุมด้านขวา (ปรับ UI ใหม่ให้เข้าใจง่ายขึ้น) */}
                 <div className="col-span-1">
-                    <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
-
+                    <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-8 max-h-160 overflow-y-auto">
                         <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3 mb-5 sticky top-0 bg-white z-10">
                             สรุปการจัดสรรห้อง
                         </h3>

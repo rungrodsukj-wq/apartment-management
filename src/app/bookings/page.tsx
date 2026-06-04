@@ -1900,20 +1900,7 @@ export default function BookingsPage() {
                                 })()}
                             </div>
                             <div className="flex items-center gap-3">
-                                <select
-                                    className={`border rounded-xl py-2 pl-3 pr-8 text-xs font-bold outline-none cursor-pointer transition-colors
-                                        ${editForm.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                            editForm.status === 'completed' ? 'bg-slate-50 text-slate-500 border-slate-200' :
-                                                editForm.status === 'upcoming' ? 'bg-sky-50 text-sky-700 border-sky-200' :
-                                                    'bg-red-50 text-red-600 border-red-200'}`}
-                                    value={editForm.status}
-                                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                                >
-                                    <option value="active">🟢 Active</option>
-                                    <option value="upcoming">🔵 Upcoming</option>
-                                    <option value="completed">⚪ Completed</option>
-                                    <option value="cancelled">🔴 Cancelled</option>
-                                </select>
+                                {getStatusBadge(editForm.status)}
                                 <button
                                     onClick={() => setIsEditModalOpen(false)}
                                     className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors"

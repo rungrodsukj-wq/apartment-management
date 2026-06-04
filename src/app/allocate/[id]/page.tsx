@@ -19,6 +19,7 @@ interface Waitlist {
     special_request?: string;
     allocation_note?: string;
     monthly_rent?: number;
+    preferred_floors: number[];
 }
 
 interface Room {
@@ -418,6 +419,10 @@ export default function AllocateRoomPage() {
                         <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
                             <span className="text-blue-400 block text-[10px] uppercase font-bold">ช่วงเวลาที่ต้องการ</span>
                             <span className="font-bold text-blue-700">{new Date(waitlist.start_date).toLocaleDateString('th-TH')} - {new Date(waitlist.end_date).toLocaleDateString('th-TH')}</span>
+                        </div>
+                        <div className="bg-green-50 px-4 py-2 rounded-xl border border-green-100">
+                            <span className="text-green-400 block text-[10px] uppercase font-bold">ชั้นที่ต้องการ</span>
+                            <span className="font-bold text-green-700">{waitlist.preferred_floors?.join(', ') || 'ไม่ระบุ'}</span>
                         </div>
                         {tempContractId && (
                             <button onClick={openTempEditModal} className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm hover:bg-amber-100 transition-colors">แก้ไขการจัดสรรชั่วคราว</button>

@@ -198,10 +198,21 @@ export default function AvailableRoomsPage() {
             const rOfType = rooms.filter(r => r.room_type === rt.key);
             const wOfType = overlappingWaitlists.filter(w => w.room_type === rt.key);
 
-            const getCellData = (kitchen: string, view: string) => {
-                const total = rOfType.filter(r => (r.kitchen_type || '') === kitchen && (r.view_direction || '') === view).length;
-                const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && (r.kitchen_type || '') === kitchen && (r.view_direction || '') === view).length;
-                const waitlistMatches = wOfType.filter(w => (w.kitchen_type || '') === kitchen && (w.view_preference || '') === view).length;
+            const getCellData = (kitchen: string | null, view: string | null) => {
+                // Handle unspecified: both kitchen and view must be null/undefined
+                const isUnspecified = kitchen === null && view === null;
+                
+                if (isUnspecified) {
+                    const total = rOfType.filter(r => !r.kitchen_type && !r.view_direction).length;
+                    const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && !r.kitchen_type && !r.view_direction).length;
+                    const waitlistMatches = wOfType.filter(w => !w.kitchen_type && !w.view_preference).length;
+                    const net = Math.max(0, physicalAvailable - waitlistMatches);
+                    return { total, available: physicalAvailable, waitlist: waitlistMatches, net };
+                }
+
+                const total = rOfType.filter(r => (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
+                const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
+                const waitlistMatches = wOfType.filter(w => (w.kitchen_type || null) === kitchen && (w.view_preference || null) === view).length;
                 const net = Math.max(0, physicalAvailable - waitlistMatches);
                 return { total, available: physicalAvailable, waitlist: waitlistMatches, net };
             };
@@ -218,6 +229,7 @@ export default function AvailableRoomsPage() {
                 frontEast: getCellData('ครัวหน้า', 'ทิศตะวันออก'),
                 backWest: getCellData('ครัวหลัง', 'ทิศตะวันตก'),
                 backEast: getCellData('ครัวหลัง', 'ทิศตะวันออก'),
+                unspecified: getCellData(null, null),
             };
         });
     }, [rooms, contracts, waitlists, checkStart, checkEnd]);
@@ -306,15 +318,18 @@ export default function AvailableRoomsPage() {
                                             <th colSpan={2} className="p-3 bg-gradient-to-br from-sky-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center">
                                                 ครัวหน้า
                                             </th>
-                                            <th colSpan={2} className="p-3 bg-gradient-to-br from-rose-100 to-white text-slate-800 font-bold text-center rounded-tr-[1.5rem] border-slate-200">
+                                            <th colSpan={2} className="p-3 bg-gradient-to-br from-rose-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center">
                                                 ครัวหลัง
+                                            </th>
+                                            <th rowSpan={3} className="p-4 bg-gradient-to-br from-purple-100 to-white text-slate-800 font-bold text-center align-middle rounded-tr-[1.5rem] border-slate-200">
+                                                ไม่ระบุ<br />ครัว/ทิศ
                                             </th>
                                         </tr>
                                         <tr>
                                             <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold border-r border-slate-200 text-center">
                                                 View
                                             </th>
-                                            <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold text-center border-slate-200">
+                                            <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold border-r border-slate-200 text-center">
                                                 View
                                             </th>
                                         </tr>
@@ -328,7 +343,7 @@ export default function AvailableRoomsPage() {
                                             <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
                                                 SALAYA ONE RESIDENCES<br />(ตะวันตก)
                                             </th>
-                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold text-center max-w-[160px] rounded-tr-[1.5rem] border-slate-200">
+                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
                                                 ซอยตั้งสิน<br />(ตะวันออก)
                                             </th>
                                         </tr>
@@ -369,6 +384,19 @@ export default function AvailableRoomsPage() {
                                                     {renderCell(row.frontEast)}
                                                     {renderCell(row.backWest)}
                                                     {renderCell(row.backEast)}
+                                                    <td className="p-4 text-center align-top border border-slate-200 rounded-r-3xl">
+                                                        <div className={`text-base font-black ${row.unspecified.net <= 0 ? 'text-slate-400' : 'text-purple-600'}`}>
+                                                            {row.unspecified.net} <span className="text-xs font-normal text-slate-500">ห้อง</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 mt-1">
+                                                            (ว่าง {row.unspecified.available} / ทั้งหมด {row.unspecified.total})
+                                                        </div>
+                                                        {row.unspecified.waitlist > 0 && (
+                                                            <div className="mt-2 inline-flex items-center justify-center rounded-full bg-purple-100 px-2 py-1 text-[9px] font-semibold text-purple-700">
+                                                                -{row.unspecified.waitlist} waitlist
+                                                            </div>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             );
                                         })}

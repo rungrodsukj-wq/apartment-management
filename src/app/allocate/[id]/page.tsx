@@ -460,7 +460,7 @@ export default function AllocateRoomPage() {
                         </div>
                     </div>
 
-                    {partialMatches.length > 0 && (
+                    {/* {partialMatches.length > 0 && (
                         <div className="pt-4 border-t border-gray-200">
                             <h2 className="text-lg font-bold text-yellow-600 mb-3 flex items-center gap-2">
                                 <span>⚠️</span> ห้องตรงสเปค ว่างพร้อมอยู่ (แต่ต้องย้ายออกทีหลัง)
@@ -494,7 +494,7 @@ export default function AllocateRoomPage() {
                                 })}
                             </div>
                         </div>
-                    )}
+                    )} */}
 
                     <div className="pt-4 border-t border-gray-200">
                         <h2 className="text-lg font-bold text-orange-500 mb-3 flex items-center gap-2">

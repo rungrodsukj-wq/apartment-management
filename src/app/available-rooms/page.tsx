@@ -63,100 +63,36 @@ export default function AvailableRoomsPage() {
     const checkStart = `${selectedYear}-${pad(selectedMonth)}-01`;
     const checkEnd = calculateEndDate(checkStart);
 
-    // Build a set of room IDs that are locked because an existing contract
-    // could reserve the room (tenant didn't explicitly mark 'not_renew').
-    // Rule: any contract tied to a room that ends on/after `checkStart` and
-    // whose renewal intention is missing or !== 'not_renew' should lock the room.
     const lockedRoomIds = useMemo(() => {
         const locked = new Set<string>();
 
-        // Index intentions by contract id for quick lookup
         const byContract: Record<string, any> = {};
         intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
 
         const nonLockIntents = ['not_renew', 'renew_no_room'];
 
         for (const c of contracts) {
-            // consider main, temp and move_to room assignments
             const roomIds = [c.main_room_id, c.temp_room_id, c.move_to_room_id].filter(Boolean) as string[];
             if (roomIds.length === 0) continue;
 
-            // determine contract end date to compare with our window
             const endDate = c.contract_end_date || c.main_end_date || c.temp_end_date || c.move_end_date;
             if (!endDate) continue;
             if (endDate < checkStart) continue;
 
             const intent = byContract[c.id];
-            // lock if no intention or intention is not in nonLockIntents
             if (!intent || !nonLockIntents.includes(intent.intention)) {
                 roomIds.forEach(rid => locked.add(rid));
             }
         }
 
-        // also include any explicit intention that references a room directly
         for (const intent of intentions) {
             if (intent.room_id) {
-                // if intention exists and is not one of nonLockIntents, lock it
                 if (!intent.intention || !nonLockIntents.includes(intent.intention)) locked.add(intent.room_id);
             }
         }
 
         return locked;
     }, [intentions, contracts, checkStart]);
-
-    const summary = useMemo(() => {
-        // Exclude locked rooms (pending/renew intention) from available rooms
-        const availableRooms = roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
-        const overlappingWaitlists = waitlists.filter(w => isOverlap(checkStart, checkEnd, w.start_date, w.end_date));
-
-        const roomTypes = [...new Set(roomsL.map(r => r.room_type).filter(Boolean))];
-        const res: Record<string, any> = {};
-
-        for (const rt of roomTypes as string[]) {
-            const rOfType = availableRooms.filter(r => r.room_type === rt);
-            const wOfType = overlappingWaitlists.filter(w => w.room_type === rt);
-
-            // Calculate breakdown by kitchen_type and view_direction
-            const roomsOfTypeAll = roomsL.filter(r => r.room_type === rt);
-            const combos: { kitchen: string; view: string }[] = [];
-            roomsOfTypeAll.forEach(r => {
-                const k = r.kitchen_type || 'ไม่ระบุครัว';
-                const v = r.view_direction || 'ไม่ระบุทิศ';
-                if (!combos.some(c => c.kitchen === k && c.view === v)) {
-                    combos.push({ kitchen: k, view: v });
-                }
-            });
-
-            // Sort combos to be consistent
-            combos.sort((a, b) => a.kitchen.localeCompare(b.kitchen) || a.view.localeCompare(b.view));
-
-            const breakdown = combos.map(combo => {
-                const physicalAvailable = rOfType.filter(r => (r.kitchen_type || 'ไม่ระบุครัว') === combo.kitchen && (r.view_direction || 'ไม่ระบุทิศ') === combo.view).length;
-                const waitlistsMatching = wOfType.filter(w => (w.kitchen_type || 'ไม่ระบุครัว') === combo.kitchen && (w.view_preference || 'ไม่ระบุทิศ') === combo.view).length;
-                const net = physicalAvailable - waitlistsMatching; // allow negative
-                const totalRoomsInCombo = roomsOfTypeAll.filter(r => (r.kitchen_type || 'ไม่ระบุครัว') === combo.kitchen && (r.view_direction || 'ไม่ระบุทิศ') === combo.view).length;
-                return {
-                    kitchen: combo.kitchen,
-                    view: combo.view,
-                    total: totalRoomsInCombo,
-                    available: physicalAvailable, // show physical available before subtracting waitlists
-                    waitlist: waitlistsMatching,
-                    net: net
-                };
-            });
-
-            res[rt] = {
-                totalRooms: roomsOfTypeAll.length,
-                totalAvailable: rOfType.length,
-                waitlistCount: wOfType.length,
-                netAvailable: rOfType.length - wOfType.length,
-                rooms: rOfType,
-                waitlists: wOfType,
-                breakdown
-            };
-        }
-        return res;
-    }, [rooms, contracts, waitlists, checkStart, checkEnd]);
 
     const matrixData = useMemo(() => {
         const rowTypes = [
@@ -166,8 +102,7 @@ export default function AvailableRoomsPage() {
             { key: 'Triple Bedroom', display: 'TRIPLE BEDROOM' }
         ];
 
-        // Also exclude locked rooms in the matrix
-                const availableRooms = roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
+        const availableRooms = roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
         const overlappingWaitlists = waitlists.filter(w => isOverlap(checkStart, checkEnd, w.start_date, w.end_date));
 
         return rowTypes.map(rt => {
@@ -175,19 +110,15 @@ export default function AvailableRoomsPage() {
             const wOfType = overlappingWaitlists.filter(w => w.room_type === rt.key);
 
             const getCellData = (kitchen: string | null, view: string | null) => {
-                // 1. เปลี่ยนคอลัมน์สุดท้ายให้เป็นกล่องรับ "คิวรอกลางที่สเปคไม่ครบ"ทั้งหมด
                 const isUnspecifiedColumn = kitchen === null && view === null;
                 
                 if (isUnspecifiedColumn) {
-                    // นับห้องที่ในระบบไม่ได้กรอกข้อมูลครัวและทิศไว้จริงๆ
                     const total = rOfType.filter(r => !r.kitchen_type && !r.view_direction).length;
                     const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && !r.kitchen_type && !r.view_direction).length;
                     
-                    // ✅ ดึงคิวจองที่ "สเปคไม่ตรงกับ 4 ช่องหลัก" (เช่น เคสคุณก็อต) มารวมไว้ตรงนี้ทั้งหมด
                     const waitlistMatches = wOfType.filter(w => {
                         const k = w.kitchen_type;
                         const v = w.view_preference;
-                        // ถ้าไม่ได้ระบุสเปคมาครบถ้วน (ครัวหน้า/หลัง + ตะวันตก/ตะวันออก) ให้ปัดมาเป็นคิวกึ่งกลางทันที
                         const isFullySpecific = (k === 'ครัวหน้า' || k === 'ครัวหลัง') && (v === 'ทิศตะวันตก' || v === 'ทิศตะวันออก');
                         return !isFullySpecific;
                     }).length;
@@ -196,11 +127,9 @@ export default function AvailableRoomsPage() {
                     return { total, available: physicalAvailable, waitlist: waitlistMatches, net };
                 }
 
-                // 2. ช่องสเปคเฉพาะ (ครัวหน้า-ตก, ครัวหน้า-ออก, ครัวหลัง-ตก, ครัวหลัง-ออก)
                 const total = rOfType.filter(r => (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
                 const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
                 
-                // คิวจองที่ระบุตรงเป๊ะๆ เท่านั้นถึงจะมาหักลบช่องนี้
                 const waitlistMatches = wOfType.filter(w => (w.kitchen_type || null) === kitchen && (w.view_preference || null) === view).length;
                 
                 const net = physicalAvailable - waitlistMatches;
@@ -208,7 +137,7 @@ export default function AvailableRoomsPage() {
             };
 
             const totalAvailable = availableRooms.filter(r => r.room_type === rt.key).length;
-            const netQuota = totalAvailable - wOfType.length; // allow negative
+            const netQuota = totalAvailable - wOfType.length; 
 
             return {
                 ...rt,
@@ -222,7 +151,7 @@ export default function AvailableRoomsPage() {
                 unspecified: getCellData(null, null),
             };
         });
-    }, [rooms, contracts, waitlists, checkStart, checkEnd]);
+    }, [rooms, contracts, waitlists, checkStart, checkEnd, roomsL, lockedRoomIds]);
 
     const monthsTH = [
         "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
@@ -232,254 +161,249 @@ export default function AvailableRoomsPage() {
     const currentYear = new Date().getFullYear();
     const years = [currentYear, currentYear + 1, currentYear + 2];
 
+    const totalAvailablePhysical = matrixData.reduce((acc, row) => acc + row.totalAvailable, 0);
+    const totalWaitlists = matrixData.reduce((acc, row) => acc + row.waitlistCount, 0);
+    const totalNetQuota = matrixData.reduce((acc, row) => acc + row.netQuota, 0);
+
     return (
-        <div className="min-h-full flex flex-col bg-transparent">
-            <div className="flex-1 p-8 md:p-10">
+        <>
+            {/* Import Google Font K2D */}
+            <style dangerouslySetInnerHTML={{ __html: `
+                @import url('https://fonts.googleapis.com/css2?family=K2D:wght@300;400;500;600;700;800&display=swap');
+            ` }} />
 
-                {/* Date Picker Card */}
-                <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 mb-8 max-w-2xl">
-                    <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-[#4F81FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        เลือกรอบบิลเดือนที่ลูกค้าต้องการเข้าพัก
-                    </h2>
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="flex-1">
-                            <label className="block text-xs font-bold text-slate-500 mb-2">เดือน</label>
-                            <select
-                                className="w-full bg-slate-50 border border-black rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 outline-none transition-all cursor-pointer"
-                                value={selectedMonth}
-                                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                            >
-                                {monthsTH.map((m, i) => (
-                                    <option key={i} value={i + 1}>{m}</option>
-                                ))}
-                            </select>
+            {/* Set Font Family to the main wrapper */}
+            <div className="min-h-full flex flex-col bg-transparent" style={{ fontFamily: "'K2D', sans-serif" }}>
+                <div className="flex-1 p-8 md:p-10">
+
+                    {/* Date Picker Card */}
+                    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 mb-8 max-w-2xl">
+                        <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-[#4F81FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            เลือกรอบบิลเดือนที่ลูกค้าต้องการเข้าพัก
+                        </h2>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="flex-1">
+                                <label className="block text-xs font-bold text-slate-500 mb-2">เดือน</label>
+                                <select
+                                    className="w-full bg-slate-50 border border-black rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 outline-none transition-all cursor-pointer font-medium"
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                >
+                                    {monthsTH.map((m, i) => (
+                                        <option key={i} value={i + 1}>{m}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-xs font-bold text-slate-500 mb-2">ปี (ค.ศ.)</label>
+                                <select
+                                    className="w-full bg-slate-50 border border-black rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 outline-none transition-all cursor-pointer font-medium"
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                >
+                                    {years.map((y) => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                        <div className="flex-1">
-                            <label className="block text-xs font-bold text-slate-500 mb-2">ปี (ค.ศ.)</label>
-                            <select
-                                className="w-full bg-slate-50 border border-black rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 outline-none transition-all cursor-pointer"
-                                value={selectedYear}
-                                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                            >
-                                {years.map((y) => (
-                                    <option key={y} value={y}>{y}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <p className="text-xs text-slate-400 mt-4 bg-slate-50 p-3 rounded-lg border border-slate-100 inline-block">
+                            <span className="font-semibold text-slate-600">ระยะเวลาคำนวณ 1 ปี:</span> {formatDateTH(checkStart)} - {formatDateTH(checkEnd)}
+                        </p>
                     </div>
-                    <p className="text-xs text-slate-400 mt-4 bg-slate-50 p-3 rounded-lg border border-slate-100 inline-block">
-                        <span className="font-semibold text-slate-600">ระยะเวลาคำนวณ 1 ปี:</span> {formatDateTH(checkStart)} - {formatDateTH(checkEnd)}
-                    </p>
-                </div>
 
-                {loading ? (
-                    <div className="flex justify-center p-20"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-[#4F81FF]"></div></div>
-                ) : (
-                    <>
-                        {/* Locked rooms notice */}
-                        {lockedRoomIds.size > 0 && (
-                            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
-                                <span className="text-2xl shrink-0">🔒</span>
-                                <div>
-                                    <p className="text-sm font-bold text-amber-800">
-                                        {lockedRoomIds.size} ห้อง ถูกล็อคอยู่ — ยังไม่นำมาคำนวณ
-                                    </p>
-                                    <p className="text-xs text-amber-600 mt-0.5">
-                                        ลูกบ้านยังไม่แจ้งความประสงค์ (Pending) หรือต้องการต่อสัญญา — ไปที่หน้า <a href="/renewal-check" className="font-bold underline hover:text-amber-800">สอบถามต่อสัญญา</a> เพื่ออัปเดตสถานะ
-                                    </p>
+                    {loading ? (
+                        <div className="flex justify-center p-20"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-[#4F81FF]"></div></div>
+                    ) : (
+                        <>
+                            {/* New Redesigned Locked rooms notice */}
+                            {lockedRoomIds.size > 0 && (
+                                <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-200 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative overflow-hidden">
+                                    {/* Accent Line */}
+                                    <div className="absolute top-0 left-0 w-2 h-full bg-amber-400"></div>
+                                    
+                                    <div className="flex items-start sm:items-center gap-4 pl-3">
+                                        <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center shrink-0 border border-amber-100 shadow-inner">
+                                            <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-800 flex flex-wrap items-center gap-2">
+                                                ห้องถูกระงับการคำนวณชั่วคราว 
+                                                <span className="bg-amber-100 text-amber-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                                                    {lockedRoomIds.size} ห้อง
+                                                </span>
+                                            </h3>
+                                            <p className="text-sm text-slate-500 mt-0.5">
+                                                ระบบยังไม่นำมาคำนวณ เนื่องจากลูกบ้านยังไม่แจ้งความประสงค์ หรือกำลังดำเนินการต่อสัญญา
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <a href="/renewal-check" className="shrink-0 inline-flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold px-6 py-3 rounded-xl transition-all shadow-sm w-full sm:w-auto justify-center group">
+                                        จัดการสถานะสัญญา
+                                        <svg className="w-4 h-4 text-slate-400 group-hover:text-[#4F81FF] group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                                    </a>
+                                </div>
+                            )}
+
+                            {/* KPI Widgets */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-6 opacity-10">
+                                        <svg className="w-16 h-16 text-[#4F81FF]" fill="currentColor" viewBox="0 0 20 20"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z"></path><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd"></path></svg>
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-500 mb-2 relative z-10">ห้องว่างทั้งหมด (Physical)</span>
+                                    <div className="relative z-10 flex items-baseline gap-2">
+                                        <span className="text-4xl font-black text-[#4F81FF]">{totalAvailablePhysical}</span>
+                                        <span className="text-sm font-medium text-slate-400">ห้อง</span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-6 opacity-10">
+                                        <svg className="w-16 h-16 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"></path></svg>
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-500 mb-2 relative z-10">คิวจองล่วงหน้า (Waitlists)</span>
+                                    <div className="relative z-10 flex items-baseline gap-2">
+                                        <span className="text-4xl font-black text-amber-500">{totalWaitlists}</span>
+                                        <span className="text-sm font-medium text-slate-400">คิว</span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-6 opacity-10">
+                                        <svg className={`w-16 h-16 ${totalNetQuota < 0 ? 'text-red-500' : 'text-emerald-500'}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd"></path></svg>
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-500 mb-2 relative z-10">คงเหลือสุทธิ (Net Available)</span>
+                                    <div className="relative z-10 flex items-baseline gap-2">
+                                        <span className={`text-4xl font-black ${totalNetQuota < 0 ? 'text-red-500' : totalNetQuota === 0 ? 'text-slate-500' : 'text-emerald-500'}`}>
+                                            {totalNetQuota}
+                                        </span>
+                                        <span className="text-sm font-medium text-slate-400">ห้อง</span>
+                                    </div>
                                 </div>
                             </div>
-                        )}
 
-                        <h2 className="text-lg font-bold text-[#0A2647] mb-4">สรุปห้องว่าง (หักคิวจองล่วงหน้าแล้ว)</h2>
+                            <h2 className="text-lg font-bold text-[#0A2647] mb-4 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-[#4F81FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                สรุปห้องว่าง (หักคิวจองล่วงหน้าแล้ว)
+                            </h2>
 
-                        <div className="bg-white rounded-[2rem] shadow-lg border border-slate-200 overflow-hidden mb-10">
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full text-left text-sm text-slate-700 border-collapse border border-slate-200">
-                                    <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase tracking-wider">
-                                        <tr>
-                                            <th rowSpan={3} className="p-4 bg-gradient-to-br from-slate-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center align-middle rounded-tl-[1.5rem]">
-                                                TYPE ROOM
-                                            </th>
-                                            <th rowSpan={3} className="p-4 bg-gradient-to-br from-amber-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center align-middle max-w-[150px]">
-                                                โควต้าจองไม่ระบุห้อง<br />(Waitlists ทั้งหมด)
-                                            </th>
-                                            <th colSpan={2} className="p-3 bg-gradient-to-br from-sky-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center">
-                                                ครัวหน้า
-                                            </th>
-                                            <th colSpan={2} className="p-3 bg-gradient-to-br from-rose-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center">
-                                                ครัวหลัง
-                                            </th>
-                                            <th rowSpan={3} className="p-4 bg-gradient-to-br from-purple-100 to-white text-slate-800 font-bold text-center align-middle rounded-tr-[1.5rem] border-slate-200">
-                                                ไม่ระบุ<br />ครัว/ทิศ
-                                            </th>
-                                        </tr>
-                                        <tr>
-                                            <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold border-r border-slate-200 text-center">
-                                                View
-                                            </th>
-                                            <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold border-r border-slate-200 text-center">
-                                                View
-                                            </th>
-                                        </tr>
-                                        <tr>
-                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
-                                                SALAYA ONE RESIDENCES<br />(ตะวันตก)
-                                            </th>
-                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
-                                                ซอยตั้งสิน<br />(ตะวันออก)
-                                            </th>
-                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
-                                                SALAYA ONE RESIDENCES<br />(ตะวันตก)
-                                            </th>
-                                            <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
-                                                ซอยตั้งสิน<br />(ตะวันออก)
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white">
-                                        {matrixData.map((row) => {
-                                            const renderCell = (cell: any) => {
-                                                const isNegative = cell.net < 0;
-                                                const isZero = cell.net === 0;
-                                                const valueClass = isNegative ? 'text-red-500' : isZero ? 'text-slate-400' : 'text-[#4F81FF]';
-                                                return (
-                                                    <td className="p-4 text-center align-top border border-slate-200">
-                                                        <div className={`text-base font-black ${valueClass}`}>
-                                                            {cell.net} <span className="text-xs font-normal text-slate-500">ห้อง</span>
-                                                        </div>
-                                                        <div className="text-[10px] text-slate-400 mt-1">
-                                                            (ว่าง {cell.available} / ทั้งหมด {cell.total})
-                                                        </div>
-                                                        {cell.waitlist > 0 && (
-                                                            <div className="mt-2 inline-flex items-center justify-center rounded-full bg-amber-100 px-2 py-1 text-[9px] font-semibold text-amber-700">
-                                                                -{cell.waitlist} waitlist
+                            <div className="bg-white rounded-[2rem] shadow-lg border border-slate-200 overflow-hidden mb-10">
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full text-left text-sm text-slate-700 border-collapse border border-slate-200">
+                                        <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase tracking-wider">
+                                            <tr>
+                                                <th rowSpan={3} className="p-4 bg-gradient-to-br from-slate-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center align-middle rounded-tl-[1.5rem]">
+                                                    TYPE ROOM
+                                                </th>
+                                                <th rowSpan={3} className="p-4 bg-gradient-to-br from-amber-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center align-middle max-w-[150px]">
+                                                    โควต้าจองไม่ระบุห้อง<br />(Waitlists ทั้งหมด)
+                                                </th>
+                                                <th colSpan={2} className="p-3 bg-gradient-to-br from-sky-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center">
+                                                    ครัวหน้า
+                                                </th>
+                                                <th colSpan={2} className="p-3 bg-gradient-to-br from-rose-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center">
+                                                    ครัวหลัง
+                                                </th>
+                                                <th rowSpan={3} className="p-4 bg-gradient-to-br from-purple-100 to-white text-slate-800 font-bold text-center align-middle rounded-tr-[1.5rem] border-slate-200">
+                                                    ไม่ระบุ<br />ครัว/ทิศ
+                                                </th>
+                                            </tr>
+                                            <tr>
+                                                <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold border-r border-slate-200 text-center">
+                                                    View
+                                                </th>
+                                                <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold border-r border-slate-200 text-center">
+                                                    View
+                                                </th>
+                                            </tr>
+                                            <tr>
+                                                <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
+                                                    SALAYA ONE RESIDENCES<br />(ตะวันตก)
+                                                </th>
+                                                <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
+                                                    ซอยตั้งสิน<br />(ตะวันออก)
+                                                </th>
+                                                <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
+                                                    SALAYA ONE RESIDENCES<br />(ตะวันตก)
+                                                </th>
+                                                <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
+                                                    ซอยตั้งสิน<br />(ตะวันออก)
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white">
+                                            {matrixData.map((row) => {
+                                                const renderCell = (cell: any) => {
+                                                    const isNegative = cell.net < 0;
+                                                    const isZero = cell.net === 0;
+                                                    const valueClass = isNegative ? 'text-red-500' : isZero ? 'text-slate-400' : 'text-[#4F81FF]';
+                                                    return (
+                                                        <td className="p-4 text-center align-top border border-slate-200">
+                                                            <div className={`text-base font-black ${valueClass}`}>
+                                                                {cell.net} <span className="text-xs font-normal text-slate-500">ห้อง</span>
                                                             </div>
-                                                        )}
-                                                    </td>
-                                                );
-                                            };
-
-                                            return (
-                                                <tr key={row.key} className="hover:bg-slate-50/50 transition-colors">
-                                                    <td className="p-4 font-bold text-slate-800 border border-slate-200 bg-slate-50/80 rounded-l-3xl">{row.display}</td>
-                                                    <td className="p-4 border border-slate-200 text-center bg-slate-50/80">
-                                                        <div className={`text-base font-black ${row.netQuota < 0 ? 'text-red-500' : row.netQuota === 0 ? 'text-slate-400' : 'text-emerald-600'}`}>
-                                                            {row.netQuota} <span className="text-xs font-normal text-slate-500">ห้อง</span>
-                                                        </div>
-                                                        <div className="text-[10px] text-slate-400 mt-0.5">
-                                                            (ว่าง {row.totalAvailable} / หักจองไม่ระบุห้อง {row.waitlistCount})
-                                                        </div>
-                                                    </td>
-                                                    {renderCell(row.frontWest)}
-                                                    {renderCell(row.frontEast)}
-                                                    {renderCell(row.backWest)}
-                                                    {renderCell(row.backEast)}
-                                                    {/* คอลัมน์ ไม่ระบุครัว/ทิศ */}
-                                                <td className="p-4 text-center align-top border border-slate-200 rounded-r-3xl bg-slate-50/30">
-                                                    {row.unspecified.waitlist > 0 ? (
-                                                        <div className="flex flex-col items-center justify-center h-full">
-                                                            <div className="bg-purple-100 border border-purple-200 px-3 py-2 rounded-xl w-full">
-                                                                <div className="text-sm font-black text-purple-700">
-                                                                    {row.unspecified.waitlist} <span className="text-xs font-normal text-purple-600">คิว</span>
+                                                            <div className="text-[10px] text-slate-400 mt-1">
+                                                                (ว่าง {cell.available} / ทั้งหมด {cell.total})
+                                                            </div>
+                                                            {cell.waitlist > 0 && (
+                                                                <div className="mt-2 inline-flex items-center justify-center rounded-full bg-amber-100 px-2 py-1 text-[9px] font-bold text-amber-700">
+                                                                    -{cell.waitlist} waitlist
                                                                 </div>
-                                                                <div className="text-[10px] text-purple-600 mt-1 font-bold">
-                                                                    รอแอดมินจับคู่ห้องให้
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-[10px] text-slate-400 mt-2">
-                                                                (นำไปหักลบในยอดรวมแล้ว)
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-slate-300 font-medium mt-2">-</div>
-                                                    )}
-                                                </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <h2 className="text-lg font-bold text-[#0A2647] mb-4">รายละเอียดห้องที่ว่าง</h2>
-                        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm text-slate-600">
-                                    <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 text-xs uppercase tracking-wider">
-                                        <tr>
-                                            <th className="p-5 pl-8">หมายเลขห้อง</th>
-                                            <th className="p-5">ประเภทห้อง</th>
-                                            <th className="p-5">รายละเอียด</th>
-                                            <th className="p-5">ตึก / ชั้น</th>
-                                            <th className="p-5">สถานะคิวรอ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {Object.entries(summary).flatMap(([rt, data]: [string, any]) => {
-                                            return data.rooms.map((room: any, index: number) => {
-                                                // Check if this room might be consumed by waitlist
-                                                const isAtRisk = index >= data.netAvailable && data.waitlistCount > 0;
-
-                                                return (
-                                                    <tr key={room.id} className={`hover:bg-slate-50/50 transition-colors ${isAtRisk ? 'bg-amber-50/30' : ''}`}>
-                                                        <td className="p-5 pl-8">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base ${isAtRisk ? 'bg-amber-100 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                                    {room.room_number.charAt(0)}
-                                                                </div>
-                                                                <span className="font-bold text-slate-800 text-lg">{room.room_number}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-5">
-                                                            <span className="bg-slate-50 text-slate-600 border border-black/60 text-xs px-3 py-1.5 rounded-lg font-medium">
-                                                                🛏️ {room.room_type || '-'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-5">
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="text-xs text-slate-500">🍳 {room.kitchen_type || '-'}</span>
-                                                                <span className="text-xs text-slate-500">🌅 {room.view_direction || '-'}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-5 font-medium text-slate-600">
-                                                            ตึก {room.building || '-'} · ชั้น {room.floor || '-'}
-                                                        </td>
-                                                        <td className="p-5">
-                                                            {isAtRisk ? (
-                                                                <span className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-600 border border-amber-200/60 text-xs px-3 py-1.5 rounded-lg font-bold">
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                                                                    อาจโดนดึงไปให้ Waitlist
-                                                                </span>
-                                                            ) : (
-                                                                <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200/60 text-xs px-3 py-1.5 rounded-lg font-bold">
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                                                                    ว่างพร้อมปล่อยเช่า
-                                                                </span>
                                                             )}
                                                         </td>
+                                                    );
+                                                };
+
+                                                return (
+                                                    <tr key={row.key} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="p-4 font-bold text-slate-800 border border-slate-200 bg-slate-50/80 rounded-l-3xl">{row.display}</td>
+                                                        <td className="p-4 border border-slate-200 text-center bg-slate-50/80">
+                                                            <div className={`text-base font-black ${row.netQuota < 0 ? 'text-red-500' : row.netQuota === 0 ? 'text-slate-400' : 'text-emerald-600'}`}>
+                                                                {row.netQuota} <span className="text-xs font-normal text-slate-500">ห้อง</span>
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                                                (ว่าง {row.totalAvailable} / หักจองไม่ระบุห้อง {row.waitlistCount})
+                                                            </div>
+                                                        </td>
+                                                        {renderCell(row.frontWest)}
+                                                        {renderCell(row.frontEast)}
+                                                        {renderCell(row.backWest)}
+                                                        {renderCell(row.backEast)}
+                                                    <td className="p-4 text-center align-top border border-slate-200 rounded-r-3xl bg-slate-50/30">
+                                                        {row.unspecified.waitlist > 0 ? (
+                                                            <div className="flex flex-col items-center justify-center h-full">
+                                                                <div className="bg-purple-100 border border-purple-200 px-3 py-2 rounded-xl w-full">
+                                                                    <div className="text-sm font-black text-purple-700">
+                                                                        {row.unspecified.waitlist} <span className="text-xs font-normal text-purple-600">คิว</span>
+                                                                    </div>
+                                                                    <div className="text-[10px] text-purple-600 mt-1 font-bold">
+                                                                        รอแอดมินจับคู่ห้องให้
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-400 mt-2">
+                                                                    (นำไปหักลบในยอดรวมแล้ว)
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-slate-300 font-medium mt-2">-</div>
+                                                        )}
+                                                    </td>
                                                     </tr>
                                                 );
-                                            });
-                                        })}
-                                        {Object.values(summary).every((data: any) => data.rooms.length === 0) && (
-                                            <tr>
-                                                <td colSpan={5} className="p-10 text-center text-slate-500">
-                                                    <div className="text-4xl mb-3">📭</div>
-                                                    <p className="font-medium text-lg">ไม่มีห้องว่างในช่วงเวลานี้</p>
-                                                    <p className="text-sm mt-1">ลองเปลี่ยนเดือน/ปีเพื่อค้นหาใหม่</p>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
-                    </>
-                )}
+                        </>
+                    )}
+                </div>
             </div>
-        </div>
+        </>
     );
 }

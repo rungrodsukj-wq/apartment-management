@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ระบบจัดการอพาร์ตเมนต์ | ApartmentOSs",
-  description: "Modern Apartment Management System",
+  title: "ระบบจัดการอพาร์ตเมนต์ | Apartment Management System",
+  description: "Salaya One Premium Service Apartment",
 };
 
 export default function RootLayout({
@@ -38,4 +38,4 @@ export default function RootLayout({
       </body>
     </html>
   );
-}
+}

@@ -22,16 +22,16 @@ const roleLabels: Record<string, string> = {
 };
 
 export function getHeaderInfo(pathname: string) {
-  if (pathname === "/") return { breadcrumb: "Salaya One Service Apartment / ภาพรวม", title: "ภาพรวม" };
-  if (pathname === "/rooms") return { breadcrumb: "Salaya One Service Apartment / ห้องพักทั้งหมด", title: "ห้องพักทั้งหมด" };
-  if (pathname === "/available-rooms") return { breadcrumb: "Salaya One Service Apartment / ห้องว่างพร้อมจอง", title: "ห้องว่างพร้อมจอง" };
-  if (pathname.startsWith("/waitlists")) return { breadcrumb: "Salaya One Service Apartment / จองไม่ระบุห้อง", title: "จองไม่ระบุห้อง" };
-  if (pathname.startsWith("/bookings")) return { breadcrumb: "Salaya One Service Apartment / จองระบุห้อง", title: "จองระบุห้อง" };
-  if (pathname.startsWith("/renewal-check")) return { breadcrumb: "Salaya One Service Apartment / สอบถามต่อสัญญา", title: "สอบถามต่อสัญญา" };
-  if (pathname.startsWith("/users")) return { breadcrumb: "Salaya One Service Apartment / จัดการสิทธิ์และผู้ใช้งาน", title: "จัดการสิทธิ์และผู้ใช้งาน" };
-  if (pathname.startsWith("/activity")) return { breadcrumb: "Salaya One Service Apartment / กิจกรรมระบบ", title: "กิจกรรมระบบ" };
-  if (pathname.startsWith("/allocate")) return { breadcrumb: "Salaya One Service Apartment / จัดสรรห้องพัก", title: "จัดสรรห้องพัก" };
-  return { breadcrumb: "Salaya One Service Apartment / ระบบ", title: "หน้าต่างระบบ" };
+  if (pathname === "/") return { breadcrumb: "Salaya One Premium Service Apartment / ภาพรวม", title: "ภาพรวม" };
+  if (pathname === "/rooms") return { breadcrumb: "Salaya One Premium Service Apartment / ห้องพักทั้งหมด", title: "ห้องพักทั้งหมด" };
+  if (pathname === "/available-rooms") return { breadcrumb: "Salaya One Premium Service Apartment / ห้องว่างพร้อมจอง", title: "ห้องว่างพร้อมจอง" };
+  if (pathname.startsWith("/waitlists")) return { breadcrumb: "Salaya One Premium Service Apartment / จองไม่ระบุห้อง", title: "จองไม่ระบุห้อง" };
+  if (pathname.startsWith("/bookings")) return { breadcrumb: "Salaya One Premium Service Apartment / จองระบุห้อง", title: "จองระบุห้อง" };
+  if (pathname.startsWith("/renewal-check")) return { breadcrumb: "Salaya One Premium Service Apartment / สอบถามต่อสัญญา", title: "สอบถามต่อสัญญา" };
+  if (pathname.startsWith("/users")) return { breadcrumb: "Salaya One Premium Service Apartment / จัดการสิทธิ์และผู้ใช้งาน", title: "จัดการสิทธิ์และผู้ใช้งาน" };
+  if (pathname.startsWith("/activity")) return { breadcrumb: "Salaya One Premium Service Apartment / กิจกรรมระบบ", title: "กิจกรรมระบบ" };
+  if (pathname.startsWith("/allocate")) return { breadcrumb: "Salaya One Premium Service Apartment / จัดสรรห้องพัก", title: "จัดสรรห้องพัก" };
+  return { breadcrumb: "Salaya One Premium Service Apartment / ระบบ", title: "หน้าต่างระบบ" };
 }
 
 export default function ClientLayoutWrapper({ 
@@ -189,7 +189,7 @@ export default function ClientLayoutWrapper({
               </div>
               {(!sidebarCollapsed || isMobileOpen) && (
                 <div className="flex flex-col">
-                  <h1 className="text-sm font-extrabold text-slate-800 leading-tight">Salaya One Service Apartment</h1>
+                  <h1 className="text-sm font-extrabold text-slate-800 leading-tight">Salaya One Premium Service Apartment</h1>
                   <span className="text-[11px] text-slate-400 font-medium">ระบบจัดการห้องพัก</span>
                 </div>
               )}

@@ -1,4 +1,4 @@
-//src/app/waitlists/page.tsx
+// src/app/waitlists/page.tsx
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -20,9 +20,9 @@ interface Waitlist {
     end_date: string;
     special_request: string;
     allocation_note?: string;
-    bed_size: string; // เพิ่มฟิลด์ขนาดเตียง
-    preferred_floors: number[]; // เพิ่มฟิลด์ชั้นที่ต้องการเป็น Array
-    monthly_rent?: number; // เพิ่มราคาค่าเช่าต่อเดือน
+    bed_size: string; 
+    preferred_floors: number[]; 
+    monthly_rent?: number; 
     status?: string;
     contract_id?: string | null;
     queue_number?: number;
@@ -50,8 +50,8 @@ export default function BookingsPage() {
         room_type: 'One Bedroom',
         kitchen_type: 'ครัวหลัง',
         view_preference: 'ทิศตะวันออก',
-        bed_size: '3.5 ฟุต', // ค่าเริ่มต้นเตียง
-        preferred_floors: [] as number[], // ค่าเริ่มต้นชั้น (Array ว่าง)
+        bed_size: '3.5 ฟุต', 
+        preferred_floors: [] as number[], 
         start_date: '',
         end_date: '',
         special_request: '',
@@ -88,7 +88,6 @@ export default function BookingsPage() {
                 }
                 
                 if (contractId) {
-                    // ดึง contract จาก database
                     const { data: contractData } = await supabase
                         .from('contracts')
                         .select('*')
@@ -96,13 +95,11 @@ export default function BookingsPage() {
                         .single();
                     
                     if (contractData?.contract_end_date) {
-                        // ตั้ง start_date = วันถัดจากวันที่สัญญาหมด
                         const endDate = new Date(contractData.contract_end_date);
                         const startDate = new Date(endDate);
                         startDate.setDate(startDate.getDate() + 1);
                         const startDateStr = startDate.toISOString().split('T')[0];
                         
-                        // คำนวณ end_date ให้เป็น 1 ปีหลังจาก start_date
                         const calcEndDate = new Date(startDate);
                         calcEndDate.setFullYear(startDate.getFullYear() + 1);
                         calcEndDate.setDate(calcEndDate.getDate() - 1);
@@ -113,7 +110,6 @@ export default function BookingsPage() {
                     }
                 }
                 
-                // อัปเดต formData และเปิด modal พร้อมกัน
                 setEditingId(null);
                 setFormData(newData);
                 setIsModalOpen(true);
@@ -147,19 +143,16 @@ export default function BookingsPage() {
         const newType = e.target.value;
         let newKitchenType = formData.kitchen_type;
         
-        // ถ้าไม่ใช่ One Bedroom Exclusive ให้ล็อคเป็นครัวหลัง
         if (['One Bedroom', 'Triple Bedroom', 'One Bedroom Suite'].includes(newType)) {
             newKitchenType = 'ครัวหลัง';
         }
 
-        // กำหนดค่า view_preference เองตามประเภทห้องที่เลือก
         let newView = formData.view_preference;
         if (newType === 'One Bedroom') {
             newView = 'ทิศตะวันออก';
         } else if (newType === 'Triple Bedroom') {
             newView = newView || 'ทิศตะวันตก';
         } else {
-            // หากไม่มีค่าเดิม ให้ตั้งค่าเริ่มต้นเป็นทิศตะวันออก
             newView = newView || 'ทิศตะวันออก';
         }
 
@@ -171,8 +164,6 @@ export default function BookingsPage() {
         });
     };
 
-    // ฟังก์ชันจัดการการติ๊กเลือกชั้น
-    // ฟังก์ชันจัดการการติ๊กเลือกชั้น
     const handleFloorToggle = (floor: number) => {
         setFormData(prev => {
             const currentFloors = prev.preferred_floors || [];
@@ -184,35 +175,29 @@ export default function BookingsPage() {
         });
     };
 
-    // 🌟 ฟังก์ชันใหม่: สำหรับปุ่ม "เลือกทั้งหมด"
     const allFloors = [2, 3, 4, 5, 6, 7];
     const isAllSelected = formData.preferred_floors.length === allFloors.length;
 
     const handleSelectAllFloors = () => {
         setFormData(prev => ({
             ...prev,
-            // ถ้าเลือกครบแล้วให้เคลียร์ออกทั้งหมด ถ้ายังไม่ครบให้ใส่ไปทุกชั้น
             preferred_floors: isAllSelected ? [] : [...allFloors]
         }));
     };
 
     async function fetchWaitlist() {
         setLoading(true);
-        // ดึงข้อมูลทั้งหมดเพื่อคำนวณคิวที่แท้จริง
         const { data } = await supabase
             .from('waitlists')
             .select('*')
-            // 👇 ให้คิวที่จองก่อนขึ้นก่อน
             .order('created_at', { ascending: true });
 
         if (data) {
-            // กำหนดหมายเลขคิวจากลำดับทั้งหมด (เพื่อไม่ให้คิวเลื่อนเมื่อคนก่อนหน้าได้ห้องแล้ว)
             const dataWithQueue = data.map((item: any, index: number) => ({
                 ...item,
                 queue_number: index + 1
             }));
 
-            // กรองเฉพาะคนที่ยังไม่จัดสรรห้อง
             const activeItems = dataWithQueue.filter((item: any) => item.status !== 'จัดสรรห้องแล้ว');
             setItems(activeItems);
         }
@@ -292,8 +277,6 @@ export default function BookingsPage() {
             } else {
                 const newId = data?.[0]?.id ?? null;
                 if (newId) await logAudit(profile, 'waitlists', 'create', newId, 'เพิ่มรายการจอง', payload);
-                // หากเข้ามาจาก renewal-check พร้อม contractId ให้บันทึกความตั้งใจว่า
-                // เป็น 'renew_no_room' (ผู้เช่าต้องการต่อแต่ยังไม่ระบุห้อง)
                 if (contractId) {
                     try {
                         const { data: existing } = await supabase.from('renewal_intentions').select('*').eq('contract_id', contractId).limit(1);
@@ -408,7 +391,7 @@ export default function BookingsPage() {
     };
 
     return (
-        <div className="min-h-full flex flex-col bg-transparent">
+        <div className="min-h-full flex flex-col bg-transparent" style={{ fontFamily: "'K2D', sans-serif" }}>
             {/* Content Area */}
             <div className="flex-1 p-8 md:p-10">
                 <div className="flex justify-between items-end mb-8">
@@ -423,7 +406,9 @@ export default function BookingsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
                     <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl">📋</div>
+                        <div className="w-14 h-14 bg-blue-50 text-[#4F81FF] rounded-2xl flex items-center justify-center shadow-inner">
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        </div>
                         <div>
                             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">คิวรอจัดสรร</p>
                             <p className="text-2xl font-bold text-[#0A2647]">{filteredItems.length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
@@ -436,7 +421,7 @@ export default function BookingsPage() {
                 <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm grid grid-cols-1 lg:grid-cols-[repeat(6,minmax(0,1fr))] gap-3 mb-6 items-center">
                     <div className="flex items-center gap-3 col-span-2 lg:col-span-2">
                         <label className="text-sm font-bold text-slate-600 whitespace-nowrap">ประเภทห้อง</label>
-                        <select value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full">
+                        <select value={filterRoomType} onChange={(e) => setFilterRoomType(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full cursor-pointer focus:ring-2 focus:ring-[#4F81FF]/50 transition-all">
                             <option value="">ทุกประเภทห้อง</option>
                             {uniqueRoomTypes.map((type, i) => (
                                 <option key={i} value={type}>{type}</option>
@@ -445,7 +430,7 @@ export default function BookingsPage() {
                     </div>
                     <div className="flex items-center gap-3 col-span-1 lg:col-span-1">
                         <label className="text-sm font-bold text-slate-600">ครัว</label>
-                        <select value={filterKitchen} onChange={(e) => setFilterKitchen(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full">
+                        <select value={filterKitchen} onChange={(e) => setFilterKitchen(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full cursor-pointer focus:ring-2 focus:ring-[#4F81FF]/50 transition-all">
                             <option value="">ทุกประเภทครัว</option>
                             {uniqueKitchens.map((kitchen, i) => (
                                 <option key={i} value={kitchen}>{kitchen}</option>
@@ -454,7 +439,7 @@ export default function BookingsPage() {
                     </div>
                     <div className="flex items-center gap-3 col-span-1 lg:col-span-1">
                         <label className="text-sm font-bold text-slate-600">ทิศ</label>
-                        <select value={filterView} onChange={(e) => setFilterView(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full">
+                        <select value={filterView} onChange={(e) => setFilterView(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none w-full cursor-pointer focus:ring-2 focus:ring-[#4F81FF]/50 transition-all">
                             <option value="">ทุกทิศ (View)</option>
                             {uniqueViews.map((view, i) => (
                                 <option key={i} value={view}>{view}</option>
@@ -468,7 +453,7 @@ export default function BookingsPage() {
                         <label className="text-sm font-bold text-slate-600 whitespace-nowrap">ค้นหา</label>
                         <input
                             type="text"
-                            className="w-full sm:max-w-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none"
+                            className="w-full sm:max-w-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#4F81FF]/50 focus:bg-white transition-all"
                             placeholder="ค้นหาชื่อหรือเลขคิว"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -479,12 +464,11 @@ export default function BookingsPage() {
                         <label className="text-sm font-bold text-slate-600 whitespace-nowrap">วันที่เริ่มสัญญา</label>
                         <input
                             type="date"
-                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none"
+                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[#4F81FF]/50 transition-all cursor-pointer"
                             value={startDate ?? ''}
                             onChange={e => {
                                 const v = e.target.value;
                                 if (!v) return setStartDate(null);
-                                // enforce day = 01
                                 const [y, m] = v.split('-');
                                 setStartDate(`${y}-${m}-01`);
                             }}
@@ -492,11 +476,11 @@ export default function BookingsPage() {
                         <button
                             type="button"
                             onClick={() => { setStartDate(null); }}
-                            className="bg-white text-slate-600 border border-slate-200 px-3 py-2 rounded-xl text-sm"
+                            className="bg-white text-slate-600 hover:text-slate-800 hover:bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-sm transition-colors font-medium"
                         >ล้าง</button>
                     </div>
 
-                    <div className="ml-auto text-sm text-slate-500">
+                    <div className="ml-auto text-sm text-slate-500 font-medium">
                         {startDate ? formatDateDMY(startDate) : 'ยังไม่เลือกวันที่'}
                     </div>
                 </div>
@@ -508,7 +492,7 @@ export default function BookingsPage() {
                         {filteredItems.map((item) => (
                             <div key={item.id} className="bg-white rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4 md:gap-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.06)] border border-slate-100 transition-all group">
 
-                                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 font-bold text-lg hidden md:flex">
+                                <div className="w-12 h-12 rounded-2xl bg-[#4F81FF]/10 text-[#4F81FF] flex items-center justify-center shrink-0 font-bold text-lg hidden md:flex">
                                     {item.queue_number}
                                 </div>
 
@@ -516,36 +500,57 @@ export default function BookingsPage() {
                                     <div className="md:col-span-3">
                                         <h3 className="text-base font-bold text-slate-800">{item.name}</h3>
                                         {item.special_request ? (
-                                            <span className="text-xs text-orange-500 font-medium truncate block mt-0.5">✨ {item.special_request}</span>
+                                            <span className="flex items-start text-xs text-amber-500 font-bold mt-1 whitespace-normal break-words">
+                                                {/* เพิ่ม shrink-0 เพื่อไม่ให้ไอคอนโดนบีบเบี้ยวเวลาข้อความยาว */}
+                                                <svg className="w-3.5 h-3.5 mr-1 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                                                </svg>
+                                                <span>{item.special_request}</span>
+                                            </span>
                                         ) : (
-                                            <span className="text-xs text-slate-400 block mt-0.5">ไม่มีรีเควสพิเศษ</span>
+                                            <span className="text-xs text-slate-400 font-medium block mt-0.5">ไม่มีรีเควสพิเศษ</span>
                                         )}
                                     </div>
 
                                     <div className="md:col-span-4 flex flex-wrap gap-2">
-                                        <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🚪 {item.room_type}</span>
-                                        <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🍳 {item.kitchen_type}</span>
+                                        <span className="inline-flex items-center bg-violet-50 text-violet-600 border border-violet-200/60 text-xs px-3 py-1.5 rounded-lg font-bold">
+                                            <svg className="w-3.5 h-3.5 mr-1.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                                            {item.room_type}
+                                        </span>
+                                        <span className="inline-flex items-center bg-amber-50 text-amber-600 border border-amber-200/60 text-xs px-3 py-1.5 rounded-lg font-bold">
+                                            <svg className="w-3.5 h-3.5 mr-1.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path></svg>
+                                            {item.kitchen_type}
+                                        </span>
                                         {item.view_preference && (
-                                            <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🌅 {item.view_preference}</span>
+                                            <span className="inline-flex items-center bg-sky-50 text-sky-600 border border-sky-200/60 text-xs px-3 py-1.5 rounded-lg font-bold">
+                                                <svg className="w-3.5 h-3.5 mr-1.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                                                {item.view_preference}
+                                            </span>
                                         )}
                                         {item.bed_size && (
-                                            <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🛏️ เตียง {item.bed_size}</span>
+                                            <span className="inline-flex items-center bg-teal-50 text-teal-600 border border-teal-200/60 text-xs px-3 py-1.5 rounded-lg font-bold">
+                                                <svg className="w-3.5 h-3.5 mr-1.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 11h18M3 15h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                                เตียง {item.bed_size}
+                                            </span>
                                         )}
                                         {item.preferred_floors && item.preferred_floors.length > 0 && (
-                                            <span className="bg-slate-50 text-slate-600 border border-slate-200/60 text-xs px-3 py-1.5 rounded-lg font-medium">🏢 ชั้น {item.preferred_floors.join(', ')}</span>
+                                            <span className="inline-flex items-center bg-rose-50 text-rose-600 border border-rose-200/60 text-xs px-3 py-1.5 rounded-lg font-bold">
+                                                <svg className="w-3.5 h-3.5 mr-1.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                                                ชั้น {item.preferred_floors.join(', ')}
+                                            </span>
                                         )}
                                     </div>
 
                                     <div className="md:col-span-2">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ค่าเช่าต่อเดือน</p>
-                                        <span className="text-xs font-extrabold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-lg inline-block">
+                                        <span className="text-xs font-extrabold text-[#4F81FF] bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg inline-block">
                                             {item.monthly_rent ? `${item.monthly_rent.toLocaleString('th-TH')} บาท` : '-'}
                                         </span>
                                     </div>
 
                                     <div className="md:col-span-3">
                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ระยะเวลาสัญญา</p>
-                                        <p className="text-xs text-slate-700 font-medium bg-slate-50 inline-block px-3 py-1.5 rounded-lg border border-slate-100">
+                                        <p className="text-xs text-slate-700 font-semibold bg-slate-50 inline-block px-3 py-1.5 rounded-lg border border-slate-100">
                                             {formatDateTH(item.start_date)} - {formatDateTH(item.end_date)}
                                         </p>
                                     </div>
@@ -565,7 +570,7 @@ export default function BookingsPage() {
                                             <button onClick={() => deleteItem(item.id)} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-red-500 transition-colors" title="ลบ">
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                             </button>
-                                            <button onClick={() => router.push(`/allocate/${item.id}`)} className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 px-4 py-2 rounded-xl text-sm font-semibold ml-2 transition-all flex items-center gap-2">
+                                            <button onClick={() => router.push(`/allocate/${item.id}`)} className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 px-4 py-2 rounded-xl text-sm font-bold ml-2 transition-all flex items-center gap-2">
                                                 จัดสรรห้อง <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                                             </button>
                                         </div>
@@ -575,9 +580,11 @@ export default function BookingsPage() {
                         ))}
                         {filteredItems.length === 0 && (
                             <div className="text-center py-20 text-slate-400 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
-                                <div className="text-5xl mb-4">📭</div>
-                                <p className="font-medium text-lg text-slate-600">ยังไม่มีรายการจอง</p>
-                                <p className="text-sm mt-1">กดปุ่ม "เพิ่มรายการจอง" ด้านบนเพื่อเริ่มใช้งาน</p>
+                                <div className="w-20 h-20 mb-4 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center">
+                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                                </div>
+                                <p className="font-bold text-lg text-slate-600">ยังไม่มีรายการจอง</p>
+                                <p className="text-sm mt-1 font-medium">กดปุ่ม "เพิ่มรายการจอง" ด้านบนเพื่อเริ่มใช้งาน</p>
                             </div>
                         )}
                     </div>
@@ -593,7 +600,7 @@ export default function BookingsPage() {
                                 {editingId ? 'แก้ไขข้อมูลการจอง' : 'สร้างรายการจองใหม่'}
                             </h2>
                             <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
-                                ✕
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
 
@@ -601,12 +608,12 @@ export default function BookingsPage() {
                             <div className="grid grid-cols-2 gap-5">
                                 <div className="col-span-2">
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
-                                    <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="ระบุชื่อลูกค้า..." />
+                                    <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all font-medium" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="ระบุชื่อลูกค้า..." />
                                 </div>
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ประเภทห้อง</label>
-                                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer" value={formData.room_type} onChange={handleRoomTypeChange}>
+                                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer font-medium" value={formData.room_type} onChange={handleRoomTypeChange}>
                                         <option value="One Bedroom">One Bedroom</option>
                                         <option value="One Bedroom Exclusive">One Bedroom Exclusive</option>
                                         <option value="Triple Bedroom">Triple Bedroom</option>
@@ -618,7 +625,7 @@ export default function BookingsPage() {
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ประเภทครัว</label>
                                     <select
                                         disabled={isKitchenDisabled}
-                                        className={`w-full border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all ${isKitchenDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white cursor-pointer'}`}
+                                        className={`w-full border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all font-medium ${isKitchenDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white cursor-pointer'}`}
                                         value={formData.kitchen_type}
                                         onChange={(e) => setFormData({ ...formData, kitchen_type: e.target.value })}
                                     >
@@ -630,7 +637,7 @@ export default function BookingsPage() {
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ขนาดเตียง</label>
-                                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer" value={formData.bed_size} onChange={(e) => setFormData({ ...formData, bed_size: e.target.value })}>
+                                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer font-medium" value={formData.bed_size} onChange={(e) => setFormData({ ...formData, bed_size: e.target.value })}>
                                         <option value="3.5 ฟุต">3.5 ฟุต</option>
                                         <option value="7 ฟุต">7 ฟุต</option>
                                         <option value="ไม่ระบุ">ไม่ระบุ</option>
@@ -640,11 +647,11 @@ export default function BookingsPage() {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ทิศที่ต้องการ</label>
                                     {formData.room_type === 'One Bedroom' ? (
-                                        <select disabled className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all cursor-not-allowed" value="ทิศตะวันออก">
+                                        <select disabled className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl p-3.5 text-sm outline-none transition-all cursor-not-allowed font-medium" value="ทิศตะวันออก">
                                             <option value="ทิศตะวันออก">ทิศตะวันออก</option>
                                         </select>
                                     ) : (
-                                        <select className="w-full bg-slate-50 text-slate-800 border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer" value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
+                                        <select className="w-full bg-slate-50 text-slate-800 border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all cursor-pointer font-medium" value={formData.view_preference} onChange={(e) => setFormData({ ...formData, view_preference: e.target.value })}>
                                             <option value="ทิศตะวันออก">ทิศตะวันออก</option>
                                             <option value="ทิศตะวันตก">ทิศตะวันตก</option>
                                             <option value="ไม่ระบุ">ไม่ระบุ</option>
@@ -652,16 +659,12 @@ export default function BookingsPage() {
                                     )}
                                 </div>
 
-                                {/* ส่วนเลือกชั้นที่ต้องการ แบบ Checkbox */}
                                 <div className="col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-4">
-
-                                    {/* 🌟 ปรับส่วน Header เป็น Flexbox เพื่อให้อยู่บรรทัดเดียวกัน */}
                                     <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                                             ชั้นที่ต้องการ (2-7) <span className="text-[10px] font-normal normal-case text-slate-400 ml-1">สามารถเลือกได้มากกว่า 1 ชั้น</span>
                                         </label>
 
-                                        {/* 🌟 ปุ่มเลือกทั้งหมด (ย้ายมาต่อท้ายข้อความ) */}
                                         <label className="flex items-center gap-1.5 cursor-pointer group bg-white border border-slate-200 px-2.5 py-1 rounded-md hover:bg-slate-50 transition-all">
                                             <input
                                                 type="checkbox"
@@ -676,7 +679,6 @@ export default function BookingsPage() {
                                     </div>
 
                                     <div className="flex flex-wrap gap-3">
-                                        {/* ปุ่มชั้น 2-7 */}
                                         {allFloors.map((floor) => (
                                             <label key={floor} className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all border ${formData.preferred_floors.includes(floor) ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-100'}`}>
                                                 <input
@@ -685,7 +687,7 @@ export default function BookingsPage() {
                                                     checked={formData.preferred_floors.includes(floor)}
                                                     onChange={() => handleFloorToggle(floor)}
                                                 />
-                                                <span className={`text-sm font-medium ${formData.preferred_floors.includes(floor) ? 'text-[#4F81FF]' : 'text-slate-600'}`}>
+                                                <span className={`text-sm font-bold ${formData.preferred_floors.includes(floor) ? 'text-[#4F81FF]' : 'text-slate-600'}`}>
                                                     ชั้น {floor}
                                                 </span>
                                             </label>
@@ -695,14 +697,14 @@ export default function BookingsPage() {
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">เริ่มสัญญา (เริ่มวันที่ 1 เสมอ)</label>
-                                    <input type="date" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all" value={formData.start_date} onChange={handleStartDateChange} />
-                                    <p className="mt-2 text-xs text-slate-500">{formData.start_date ? formatDateTH(formData.start_date) : 'วันที่ไทยจะแสดงเมื่อเลือกวันเริ่มต้น'}</p>
+                                    <input type="date" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all font-medium cursor-pointer" value={formData.start_date} onChange={handleStartDateChange} />
+                                    <p className="mt-2 text-xs text-slate-500 font-medium">{formData.start_date ? formatDateTH(formData.start_date) : 'วันที่ไทยจะแสดงเมื่อเลือกวันเริ่มต้น'}</p>
                                 </div>
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">สิ้นสุดสัญญา (อัตโนมัติ 1 ปี)</label>
-                                    <input type="date" required className="w-full bg-slate-100 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-500 outline-none cursor-not-allowed" value={formData.end_date} readOnly />
-                                    <p className="mt-2 text-xs text-slate-500">{formData.end_date ? formatDateTH(formData.end_date) : 'วันที่ไทยจะแสดงเมื่อวันเริ่มต้นถูกเลือกแล้ว'}</p>
+                                    <input type="date" required className="w-full bg-slate-100 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-500 outline-none cursor-not-allowed font-medium" value={formData.end_date} readOnly />
+                                    <p className="mt-2 text-xs text-slate-500 font-medium">{formData.end_date ? formatDateTH(formData.end_date) : 'วันที่ไทยจะแสดงเมื่อวันเริ่มต้นถูกเลือกแล้ว'}</p>
                                 </div>
 
                                 <div className="col-span-2">
@@ -710,7 +712,7 @@ export default function BookingsPage() {
                                     <input
                                         type="text"
                                         inputMode="numeric"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all font-bold"
                                         value={
                                             formData.monthly_rent
                                                 ? Number(formData.monthly_rent).toLocaleString("en-US")
@@ -730,7 +732,7 @@ export default function BookingsPage() {
 
                                 <div className="col-span-2">
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ความต้องการพิเศษอื่นๆ</label>
-                                    <textarea rows={2} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all resize-none" value={formData.special_request} onChange={(e) => setFormData({ ...formData, special_request: e.target.value })} placeholder="เช่น ใกล้บันไดหนีไฟ, ห้องมุม..." />
+                                    <textarea rows={2} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all resize-none font-medium" value={formData.special_request} onChange={(e) => setFormData({ ...formData, special_request: e.target.value })} placeholder="เช่น ใกล้บันไดหนีไฟ, ห้องมุม..." />
                                 </div>
                             </div>
 

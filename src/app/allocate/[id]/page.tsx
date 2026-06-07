@@ -86,19 +86,19 @@ export default function AllocateRoomPage() {
 
     useEffect(() => {
         if (assignAs === 'temp' && selectedRoomId && waitlist) {
-            const { availableUntil } = getRoomAvailability(selectedRoomId, waitlist.start_date);
+            const defaultEndDate = new Date(waitlist.start_date);
+            defaultEndDate.setMonth(defaultEndDate.getMonth() + 2);
+            defaultEndDate.setDate(defaultEndDate.getDate() - 1);
 
-            if (availableUntil) {
-                const defaultEndDate = new Date(availableUntil);
-                defaultEndDate.setDate(defaultEndDate.getDate() - 1);
-
-                const yyyy = defaultEndDate.getFullYear();
-                const mm = String(defaultEndDate.getMonth() + 1).padStart(2, '0');
-                const dd = String(defaultEndDate.getDate()).padStart(2, '0');
-                setTempEndDate(`${yyyy}-${mm}-${dd}`);
-            } else {
-                setTempEndDate(waitlist.end_date);
+            const contractEndDate = new Date(waitlist.end_date);
+            if (defaultEndDate > contractEndDate) {
+                defaultEndDate.setTime(contractEndDate.getTime());
             }
+
+            const yyyy = defaultEndDate.getFullYear();
+            const mm = String(defaultEndDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(defaultEndDate.getDate()).padStart(2, '0');
+            setTempEndDate(`${yyyy}-${mm}-${dd}`);
         } else {
             setTempEndDate('');
         }
@@ -511,6 +511,39 @@ export default function AllocateRoomPage() {
                         </div>
                     )} */}
 
+                    <div className="pt-4 border-t border-gray-200 mt-6">
+                        <h2 className="text-lg font-bold text-blue-500 mb-3 flex items-center gap-2">
+                            <span>💡</span> ห้องทางเลือก (ไม่ตรงสเปค แต่เข้าอยู่ได้เลย)
+                        </h2>
+                        <div className="space-y-3">
+                            {alternativeMatches.length > 0 ? alternativeMatches.map(room => (
+                                <div
+                                    key={room.id}
+                                    // 🌟 เลือกให้เป็น Main Room
+                                    onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
+                                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all opacity-80 hover:opacity-100 ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-blue-300'}`}
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <div className="font-bold text-lg text-gray-900">ห้อง {room.room_number}</div>
+                                        <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold">สเปคอื่นที่พร้อมเข้าอยู่</div>
+                                    </div>
+                                    <div className="text-sm text-gray-500 mt-2 flex gap-4">
+                                        <span className={waitlist.room_type && waitlist.room_type !== 'ไม่ระบุ' && waitlist.room_type !== room.room_type ? 'text-red-500' : ''}>🛏️ {room.room_type}</span>
+                                        <span className={waitlist.kitchen_type && waitlist.kitchen_type !== 'ไม่ระบุ' && waitlist.kitchen_type !== room.kitchen_type ? 'text-red-500' : ''}>🍳 {room.kitchen_type}</span>
+                                        <span className={waitlist.view_preference && waitlist.view_preference !== 'ไม่ระบุ' && waitlist.view_preference !== room.view_direction ? 'text-red-500' : ''}>🧭 {room.view_direction}</span>
+                                    </div>
+                                    <div className="text-xs font-semibold text-gray-600 mt-3 bg-white p-2 rounded-lg border border-gray-200 inline-flex items-center gap-1.5 w-full">
+                                        📅 {getRoomAvailabilityText(room.id, searchStartDate)}
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="p-5 text-center border border-dashed border-gray-300 rounded-xl text-gray-400 text-sm bg-gray-50">
+                                    ไม่มีห้องอื่นที่ว่างในช่วงเวลานี้เลย
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="pt-4 border-t border-gray-200">
                         <h2 className="text-lg font-bold text-orange-500 mb-3 flex items-center gap-2">
                             <span>⏳</span> ห้องตรงสเปค แต่ยังติดจอง (Available Later)
@@ -549,38 +582,7 @@ export default function AllocateRoomPage() {
                         </div>
                     </div>
 
-                    <div className="pt-4 border-t border-gray-200 mt-6">
-                        <h2 className="text-lg font-bold text-blue-500 mb-3 flex items-center gap-2">
-                            <span>💡</span> ห้องทางเลือก (ไม่ตรงสเปค แต่เข้าอยู่ได้เลย)
-                        </h2>
-                        <div className="space-y-3">
-                            {alternativeMatches.length > 0 ? alternativeMatches.map(room => (
-                                <div
-                                    key={room.id}
-                                    // 🌟 เลือกให้เป็น Main Room
-                                    onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
-                                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all opacity-80 hover:opacity-100 ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-blue-300'}`}
-                                >
-                                    <div className="flex justify-between items-center">
-                                        <div className="font-bold text-lg text-gray-900">ห้อง {room.room_number}</div>
-                                        <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold">สเปคอื่นที่พร้อมเข้าอยู่</div>
-                                    </div>
-                                    <div className="text-sm text-gray-500 mt-2 flex gap-4">
-                                        <span className={waitlist.room_type && waitlist.room_type !== 'ไม่ระบุ' && waitlist.room_type !== room.room_type ? 'text-red-500' : ''}>🛏️ {room.room_type}</span>
-                                        <span className={waitlist.kitchen_type && waitlist.kitchen_type !== 'ไม่ระบุ' && waitlist.kitchen_type !== room.kitchen_type ? 'text-red-500' : ''}>🍳 {room.kitchen_type}</span>
-                                        <span className={waitlist.view_preference && waitlist.view_preference !== 'ไม่ระบุ' && waitlist.view_preference !== room.view_direction ? 'text-red-500' : ''}>🧭 {room.view_direction}</span>
-                                    </div>
-                                    <div className="text-xs font-semibold text-gray-600 mt-3 bg-white p-2 rounded-lg border border-gray-200 inline-flex items-center gap-1.5 w-full">
-                                        📅 {getRoomAvailabilityText(room.id, searchStartDate)}
-                                    </div>
-                                </div>
-                            )) : (
-                                <div className="p-5 text-center border border-dashed border-gray-300 rounded-xl text-gray-400 text-sm bg-gray-50">
-                                    ไม่มีห้องอื่นที่ว่างในช่วงเวลานี้เลย
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    
                 </div>
 
                 {/* แผงควบคุมด้านขวา (ปรับ UI ใหม่ให้เข้าใจง่ายขึ้น) */}
@@ -713,7 +715,7 @@ export default function AllocateRoomPage() {
                                         <div className="mt-3 flex gap-2 items-start text-[11px] text-purple-700 bg-purple-100 p-2.5 rounded-lg">
                                             <span className="text-sm">💡</span>
                                             <p className="leading-relaxed">
-                                                ระบบได้ตั้งค่าแนะนำให้ย้ายออกก่อนวันที่ห้องนี้จะติดจองคิวถัดไป 1 วัน คุณสามารถปรับเปลี่ยนได้ตามความเหมาะสม
+                                                ระบบได้ตั้งค่าแนะนำให้ย้ายออกหลังจากเริ่มสัญญา 2 เดือน คุณสามารถปรับเปลี่ยนได้ตามความเหมาะสม
                                             </p>
                                         </div>
                                     </div>

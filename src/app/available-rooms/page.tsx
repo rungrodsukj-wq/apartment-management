@@ -133,15 +133,15 @@ export default function AvailableRoomsPage() {
             const breakdown = combos.map(combo => {
                 const physicalAvailable = rOfType.filter(r => (r.kitchen_type || 'ไม่ระบุครัว') === combo.kitchen && (r.view_direction || 'ไม่ระบุทิศ') === combo.view).length;
                 const waitlistsMatching = wOfType.filter(w => (w.kitchen_type || 'ไม่ระบุครัว') === combo.kitchen && (w.view_preference || 'ไม่ระบุทิศ') === combo.view).length;
-                const net = physicalAvailable - waitlistsMatching;
+                const net = physicalAvailable - waitlistsMatching; // allow negative
                 const totalRoomsInCombo = roomsOfTypeAll.filter(r => (r.kitchen_type || 'ไม่ระบุครัว') === combo.kitchen && (r.view_direction || 'ไม่ระบุทิศ') === combo.view).length;
                 return {
                     kitchen: combo.kitchen,
                     view: combo.view,
                     total: totalRoomsInCombo,
-                    available: physicalAvailable,
+                    available: physicalAvailable, // show physical available before subtracting waitlists
                     waitlist: waitlistsMatching,
-                    net: Math.max(0, net)
+                    net: net
                 };
             });
 
@@ -182,19 +182,19 @@ export default function AvailableRoomsPage() {
                     const total = rOfType.filter(r => !r.kitchen_type && !r.view_direction).length;
                     const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && !r.kitchen_type && !r.view_direction).length;
                     const waitlistMatches = wOfType.filter(w => !w.kitchen_type && !w.view_preference).length;
-                    const net = Math.max(0, physicalAvailable - waitlistMatches);
+                    const net = physicalAvailable - waitlistMatches; // allow negative
                     return { total, available: physicalAvailable, waitlist: waitlistMatches, net };
                 }
 
                 const total = rOfType.filter(r => (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
                 const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
                 const waitlistMatches = wOfType.filter(w => (w.kitchen_type || null) === kitchen && (w.view_preference || null) === view).length;
-                const net = Math.max(0, physicalAvailable - waitlistMatches);
+                const net = physicalAvailable - waitlistMatches; // allow negative
                 return { total, available: physicalAvailable, waitlist: waitlistMatches, net };
             };
 
             const totalAvailable = availableRooms.filter(r => r.room_type === rt.key).length;
-            const netQuota = Math.max(0, totalAvailable - wOfType.length);
+            const netQuota = totalAvailable - wOfType.length; // allow negative
 
             return {
                 ...rt,
@@ -327,10 +327,12 @@ export default function AvailableRoomsPage() {
                                     <tbody className="bg-white">
                                         {matrixData.map((row) => {
                                             const renderCell = (cell: any) => {
-                                                const isSoldOut = cell.net <= 0;
+                                                const isNegative = cell.net < 0;
+                                                const isZero = cell.net === 0;
+                                                const valueClass = isNegative ? 'text-red-500' : isZero ? 'text-slate-400' : 'text-[#4F81FF]';
                                                 return (
                                                     <td className="p-4 text-center align-top border border-slate-200">
-                                                        <div className={`text-base font-black ${isSoldOut ? 'text-slate-400' : 'text-[#4F81FF]'}`}>
+                                                        <div className={`text-base font-black ${valueClass}`}>
                                                             {cell.net} <span className="text-xs font-normal text-slate-500">ห้อง</span>
                                                         </div>
                                                         <div className="text-[10px] text-slate-400 mt-1">
@@ -349,7 +351,7 @@ export default function AvailableRoomsPage() {
                                                 <tr key={row.key} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="p-4 font-bold text-slate-800 border border-slate-200 bg-slate-50/80 rounded-l-3xl">{row.display}</td>
                                                     <td className="p-4 border border-slate-200 text-center bg-slate-50/80">
-                                                        <div className={`text-base font-black ${row.netQuota <= 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                                        <div className={`text-base font-black ${row.netQuota < 0 ? 'text-red-500' : row.netQuota === 0 ? 'text-slate-400' : 'text-emerald-600'}`}>
                                                             {row.netQuota} <span className="text-xs font-normal text-slate-500">ห้อง</span>
                                                         </div>
                                                         <div className="text-[10px] text-slate-400 mt-0.5">
@@ -361,7 +363,7 @@ export default function AvailableRoomsPage() {
                                                     {renderCell(row.backWest)}
                                                     {renderCell(row.backEast)}
                                                     <td className="p-4 text-center align-top border border-slate-200 rounded-r-3xl">
-                                                        <div className={`text-base font-black ${row.unspecified.net <= 0 ? 'text-slate-400' : 'text-purple-600'}`}>
+                                                        <div className={`text-base font-black ${row.unspecified.net < 0 ? 'text-red-500' : row.unspecified.net === 0 ? 'text-slate-400' : 'text-purple-600'}`}>
                                                             {row.unspecified.net} <span className="text-xs font-normal text-slate-500">ห้อง</span>
                                                         </div>
                                                         <div className="text-[10px] text-slate-400 mt-1">

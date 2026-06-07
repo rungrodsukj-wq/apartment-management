@@ -34,8 +34,10 @@ export default function RenewalCheckPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
 
-    // Month filter: how many months ahead to look
-    const [monthsAhead, setMonthsAhead] = useState(3);
+    // Month filter: how many months ahead to look ('all' for no upper bound)
+    const [monthsAhead, setMonthsAhead] = useState('3');
+    // View mode: group by month or sort by room
+    const [viewMode, setViewMode] = useState<'byMonth' | 'byRoom'>('byMonth');
 
     // Search filter: room number or tenant name
     const [searchQuery, setSearchQuery] = useState('');
@@ -86,6 +88,31 @@ export default function RenewalCheckPage() {
         if (cData) setContracts(cData);
         if (rData) setRooms(rData);
         if (iData) setIntentions(iData);
+
+        if (cData && iData) {
+            const existingContractIds = new Set(iData.map((item: any) => item.contract_id));
+            const missingContracts = cData.filter((contract: any) => contract.id && !existingContractIds.has(contract.id));
+            if (missingContracts.length > 0) {
+                const today = new Date();
+                const surveyMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+                const inserts = missingContracts.map((contract: any) => ({
+                    contract_id: contract.id,
+                    room_id: contract.main_room_id || contract.temp_room_id || contract.move_to_room_id || null,
+                    tenant_name: contract.tenant_name || '',
+                    intention: 'not_asked',
+                    survey_month: surveyMonth,
+                    note: '',
+                }));
+                const { error: insertError } = await supabase.from('renewal_intentions').insert(inserts);
+                if (insertError) {
+                    console.warn('Failed to backfill renewal intentions', insertError.message);
+                } else {
+                    const { data: refreshed } = await supabase.from('renewal_intentions').select('*');
+                    if (refreshed) setIntentions(refreshed);
+                }
+            }
+        }
+
         setLoading(false);
     }
 
@@ -95,28 +122,29 @@ export default function RenewalCheckPage() {
         return intentions.find(i => i.contract_id === contractId) || null;
     };
 
-    // Filter contracts that expire within X months
+    // Filter contracts that expire within X months (or all upcoming if 'all')
     const expiringContracts = useMemo(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const cutoff = new Date(today);
-        cutoff.setMonth(cutoff.getMonth() + monthsAhead);
+        const monthsAheadNum = monthsAhead === 'all' ? null : Number(monthsAhead);
+        const cutoff = monthsAheadNum !== null ? new Date(today) : null;
+        if (cutoff && monthsAheadNum !== null) cutoff.setMonth(cutoff.getMonth() + monthsAheadNum);
 
         return contracts
             .filter(c => {
                 if (!c.contract_end_date) return false;
                 const end = new Date(c.contract_end_date);
                 end.setHours(0, 0, 0, 0);
-                return end >= today && end <= cutoff;
+                if (monthsAheadNum === null) {
+                    // 'all' -> include any contract that ends on/after today
+                    return end >= today;
+                }
+                return end >= today && end <= (cutoff as Date);
             })
             .filter(c => {
                 // Apply intention filter
                 if (intentionFilter === 'all') return true;
-                
-                // กำหนดค่าเริ่มต้นเป็น 'pending' หากยังไม่มีข้อมูลบันทึกในฐานข้อมูล (ตามโค้ดเดิมของคุณ)
-                const intention = getIntention(c.id)?.intention || 'pending'; 
-                
-                // เทียบค่าตรง ๆ กับฟิลเตอร์ที่เลือกได้เลย
+                const intention = getIntention(c.id)?.intention || 'not_asked';
                 return intention === intentionFilter;
             })
             .filter(c => {
@@ -268,7 +296,7 @@ export default function RenewalCheckPage() {
             noteModal.contractId,
             noteModal.roomId,
             noteModal.tenantName,
-            existing?.intention || 'pending',
+            existing?.intention || 'not_asked',
             noteInput
         );
         setNoteModal(null);
@@ -360,14 +388,13 @@ export default function RenewalCheckPage() {
     };
 
     const stats = useMemo(() => {
-        // 1. นับเฉพาะ "รอตอบกลับ" (รวมถึงห้องที่ยังไม่มีประวัติให้ถือว่ารอตอบกลับเบื้องต้น หรือเปลี่ยนเป็น 0 ถ้ายึดตามจริง)
-        const pending = expiringContracts.filter(c => {
-            const i = getIntention(c.id);
-            return !i || i.intention === 'pending';
-        }).length;
+        const pending = expiringContracts.filter(c => getIntention(c.id)?.intention === 'pending').length;
 
-        // 2. เพิ่มตัวแปรนับ "ยังไม่สอบถาม" แยกออกมา
-        const notAsked = expiringContracts.filter(c => getIntention(c.id)?.intention === 'not_asked').length;
+        // เริ่มต้นเป็น not_asked หากยังไม่มี record
+        const notAsked = expiringContracts.filter(c => {
+            const intention = getIntention(c.id)?.intention || 'not_asked';
+            return intention === 'not_asked';
+        }).length;
 
         const renew = expiringContracts.filter(c => {
             const intention = getIntention(c.id)?.intention;
@@ -388,10 +415,23 @@ export default function RenewalCheckPage() {
         return { overdue, urgent, soon, upcoming };
     }, [expiringContracts]);
 
+    const monthBuckets = useMemo(() => {
+        const map: Record<string, any[]> = {};
+        expiringContracts.forEach(c => {
+            const d = new Date(c.contract_end_date);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (!map[key]) map[key] = [];
+            map[key].push(c);
+        });
+        // sort keys ascending
+        const keys = Object.keys(map).sort();
+        return keys.map(k => ({ key: k, items: map[k] }));
+    }, [expiringContracts]);
+
     const renderContractCard = (contract: any, index: number) => {
         const room = getRoom(contract.main_room_id);
         const intention = getIntention(contract.id);
-        const currentIntention: Intention = intention?.intention || 'pending';
+        const currentIntention: Intention = intention?.intention || 'not_asked';
         const cfg = intentionConfig[currentIntention];
         const days = getDaysUntil(contract.contract_end_date);
         const isSaving = saving === contract.id;
@@ -631,17 +671,18 @@ export default function RenewalCheckPage() {
                 <div className="grid gap-3 lg:grid-cols-[minmax(260px,420px)_1fr] mb-4">
                     <div className="flex flex-wrap items-center gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
                         <span className="text-sm font-semibold text-slate-600 px-2">แสดงสัญญาที่หมดภายใน:</span>
-                        <select
-                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-[#4F81FF]/30 cursor-pointer transition-all"
-                            value={monthsAhead}
-                            onChange={e => setMonthsAhead(Number(e.target.value))}
-                        >
-                            <option value={1}>1 เดือน</option>
-                            <option value={2}>2 เดือน</option>
-                            <option value={3}>3 เดือน</option>
-                            <option value={4}>4 เดือน</option>
-                            <option value={6}>6 เดือน</option>
-                        </select>
+                            <select
+                                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-[#4F81FF]/30 cursor-pointer transition-all"
+                                value={monthsAhead}
+                                onChange={e => setMonthsAhead(e.target.value)}
+                            >
+                                <option value="1">1 เดือน</option>
+                                <option value="2">2 เดือน</option>
+                                <option value="3">3 เดือน</option>
+                                <option value="4">4 เดือน</option>
+                                <option value="6">6 เดือน</option>
+                                <option value="all">ทั้งหมด</option>
+                            </select>
                     </div>
 
                     <div className="flex items-center gap-2 bg-white rounded-2xl p-2 border border-slate-100 shadow-sm">
@@ -694,6 +735,23 @@ export default function RenewalCheckPage() {
                 </div>
 
                 {/* Main Content Area */}
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold text-slate-600 px-2">มุมมอง:</span>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('byMonth')}
+                            className={`px-3 py-2 rounded-xl text-sm font-semibold ${viewMode === 'byMonth' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
+                        >แยกเดือน</button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('byRoom')}
+                            className={`px-3 py-2 rounded-xl text-sm font-semibold ${viewMode === 'byRoom' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
+                        >เรียงตามห้อง</button>
+                    </div>
+                    <div className="text-sm text-slate-500">แสดง {expiringContracts.length} รายการ</div>
+                </div>
+
                 {loading ? (
                     <div className="flex flex-col items-center justify-center p-33 space-y-4">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-blue-600"></div>
@@ -710,41 +768,29 @@ export default function RenewalCheckPage() {
                         <p className="text-slate-500 mt-2">ลองเปลี่ยนช่วงเวลาค้นหาด้านบน เพื่อดูสัญญาในอนาคต</p>
                     </div>
                 ) : (
-                    <div className="space-y-2">
-                        {renderGroup(
-                            'เลยกำหนด (Overdue)', 
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-red-500">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-                            </svg>, 
-                            'text-red-600', 
-                            grouped.overdue
-                        )}
-                        {renderGroup(
-                            'ด่วน — หมดภายใน 30 วัน', 
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-orange-500">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
-                            </svg>, 
-                            'text-orange-600', 
-                            grouped.urgent
-                        )}
-                        {renderGroup(
-                            'เร็วๆ นี้ — หมดภายใน 60 วัน', 
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-amber-500">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                            </svg>, 
-                            'text-amber-600', 
-                            grouped.soon
-                        )}
-                        {renderGroup(
-                            'กำลังจะหมด — เกิน 60 วัน', 
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-blue-500">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
-                            </svg>, 
-                            'text-blue-600', 
-                            grouped.upcoming
-                        )}
-                    </div>
+                    viewMode === 'byRoom' ? (
+                        <div className="space-y-2">
+                            {expiringContracts.map((c, idx) => renderContractCard(c, idx + 1))}
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {monthBuckets.map((b) => {
+                                const [year, month] = b.key.split('-');
+                                const monthLabel = new Date(Number(year), Number(month) - 1, 1).toLocaleString('th-TH', { year: 'numeric', month: 'short' });
+                                return (
+                                    <div key={b.key} className="mb-8">
+                                        <div className={`flex items-center gap-3 mb-4`}>
+                                            <h2 className={`text-lg font-bold text-slate-800`}>{monthLabel}</h2>
+                                            <span className="text-xs text-slate-500 font-semibold bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-sm">{b.items.length} รายการ</span>
+                                        </div>
+                                        <div className="flex flex-col gap-4">
+                                            {b.items.map((c, idx) => renderContractCard(c, idx + 1))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )
                 )}
             </div>
 

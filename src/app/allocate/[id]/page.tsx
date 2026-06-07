@@ -144,7 +144,30 @@ export default function AllocateRoomPage() {
         setLoading(false);
     }
 
-    
+    const ensureRenewalIntentionForContract = async (contractId: string, roomId: string | null, tenantName: string) => {
+        if (!contractId) return;
+        const { data: existing, error: existingError } = await supabase.from('renewal_intentions').select('*').eq('contract_id', contractId).limit(1);
+        if (existingError) {
+            console.warn('Failed to check existing renewal intention', existingError.message);
+            return;
+        }
+        if (existing && existing.length > 0) return;
+
+        const today = new Date();
+        const surveyMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+        const intentPayload = {
+            contract_id: contractId,
+            room_id: roomId,
+            tenant_name: tenantName,
+            intention: 'not_asked',
+            survey_month: surveyMonth,
+            note: '',
+        };
+        const { error: intentError } = await supabase.from('renewal_intentions').insert([intentPayload]);
+        if (intentError) {
+            console.warn('Failed to create default renewal intention for contract', intentError.message);
+        }
+    };
 
     const getSearchStartDate = () => {
         if (assignAs === 'main' && tempContractId && tempEndDate) {
@@ -190,6 +213,7 @@ export default function AllocateRoomPage() {
                 }
                 insertedContractId = tempContractId;
                 await logAudit(profile, 'contracts', 'update', tempContractId, 'อัปเดตสัญญา เพิ่มห้องหลักให้กับสัญญาที่มีอยู่', updatePayload);
+                await ensureRenewalIntentionForContract(tempContractId, selectedRoomId, waitlist.name);
             } else {
                 const contractPayload = { ...basePayload, main_room_id: selectedRoomId, main_start_date: finalMainStartDate, main_end_date: waitlist.end_date };
                 const { data: contractData, error: contractError } = await supabase.from('contracts').insert([contractPayload]).select('id');
@@ -199,7 +223,10 @@ export default function AllocateRoomPage() {
                     return;
                 }
                 insertedContractId = contractData?.[0]?.id ?? null;
-                if (insertedContractId) await logAudit(profile, 'contracts', 'create', insertedContractId, 'จัดสรรห้องให้ waitlist และสร้างสัญญา', contractPayload);
+                if (insertedContractId) {
+                    await logAudit(profile, 'contracts', 'create', insertedContractId, 'จัดสรรห้องให้ waitlist และสร้างสัญญา', contractPayload);
+                    await ensureRenewalIntentionForContract(insertedContractId, contractPayload.main_room_id || contractPayload.temp_room_id || contractPayload.move_to_room_id || null, contractPayload.tenant_name);
+                }
             }
 
             const { error: waitlistError } = await supabase.from('waitlists').update({ status: 'จัดสรรห้องแล้ว' }).eq('id', waitlistId);
@@ -219,6 +246,7 @@ export default function AllocateRoomPage() {
                 }
                 insertedContractId = tempContractId;
                 await logAudit(profile, 'contracts', 'update', tempContractId, 'อัปเดตสัญญาชั่วคราว (temp) สำหรับ waitlist', tempFields);
+                await ensureRenewalIntentionForContract(tempContractId, selectedRoomId, waitlist.name);
             } else {
                 const { data: contractData, error: contractError } = await supabase.from('contracts').insert([{ ...basePayload, ...tempFields }]).select('id');
                 if (contractError) {
@@ -227,8 +255,11 @@ export default function AllocateRoomPage() {
                     return;
                 }
                 insertedContractId = contractData?.[0]?.id ?? null;
-                if (insertedContractId) await logAudit(profile, 'contracts', 'create', insertedContractId, 'จัดสรรห้องชั่วคราวให้ waitlist และสร้างสัญญา (ชั่วคราว)', { ...basePayload, ...tempFields });
-                setTempContractId(insertedContractId);
+                if (insertedContractId) {
+                    await logAudit(profile, 'contracts', 'create', insertedContractId, 'จัดสรรห้องชั่วคราวให้ waitlist และสร้างสัญญา (ชั่วคราว)', { ...basePayload, ...tempFields });
+                    await ensureRenewalIntentionForContract(insertedContractId, selectedRoomId, waitlist.name);
+                    setTempContractId(insertedContractId);
+                }
             }
 
             if (insertedContractId) {
@@ -237,8 +268,8 @@ export default function AllocateRoomPage() {
                 const note = `จัดสรรห้องชั่วคราว: ${roomLabel}`;
                 const { error: wlErr } = await supabase.from('waitlists').update({ status: 'จัดสรรชั่วคราว', allocation_note: note }).eq('id', waitlistId);
                 if (!wlErr) {
-                    await logAudit(profile, 'waitlists', 'update', waitlistId, 'อัปเดตสถานะ waitlist เป็นจัดสรรชั่วคราว และเพิ่มโน้ต (allocation_note)', { status: 'จัดสรรชั่วคราว', allocation_note: note, contract_id: insertedContractId });
-                    setWaitlist({ ...waitlist, status: 'จัดสรรชั่วคราว', allocation_note: note });
+                    await logAudit(profile, 'waitlists', 'update', waitlistId, 'อัปเดตสถานะ waitlist เป็นจัดสรรชั่วคราว และเพิ่มโน้ต (allocation_note)', { status: 'จัดสรรชั่วคร่าว', allocation_note: note, contract_id: insertedContractId });
+                    setWaitlist({ ...waitlist, status: 'จัดสรรชั่วคร่าว', allocation_note: note });
                 }
             }
         }

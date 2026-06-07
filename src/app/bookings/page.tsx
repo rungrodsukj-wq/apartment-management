@@ -735,7 +735,24 @@ export default function BookingsPage() {
             alert('เกิดข้อผิดพลาด: ' + error.message);
         } else {
             const newId = data?.[0]?.id ?? null;
-            if (newId) await logAudit(profile, 'contracts', 'create', newId, 'สร้างสัญญาเช่าใหม่', payload);
+            if (newId) {
+                await logAudit(profile, 'contracts', 'create', newId, 'สร้างสัญญาเช่าใหม่', payload);
+
+                const today = new Date();
+                const surveyMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+                const intentPayload = {
+                    contract_id: newId,
+                    room_id: payload.main_room_id || payload.temp_room_id || payload.move_to_room_id || null,
+                    tenant_name: payload.tenant_name,
+                    intention: 'not_asked',
+                    survey_month: surveyMonth,
+                    note: '',
+                };
+                const { error: intentError } = await supabase.from('renewal_intentions').insert([intentPayload]);
+                if (intentError) {
+                    console.warn('Failed to create default renewal intention for new contract', intentError.message);
+                }
+            }
             setIsCreateModalOpen(false);
             setIsShortTermContract(false);
             setCreateForm({

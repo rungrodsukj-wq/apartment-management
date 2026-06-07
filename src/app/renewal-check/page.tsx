@@ -432,7 +432,7 @@ export default function RenewalCheckPage() {
         const room = getRoom(contract.main_room_id);
         const intention = getIntention(contract.id);
         const currentIntention: Intention = intention?.intention || 'not_asked';
-        const cfg = intentionConfig[currentIntention];
+        const cfg = intentionConfig[currentIntention] ?? intentionConfig['not_asked'];
         const days = getDaysUntil(contract.contract_end_date);
         const isSaving = saving === contract.id;
 

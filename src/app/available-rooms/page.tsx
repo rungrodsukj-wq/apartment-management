@@ -58,6 +58,8 @@ export default function AvailableRoomsPage() {
         });
     };
 
+    const roomsL = rooms.filter(r => r.building === 'L');
+
     const checkStart = `${selectedYear}-${pad(selectedMonth)}-01`;
     const checkEnd = calculateEndDate(checkStart);
 
@@ -102,10 +104,10 @@ export default function AvailableRoomsPage() {
 
     const summary = useMemo(() => {
         // Exclude locked rooms (pending/renew intention) from available rooms
-        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
+        const availableRooms = roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
         const overlappingWaitlists = waitlists.filter(w => isOverlap(checkStart, checkEnd, w.start_date, w.end_date));
 
-        const roomTypes = [...new Set(rooms.map(r => r.room_type).filter(Boolean))];
+        const roomTypes = [...new Set(roomsL.map(r => r.room_type).filter(Boolean))];
         const res: Record<string, any> = {};
 
         for (const rt of roomTypes as string[]) {
@@ -113,7 +115,7 @@ export default function AvailableRoomsPage() {
             const wOfType = overlappingWaitlists.filter(w => w.room_type === rt);
 
             // Calculate breakdown by kitchen_type and view_direction
-            const roomsOfTypeAll = rooms.filter(r => r.room_type === rt);
+            const roomsOfTypeAll = roomsL.filter(r => r.room_type === rt);
             const combos: { kitchen: string; view: string }[] = [];
             roomsOfTypeAll.forEach(r => {
                 const k = r.kitchen_type || 'ไม่ระบุครัว';
@@ -163,11 +165,11 @@ export default function AvailableRoomsPage() {
         ];
 
         // Also exclude locked rooms in the matrix
-                const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
+                const availableRooms = roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
         const overlappingWaitlists = waitlists.filter(w => isOverlap(checkStart, checkEnd, w.start_date, w.end_date));
 
         return rowTypes.map(rt => {
-            const rOfType = rooms.filter(r => r.room_type === rt.key);
+            const rOfType = roomsL.filter(r => r.room_type === rt.key);
             const wOfType = overlappingWaitlists.filter(w => w.room_type === rt.key);
 
             const getCellData = (kitchen: string | null, view: string | null) => {

@@ -29,6 +29,7 @@ interface Room {
     room_type: string;
     kitchen_type: string;
     view_direction: string;
+    building?: string | null;
 }
 
 interface Contract {
@@ -294,7 +295,9 @@ export default function AllocateRoomPage() {
         return locked;
     })();
 
-    const matchedRooms = rooms.filter(r =>
+    const roomsL = rooms.filter(r => r.building === 'L');
+
+    const matchedRooms = roomsL.filter(r =>
         (!waitlist.room_type || waitlist.room_type === 'ไม่ระบุ' || r.room_type === waitlist.room_type) &&
         (!waitlist.kitchen_type || waitlist.kitchen_type === 'ไม่ระบุ' || r.kitchen_type === waitlist.kitchen_type) &&
         (!waitlist.view_preference || waitlist.view_preference === 'ไม่ระบุ' || r.view_direction === waitlist.view_preference) &&
@@ -319,7 +322,7 @@ export default function AllocateRoomPage() {
         }
     });
 
-    const otherRooms = rooms.filter(r => !matchedRooms.some(m => m.id === r.id));
+    const otherRooms = roomsL.filter(r => !matchedRooms.some(m => m.id === r.id));
     const alternativeMatches = otherRooms.filter(r => {
         if (lockedRoomIds.has(r.id)) return false;
         const { availableFrom } = getRoomAvailability(allContracts, r.id, searchStartDate);

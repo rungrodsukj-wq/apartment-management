@@ -865,7 +865,7 @@ export default function BookingsPage() {
         }
 
         const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
-        const availableRooms = rooms.filter(r => r.building === 'L' && isRoomAvailable(contracts, intentions, r.id, start, end));
+        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, start, end));
         const perfectMatchRooms = availableRooms.filter(r => {
             const isMatch = (prefVal: any, roomVal: any) => {
                 if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
@@ -926,7 +926,7 @@ export default function BookingsPage() {
             if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
             return prefVal === roomVal;
         };
-        const availableRooms = rooms.filter(r => r.building === 'L' && r.id !== createForm.main_room_id && isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
+        const availableRooms = rooms.filter(r => r.id !== createForm.main_room_id && isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
         const perfectMatchRooms = availableRooms.filter(r =>
             isMatch(customerPref.room_type, r.room_type) &&
             isMatch(customerPref.kitchen_type, r.kitchen_type) &&
@@ -1602,7 +1602,7 @@ export default function BookingsPage() {
                                             const start = createForm.main_start_date || createForm.contract_start_date;
                                             const end = createForm.main_end_date || createForm.contract_end_date;
                                             const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
-                                            const availableRooms = rooms.filter(r => r.building === 'L' && isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
+                                            const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
                                             const isMatch = (prefVal: any, roomVal: any) => {
                                                 if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
                                                 return prefVal === roomVal;
@@ -1962,7 +1962,7 @@ export default function BookingsPage() {
                                             </p>
                                         ) : (() => {
                                             const customerPref = waitlists.find(w => w.name === editForm.tenant_name) || {};
-                                            const availableRooms = rooms.filter(r => r.building === 'L' && isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id));
+                                            const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id));
                                             const perfectMatchRooms = availableRooms.filter(r => {
                                                 const isMatch = (prefVal: any, roomVal: any) => {
                                                     if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
@@ -2164,7 +2164,7 @@ export default function BookingsPage() {
                                         </p>
                                     ) : (() => {
                                         const customerPref = waitlists.find(w => w.name === editForm.tenant_name) || {};
-                                        const availableRooms = rooms.filter(r => r.building === 'L' && isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id) && applyRoomFilters(r));
+                                        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id) && applyRoomFilters(r));
                                         const isMatch = (prefVal: any, roomVal: any) => {
                                             if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
                                             return prefVal === roomVal;
@@ -2277,7 +2277,7 @@ export default function BookingsPage() {
                                             ⚠️ กรุณาระบุวันที่ย้ายก่อนเพื่อดูห้องว่าง
                                         </p>
                                     ) : (() => {
-                                        const availableRooms = rooms.filter(r => r.building === 'L' && isRoomAvailable(contracts, intentions, r.id, editForm.move_start_date, editForm.move_end_date, editForm.id) && applyRoomFilters(r));
+                                        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.move_start_date, editForm.move_end_date, editForm.id) && applyRoomFilters(r));
                                         return availableRooms.length > 0 ? (
                                             <>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">

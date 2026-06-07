@@ -295,10 +295,12 @@ export default function AllocateRoomPage() {
     const searchStartDate = getSearchStartDate();
 
     // Build locked rooms set: any contract that ends on/after searchStartDate and
-    // whose intention is missing or not 'not_renew' will lock the associated room(s).
+    // whose intention is missing or not explicitly a non-locking intent will lock the associated room(s).
     const lockedRoomIds = (() => {
         const locked = new Set<string>();
         if (!searchStartDate) return locked;
+
+        const nonLockIntents = ['not_renew', 'renew_no_room'];
 
         const byContract: Record<string, any> = {};
         intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
@@ -312,21 +314,21 @@ export default function AllocateRoomPage() {
             if (endDate < searchStartDate) continue;
 
             const intent = c.id ? byContract[c.id] : undefined;
-            if (!intent || intent.intention !== 'not_renew') {
+            if (!intent || !nonLockIntents.includes(intent.intention)) {
                 roomIds.forEach(rid => locked.add(rid));
             }
         }
 
         for (const intent of intentions) {
             if (intent.room_id) {
-                if (!intent.intention || intent.intention !== 'not_renew') locked.add(intent.room_id);
+                if (!intent.intention || !nonLockIntents.includes(intent.intention)) locked.add(intent.room_id);
             }
         }
 
         return locked;
     })();
 
-    const roomsL = rooms.filter(r => r.building === 'L');
+    const roomsL = rooms;
 
     const matchedRooms = roomsL.filter(r =>
         (!waitlist.room_type || waitlist.room_type === 'ไม่ระบุ' || r.room_type === waitlist.room_type) &&

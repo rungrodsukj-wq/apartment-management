@@ -1,7 +1,12 @@
 // Shared availability helpers
 export const isOverlap = (start1: string, end1: string, start2: string, end2: string) => {
     if (!start1 || !end1 || !start2 || !end2) return false;
-    return new Date(start1) < new Date(end2) && new Date(start2) < new Date(end1);
+    // Treat date ranges as inclusive: ranges that touch should count as overlapping.
+    const s1 = new Date(start1).getTime();
+    const e1 = new Date(end1).getTime();
+    const s2 = new Date(start2).getTime();
+    const e2 = new Date(end2).getTime();
+    return s1 <= e2 && s2 <= e1;
 };
 
 export const getContractIntention = (intentions: any[], contractId?: string | null) => {
@@ -39,11 +44,13 @@ export const isRoomAvailable = (
             try {
                 if (new Date(contractEnd) >= new Date(checkStart)) {
                     const intention = getContractIntention(intentions, c.id);
-                    if (intention !== 'not_renew') return false;
+                    const nonLockIntents = ['not_renew', 'renew_no_room'];
+                    if (!nonLockIntents.includes(intention)) return false;
                 }
             } catch (e) {
                 const intention = getContractIntention(intentions, c.id);
-                if (intention !== 'not_renew') return false;
+                const nonLockIntents = ['not_renew', 'renew_no_room'];
+                if (!nonLockIntents.includes(intention)) return false;
             }
         }
     }

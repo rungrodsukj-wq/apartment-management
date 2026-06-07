@@ -74,6 +74,8 @@ export default function AvailableRoomsPage() {
         const byContract: Record<string, any> = {};
         intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
 
+        const nonLockIntents = ['not_renew', 'renew_no_room'];
+
         for (const c of contracts) {
             // consider main, temp and move_to room assignments
             const roomIds = [c.main_room_id, c.temp_room_id, c.move_to_room_id].filter(Boolean) as string[];
@@ -85,8 +87,8 @@ export default function AvailableRoomsPage() {
             if (endDate < checkStart) continue;
 
             const intent = byContract[c.id];
-            // lock if no intention or intention is not 'not_renew'
-            if (!intent || intent.intention !== 'not_renew') {
+            // lock if no intention or intention is not in nonLockIntents
+            if (!intent || !nonLockIntents.includes(intent.intention)) {
                 roomIds.forEach(rid => locked.add(rid));
             }
         }
@@ -94,8 +96,8 @@ export default function AvailableRoomsPage() {
         // also include any explicit intention that references a room directly
         for (const intent of intentions) {
             if (intent.room_id) {
-                // if intention exists and is not 'not_renew', lock it
-                if (!intent.intention || intent.intention !== 'not_renew') locked.add(intent.room_id);
+                // if intention exists and is not one of nonLockIntents, lock it
+                if (!intent.intention || !nonLockIntents.includes(intent.intention)) locked.add(intent.room_id);
             }
         }
 

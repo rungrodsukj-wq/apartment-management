@@ -23,9 +23,9 @@ const statusLabels: Record<UserStatus, string> = {
 const pageList = [
   { key: 'dashboard', name: 'Dashboard' },
   { key: 'rooms', name: 'ผังห้องพัก' },
-  { key: 'available_rooms', name: 'ห้องจองได้' },
+  // { key: 'available_rooms', name: 'ห้องจองได้' },
   { key: 'waitlists', name: 'จองไม่ระบุห้อง' },
-  { key: 'bookings', name: 'การจอง' },
+  { key: 'bookings', name: 'การจองระบุห้อง' },
   { key: 'renewal_check', name: 'สอบถามต่อสัญญา' },
 ];
 

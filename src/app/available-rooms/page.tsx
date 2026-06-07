@@ -175,21 +175,35 @@ export default function AvailableRoomsPage() {
             const wOfType = overlappingWaitlists.filter(w => w.room_type === rt.key);
 
             const getCellData = (kitchen: string | null, view: string | null) => {
-                // Handle unspecified: both kitchen and view must be null/undefined
-                const isUnspecified = kitchen === null && view === null;
+                // 1. เปลี่ยนคอลัมน์สุดท้ายให้เป็นกล่องรับ "คิวรอกลางที่สเปคไม่ครบ"ทั้งหมด
+                const isUnspecifiedColumn = kitchen === null && view === null;
                 
-                if (isUnspecified) {
+                if (isUnspecifiedColumn) {
+                    // นับห้องที่ในระบบไม่ได้กรอกข้อมูลครัวและทิศไว้จริงๆ
                     const total = rOfType.filter(r => !r.kitchen_type && !r.view_direction).length;
                     const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && !r.kitchen_type && !r.view_direction).length;
-                    const waitlistMatches = wOfType.filter(w => !w.kitchen_type && !w.view_preference).length;
-                    const net = physicalAvailable - waitlistMatches; // allow negative
+                    
+                    // ✅ ดึงคิวจองที่ "สเปคไม่ตรงกับ 4 ช่องหลัก" (เช่น เคสคุณก็อต) มารวมไว้ตรงนี้ทั้งหมด
+                    const waitlistMatches = wOfType.filter(w => {
+                        const k = w.kitchen_type;
+                        const v = w.view_preference;
+                        // ถ้าไม่ได้ระบุสเปคมาครบถ้วน (ครัวหน้า/หลัง + ตะวันตก/ตะวันออก) ให้ปัดมาเป็นคิวกึ่งกลางทันที
+                        const isFullySpecific = (k === 'ครัวหน้า' || k === 'ครัวหลัง') && (v === 'ทิศตะวันตก' || v === 'ทิศตะวันออก');
+                        return !isFullySpecific;
+                    }).length;
+
+                    const net = physicalAvailable - waitlistMatches;
                     return { total, available: physicalAvailable, waitlist: waitlistMatches, net };
                 }
 
+                // 2. ช่องสเปคเฉพาะ (ครัวหน้า-ตก, ครัวหน้า-ออก, ครัวหลัง-ตก, ครัวหลัง-ออก)
                 const total = rOfType.filter(r => (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
                 const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
+                
+                // คิวจองที่ระบุตรงเป๊ะๆ เท่านั้นถึงจะมาหักลบช่องนี้
                 const waitlistMatches = wOfType.filter(w => (w.kitchen_type || null) === kitchen && (w.view_preference || null) === view).length;
-                const net = physicalAvailable - waitlistMatches; // allow negative
+                
+                const net = physicalAvailable - waitlistMatches;
                 return { total, available: physicalAvailable, waitlist: waitlistMatches, net };
             };
 
@@ -362,19 +376,26 @@ export default function AvailableRoomsPage() {
                                                     {renderCell(row.frontEast)}
                                                     {renderCell(row.backWest)}
                                                     {renderCell(row.backEast)}
-                                                    <td className="p-4 text-center align-top border border-slate-200 rounded-r-3xl">
-                                                        <div className={`text-base font-black ${row.unspecified.net < 0 ? 'text-red-500' : row.unspecified.net === 0 ? 'text-slate-400' : 'text-purple-600'}`}>
-                                                            {row.unspecified.net} <span className="text-xs font-normal text-slate-500">ห้อง</span>
-                                                        </div>
-                                                        <div className="text-[10px] text-slate-400 mt-1">
-                                                            (ว่าง {row.unspecified.available} / ทั้งหมด {row.unspecified.total})
-                                                        </div>
-                                                        {row.unspecified.waitlist > 0 && (
-                                                            <div className="mt-2 inline-flex items-center justify-center rounded-full bg-purple-100 px-2 py-1 text-[9px] font-semibold text-purple-700">
-                                                                -{row.unspecified.waitlist} waitlist
+                                                    {/* คอลัมน์ ไม่ระบุครัว/ทิศ */}
+                                                <td className="p-4 text-center align-top border border-slate-200 rounded-r-3xl bg-slate-50/30">
+                                                    {row.unspecified.waitlist > 0 ? (
+                                                        <div className="flex flex-col items-center justify-center h-full">
+                                                            <div className="bg-purple-100 border border-purple-200 px-3 py-2 rounded-xl w-full">
+                                                                <div className="text-sm font-black text-purple-700">
+                                                                    {row.unspecified.waitlist} <span className="text-xs font-normal text-purple-600">คิว</span>
+                                                                </div>
+                                                                <div className="text-[10px] text-purple-600 mt-1 font-bold">
+                                                                    รอแอดมินจับคู่ห้องให้
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                    </td>
+                                                            <div className="text-[10px] text-slate-400 mt-2">
+                                                                (นำไปหักลบในยอดรวมแล้ว)
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-slate-300 font-medium mt-2">-</div>
+                                                    )}
+                                                </td>
                                                 </tr>
                                             );
                                         })}

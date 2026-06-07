@@ -56,6 +56,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [selectedBlockForDetail, setSelectedBlockForDetail] = useState<Block | null>(null);
 
+  // Renewal intention for modal detail
+  const [modalRenewalIntent, setModalRenewalIntent] = useState<string | null>(null);
+
+
   // State สำหรับตัวกรอง
   const [filterBuilding, setFilterBuilding] = useState('');
   const [filterFloor, setFilterFloor] = useState('');
@@ -176,6 +180,25 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData();
   }, [searchStartDate, searchEndDate]);
+
+  useEffect(() => {
+    if (!selectedBlockForDetail) {
+      setModalRenewalIntent(null);
+      return;
+    }
+
+    const fetchIntent = async () => {
+      try {
+        const { data } = await supabase.from('renewal_intentions').select('*').eq('contract_id', selectedBlockForDetail.contract.id).limit(1);
+        if (data && Array.isArray(data) && data.length > 0) setModalRenewalIntent((data[0] as any).intention || null);
+        else setModalRenewalIntent(null);
+      } catch (err) {
+        setModalRenewalIntent(null);
+      }
+    };
+
+    fetchIntent();
+  }, [selectedBlockForDetail]);
 
   const isDateOverlapping = (start1: string, end1: string, start2: string, end2: string) => {
     if (!start1 || !end1 || !start2 || !end2) return false;
@@ -971,6 +994,28 @@ export default function DashboardPage() {
                         {c.monthly_rent != null ? `${Number(c.monthly_rent).toLocaleString('th-TH')} บาท` : '-'}
                       </span>
                     </div>
+                  </div>
+                </div>
+
+                {/* Renewal Status */}
+                <div className="pt-2">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">สถานะการต่อสัญญา</p>
+                  <div className="mt-2">
+                    {modalRenewalIntent === null ? (
+                      <span className="text-xs text-slate-500">ไม่มีข้อมูลการต่อสัญญา</span>
+                    ) : modalRenewalIntent === 'pending' ? (
+                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">รอดำเนินการ</span>
+                    ) : modalRenewalIntent === 'not_asked' ? (
+                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200/60">ยังไม่ได้สอบถาม</span>
+                    ) : modalRenewalIntent === 'renew' ? (
+                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">ต้องการต่อสัญญา</span>
+                    ) : modalRenewalIntent === 'renew_no_room' ? (
+                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200/60">ต้องการต่อ (ยังไม่มีห้อง)</span>
+                    ) : modalRenewalIntent === 'not_renew' ? (
+                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-red-50 text-red-600 border border-red-200/60">ไม่ต้องการต่อ</span>
+                    ) : (
+                      <span className="text-xs text-slate-500">{modalRenewalIntent}</span>
+                    )}
                   </div>
                 </div>
 

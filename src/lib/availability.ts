@@ -28,6 +28,11 @@ export const isRoomAvailable = (
     for (const c of contracts) {
         if (currentContractId && c.id === currentContractId) continue;
         if (c.status === 'cancelled') continue;
+        
+        // ✅ เพิ่มบรรทัดนี้: ถ้าสัญญาไม่ได้ผูกกับห้องนี้เลย ให้ข้ามไป
+        if (c.main_room_id !== roomId && c.temp_room_id !== roomId && c.move_to_room_id !== roomId) {
+            continue;
+        }
 
         const periods = [
             c.main_room_id === roomId && c.main_start_date && c.main_end_date ? { start: c.main_start_date, end: c.main_end_date } : null,

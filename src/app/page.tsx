@@ -837,16 +837,11 @@ export default function DashboardPage() {
                             type="button"
                             onClick={() => setSelectedBlockForDetail(block)}
                             style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
-                            className={`absolute top-1.5 bottom-1.5 rounded-lg shadow-sm text-xs font-bold text-white flex items-center px-2.5 cursor-pointer transition-all hover:brightness-110 hover:shadow-md hover:z-20 border border-white/10 text-left outline-none focus:ring-1 focus:ring-white/50
-                              ${block.isCancelled
-                                ? 'bg-slate-200 !text-slate-500 line-through decoration-red-400/80 decoration-2 border-slate-300 border-dashed'
-                                : block.type === 'TEMP'
-                                  ? 'bg-gradient-to-r from-amber-400 to-orange-500'
-                                  : block.type === 'MOVE'
-                                    ? 'bg-gradient-to-r from-purple-500 to-indigo-500'
-                                    : 'bg-gradient-to-r from-[#4F81FF] to-[#3D6CE5]'
-                              }
-                            `}
+                            className={`absolute top-2 bottom-2 rounded-md shadow-md text-xs text-white flex items-center px-3 cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:brightness-110 hover:z-30 hover:shadow-lg border border-white/30
+                            ${block.type === 'TEMP' ? 'bg-gradient-to-r from-orange-400 to-orange-500' : 
+                              block.type === 'MOVE' ? 'bg-gradient-to-r from-purple-500 to-purple-600' : 
+                              'bg-gradient-to-r from-blue-500 to-blue-600'}
+                          `}
                             title={`คลิกเพื่อดูรายละเอียดคุณ ${block.name} ${block.isCancelled ? '(ยกเลิก)' : ''} | เข้า: ${block.start.toLocaleDateString('th-TH')} | ออก: ${block.end.toLocaleDateString('th-TH')}`}
                           >
                             {widthPx > 35 && <span className="truncate drop-shadow-sm">{block.name}</span>}

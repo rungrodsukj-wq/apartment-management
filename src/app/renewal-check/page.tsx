@@ -47,6 +47,11 @@ export default function RenewalCheckPage() {
     const [noteModal, setNoteModal] = useState<{ contractId: string; roomId: string; tenantName: string; currentNote: string } | null>(null);
     const [noteInput, setNoteInput] = useState('');
 
+    // Move out date edit modal state
+    const [editMoveOutDateModal, setEditMoveOutDateModal] = useState<{ contractId: string; currentMoveOutDate: string; maxDate: string } | null>(null);
+    const [editMoveOutDate, setEditMoveOutDate] = useState('');
+    const [editMoveOutDateError, setEditMoveOutDateError] = useState<string | null>(null);
+
     // Confirmation Modal state
     const [confirmModal, setConfirmModal] = useState<{
         contractId: string;
@@ -269,6 +274,28 @@ export default function RenewalCheckPage() {
         setNoteModal(null);
     };
 
+    const handleSaveMoveOutDate = async () => {
+        if (!editMoveOutDateModal) return;
+        const contract = getContractById(editMoveOutDateModal.contractId);
+        if (!contract) return;
+
+        const fieldToUpdate = contract.move_end_date ? 'move_end_date' : 'main_end_date';
+        const contractUpdate: Record<string, string> = { [fieldToUpdate]: editMoveOutDate };
+        const { error: contractError } = await supabase
+            .from('contracts')
+            .update(contractUpdate)
+            .eq('id', editMoveOutDateModal.contractId);
+        if (contractError) {
+            setEditMoveOutDateError('เกิดข้อผิดพลาดในการบันทึก: ' + contractError.message);
+            return;
+        }
+        await logAudit(profile, 'contracts', 'update', editMoveOutDateModal.contractId, 'แก้ไขวันที่คาดว่าจะย้ายออก', describeChanges(contractUpdate));
+        await fetchData();
+        setEditMoveOutDateModal(null);
+        setEditMoveOutDate('');
+        setEditMoveOutDateError(null);
+    };
+
     const intentionConfig: Record<Intention, { label: string; color: string; bg: string; border: string; icon: (props?: { className?: string }) => React.ReactNode; btnHover: string }> = {
         pending: { 
             label: 'รอตอบกลับ', 
@@ -408,6 +435,11 @@ export default function RenewalCheckPage() {
                                     กำลังบันทึก...
                                 </span>
                             )}
+                            {currentIntention === 'not_renew' && (contract.move_end_date || contract.main_end_date) && (
+                                <span className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-200">
+                                    ย้ายออก: {formatDateTH(contract.move_end_date || contract.main_end_date)}
+                                </span>
+                            )}
                         </div>
 
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
@@ -508,6 +540,30 @@ export default function RenewalCheckPage() {
                                 </svg>
                                 <span>หมายเหตุ</span>
                             </button>
+
+                            {currentIntention === 'not_renew' && (
+                                <button
+                                    type="button"
+                                    disabled={isSaving}
+                                    onClick={() => {
+                                        const maxDate = contract.contract_end_date || '';
+                                        setEditMoveOutDateModal({
+                                            contractId: contract.id,
+                                            currentMoveOutDate: contract.move_end_date || contract.main_end_date || '',
+                                            maxDate
+                                        });
+                                        setEditMoveOutDate(contract.move_end_date || contract.main_end_date || '');
+                                        setEditMoveOutDateError(null);
+                                    }}
+                                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 border-red-200 text-red-500 hover:border-red-400 hover:text-red-600 hover:bg-red-50 transition-all duration-200 disabled:opacity-50"
+                                    title="แก้ไขวันที่ย้ายออก"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                                    </svg>
+                                    <span>แก้ไขวันที่ย้าย</span>
+                                </button>
+                            )}
                         </>
                     ) : (
                         <div className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${cfg.bg} ${cfg.color} ${cfg.border}`}>
@@ -824,6 +880,76 @@ export default function RenewalCheckPage() {
                                     onClick={handleSaveNote}
                                     className="flex-1 px-5 py-3.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all"
                                 >บันทึกหมายเหตุ</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Move Out Date Modal */}
+            {editMoveOutDateModal && (
+                <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-red-50/50">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800">แก้ไขวันที่ย้ายออก</h2>
+                                <p className="text-sm font-medium text-slate-500 mt-0.5">วันที่ออกจากห้อง</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setEditMoveOutDateModal(null);
+                                    setEditMoveOutDate('');
+                                    setEditMoveOutDateError(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-sm"
+                            >✕</button>
+                        </div>
+                        <div className="p-8 space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">วันที่คาดว่าจะย้ายออก</label>
+                                <input
+                                    type="date"
+                                    value={editMoveOutDate}
+                                    onChange={(e) => {
+                                        setEditMoveOutDate(e.target.value);
+                                        setEditMoveOutDateError(null);
+                                    }}
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-200"
+                                    min="2000-01-01"
+                                />
+                                <p className="mt-2 text-xs text-slate-500">
+                                    วันที่ต้องไม่เกินวันที่สัญญาสิ้นสุด ({formatDateTH(editMoveOutDateModal.maxDate)})
+                                </p>
+                                {editMoveOutDateError && (
+                                    <p className="mt-2 text-xs text-red-600 font-semibold">{editMoveOutDateError}</p>
+                                )}
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditMoveOutDateModal(null);
+                                        setEditMoveOutDate('');
+                                        setEditMoveOutDateError(null);
+                                    }}
+                                    className="flex-1 px-5 py-3.5 text-sm font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-xl hover:bg-slate-50 transition-all"
+                                >ยกเลิก</button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!editMoveOutDate) {
+                                            setEditMoveOutDateError('กรุณาระบุวันที่');
+                                            return;
+                                        }
+                                        const maxDate = editMoveOutDateModal?.maxDate || '';
+                                        if (!isMoveOutDateValid(editMoveOutDate, maxDate)) {
+                                            setEditMoveOutDateError('วันที่ต้องไม่เกินวันที่สัญญาสิ้นสุด');
+                                            return;
+                                        }
+                                        handleSaveMoveOutDate();
+                                    }}
+                                    className="flex-1 px-5 py-3.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-lg shadow-red-600/30 transition-all"
+                                >บันทึกวันที่</button>
                             </div>
                         </div>
                     </div>

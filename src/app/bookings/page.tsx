@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { canEditPage } from '../../lib/permissions';
 import { logAudit, describeChanges } from '../../lib/audit';
+import { isOverlap, isRoomAvailable, getRoomFreeWindow } from '../../lib/availability';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 const parseDateFromYYYYMMDD = (dateStr: string) => {
@@ -312,7 +313,7 @@ export default function BookingsPage() {
                 {roomList.map((room) => {
                     const isSelected = selectedId === room.id;
                     const freeWindow = options?.searchStart && options?.searchEnd
-                        ? getRoomFreeWindow(room.id, options.searchStart, options.searchEnd)
+                        ? getRoomFreeWindow(contracts, room.id, options.searchStart, options.searchEnd)
                         : null;
                     const formatWindowDate = (date: string) => formatDateTH(date) || null;
                     return (
@@ -784,57 +785,7 @@ export default function BookingsPage() {
         }
     };
 
-    const isOverlap = (start1: string, end1: string, start2: string, end2: string) => {
-        if (!start1 || !end1 || !start2 || !end2) return false;
-        return new Date(start1) < new Date(end2) && new Date(start2) < new Date(end1);
-    };
-
-    // ── Updated: accepts optional excludeContractId ──
-    const isRoomAvailable = (roomId: string, checkStart: string, checkEnd: string, currentContractId?: string) => {
-        if (!checkStart || !checkEnd) return true;
-        for (const c of contracts) {
-            if (currentContractId && c.id === currentContractId) continue;
-            if (c.status === 'cancelled') continue;
-            if (c.main_room_id === roomId && isOverlap(checkStart, checkEnd, c.main_start_date, c.main_end_date)) return false;
-            if (c.temp_room_id === roomId && isOverlap(checkStart, checkEnd, c.temp_start_date, c.temp_end_date)) return false;
-            if (c.move_to_room_id === roomId && isOverlap(checkStart, checkEnd, c.move_start_date, c.move_end_date)) return false;
-        }
-        return true;
-    };
-
-    const getRoomFreeWindow = (roomId: string, searchStart: string, searchEnd: string) => {
-        const occupied = contracts
-            .filter(c => c.status !== 'cancelled')
-            .flatMap(c => {
-                const periods: { start: string; end: string }[] = [];
-                if (c.main_room_id === roomId && c.main_start_date && c.main_end_date)
-                    periods.push({ start: c.main_start_date, end: c.main_end_date });
-                if (c.temp_room_id === roomId && c.temp_start_date && c.temp_end_date)
-                    periods.push({ start: c.temp_start_date, end: c.temp_end_date });
-                if (c.move_to_room_id === roomId && c.move_start_date && c.move_end_date)
-                    periods.push({ start: c.move_start_date, end: c.move_end_date });
-                return periods;
-            })
-            .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-
-        let freeStart = '2000-01-01';
-        let freeEnd = '2099-12-31';
-
-        for (const occ of occupied) {
-            if (new Date(occ.end) < new Date(searchStart)) {
-                const d = new Date(occ.end);
-                d.setDate(d.getDate() + 1);
-                freeStart = d.toISOString().split('T')[0];
-            } else if (new Date(occ.start) > new Date(searchEnd)) {
-                const d = new Date(occ.start);
-                d.setDate(d.getDate() - 1);
-                freeEnd = d.toISOString().split('T')[0];
-                break;
-            }
-        }
-
-        return { start: freeStart, end: freeEnd };
-    };
+    // availability helpers moved to src/lib/availability.ts
 
     const formatDateTH = (dateStr: string) => {
         if (!dateStr || dateStr === '2000-01-01' || dateStr === '2099-12-31') return null;
@@ -880,6 +831,8 @@ export default function BookingsPage() {
 
     const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all";
     const labelCls = "block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2";
+    const isRenewalMode = Boolean(createForm.parent_contract_id);
+    const renewalRoom = rooms.find((r: any) => r.id === createForm.main_room_id);
 
     // ── Shared room selector for create modal ──
     const renderCreateRoomSelector = () => {
@@ -895,7 +848,7 @@ export default function BookingsPage() {
         }
 
         const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
-        const availableRooms = rooms.filter(r => isRoomAvailable(r.id, start, end));
+        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, start, end));
         const perfectMatchRooms = availableRooms.filter(r => {
             const isMatch = (prefVal: any, roomVal: any) => {
                 if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
@@ -956,7 +909,7 @@ export default function BookingsPage() {
             if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
             return prefVal === roomVal;
         };
-        const availableRooms = rooms.filter(r => r.id !== createForm.main_room_id && isRoomAvailable(r.id, start, end) && applyRoomFilters(r));
+        const availableRooms = rooms.filter(r => r.id !== createForm.main_room_id && isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
         const perfectMatchRooms = availableRooms.filter(r =>
             isMatch(customerPref.room_type, r.room_type) &&
             isMatch(customerPref.kitchen_type, r.kitchen_type) &&
@@ -974,7 +927,7 @@ export default function BookingsPage() {
 
         const RoomCard = ({ room, isMatchRoom }: { room: any; isMatchRoom: boolean }) => {
             const isSelected = createForm.temp_room_id === room.id;
-            const fw = getRoomFreeWindow(room.id, start, end);
+            const fw = getRoomFreeWindow(contracts, room.id, start, end);
             const fmtDate = (d: string) => formatDateTH(d);
 
             return (
@@ -1539,7 +1492,7 @@ export default function BookingsPage() {
                                             <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-5 relative">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setCreateForm({ ...createForm, has_temp_room: false, temp_room_id: '' })}
+                                                    onClick={() => setCreateForm({ ...createForm, has_temp_room: false, temp_room_id: '', temp_start_date: '', temp_end_date: '' })}
                                                     className="absolute top-4 right-4 text-xs px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-xl font-semibold hover:bg-red-50 transition-colors"
                                                 >
                                                     ยกเลิก
@@ -1599,7 +1552,7 @@ export default function BookingsPage() {
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">เลือกห้องพักหลัก</p>
                                             <p className="text-sm text-slate-500">ดูห้องว่างในช่วงสัญญาได้ที่นี่</p>
                                         </div>
-                                        {createForm.main_room_id && (
+                                        {!isRenewalMode && createForm.main_room_id && (
                                             <button
                                                 type="button"
                                                 onClick={moveCreateMainToTemp}
@@ -1610,77 +1563,29 @@ export default function BookingsPage() {
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-5">
-                                        <div>
-                                            <label className={labelCls}>ตึก</label>
-                                            <select
-                                                className={inputCls}
-                                                value={roomFilters.building}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, building: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกตึก --</option>
-                                                {buildingOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
+                                    {isRenewalMode ? (
+                                        <div className="rounded-2xl border border-blue-200/60 bg-blue-50 p-6">
+                                            <p className="text-sm font-semibold text-slate-700">ห้องเก่าที่ต่อสัญญา</p>
+                                            {renewalRoom ? (
+                                                <>
+                                                    <p className="mt-3 text-3xl font-bold text-blue-900">ห้อง {renewalRoom.room_number}</p>
+                                                    <p className="mt-2 text-sm text-blue-600">
+                                                        {[renewalRoom.room_type, renewalRoom.view_direction ? `วิว${renewalRoom.view_direction}` : null, renewalRoom.kitchen_type ? `ครัว${renewalRoom.kitchen_type}` : null]
+                                                            .filter(Boolean)
+                                                            .join(' · ')}
+                                                    </p>
+                                                    <p className="mt-4 text-sm text-slate-600">ห้องนี้ถูกล็อกไว้สำหรับการต่อสัญญาใหม่ ไม่ต้องเลือกห้องเพิ่มเติม</p>
+                                                </>
+                                            ) : (
+                                                <p className="mt-3 text-sm text-slate-600">ไม่พบข้อมูลห้องเดิม โปรดตรวจสอบข้อมูลสัญญา</p>
+                                            )}
                                         </div>
-                                        <div>
-                                            <label className={labelCls}>ชั้น</label>
-                                            <select
-                                                className={inputCls}
-                                                value={roomFilters.floor}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, floor: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกชั้น --</option>
-                                                {floorOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>ประเภทห้อง</label>
-                                            <select
-                                                className={inputCls}
-                                                value={roomFilters.room_type}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกประเภทห้อง --</option>
-                                                {roomTypeOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>ประเภทครัว</label>
-                                            <select
-                                                className={inputCls}
-                                                value={roomFilters.kitchen}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกประเภทครัว --</option>
-                                                {kitchenOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>ค้นหา</label>
-                                            <input
-                                                type="text"
-                                                className={inputCls}
-                                                placeholder="ค้นหาเลขห้อง หรือ ประเภท"
-                                                value={roomFilters.search}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, search: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {createForm.contract_start_date && createForm.contract_end_date ? (
+                                    ) : createForm.contract_start_date && createForm.contract_end_date ? (
                                         (() => {
                                             const start = createForm.main_start_date || createForm.contract_start_date;
                                             const end = createForm.main_end_date || createForm.contract_end_date;
                                             const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
-                                            const availableRooms = rooms.filter(r => isRoomAvailable(r.id, start, end) && applyRoomFilters(r));
+                                            const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
                                             const isMatch = (prefVal: any, roomVal: any) => {
                                                 if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
                                                 return prefVal === roomVal;
@@ -1702,7 +1607,7 @@ export default function BookingsPage() {
 
                                             const RoomCard = ({ room, isMatchRoom }: { room: any; isMatchRoom: boolean }) => {
                                                 const isSelected = createForm.main_room_id === room.id;
-                                                const fw = getRoomFreeWindow(room.id, start, end);
+                                                const fw = getRoomFreeWindow(contracts, room.id, start, end);
                                                 const fmtDate = (d: string) => formatDateTH(d);
 
                                                 return (
@@ -1757,7 +1662,6 @@ export default function BookingsPage() {
                                                     </div>
                                                     {perfectMatchRooms.length > 0 && (
                                                         <div>
-                                                            {/* <p className="text-[11px] font-bold text-amber-600 mb-2">⭐ ตรงสเปกลูกค้า</p> */}
                                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                                                                 {perfectMatchRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={true} />)}
                                                             </div>
@@ -1957,7 +1861,7 @@ export default function BookingsPage() {
                                     <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-5 relative">
                                         <button
                                             type="button"
-                                            onClick={() => setEditForm({ ...editForm, has_temp_room: false, temp_room_id: null })}
+                                            onClick={() => setEditForm({ ...editForm, has_temp_room: false, temp_room_id: null, temp_start_date: null, temp_end_date: null })}
                                             className="absolute top-4 right-4 text-xs px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-xl font-semibold hover:bg-red-50 transition-colors"
                                         >
                                             ยกเลิก
@@ -2041,7 +1945,7 @@ export default function BookingsPage() {
                                             </p>
                                         ) : (() => {
                                             const customerPref = waitlists.find(w => w.name === editForm.tenant_name) || {};
-                                            const availableRooms = rooms.filter(r => isRoomAvailable(r.id, editForm.main_start_date, editForm.main_end_date, editForm.id));
+                                            const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id));
                                             const perfectMatchRooms = availableRooms.filter(r => {
                                                 const isMatch = (prefVal: any, roomVal: any) => {
                                                     if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
@@ -2243,7 +2147,7 @@ export default function BookingsPage() {
                                         </p>
                                     ) : (() => {
                                         const customerPref = waitlists.find(w => w.name === editForm.tenant_name) || {};
-                                        const availableRooms = rooms.filter(r => isRoomAvailable(r.id, editForm.main_start_date, editForm.main_end_date, editForm.id) && applyRoomFilters(r));
+                                        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id) && applyRoomFilters(r));
                                         const isMatch = (prefVal: any, roomVal: any) => {
                                             if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
                                             return prefVal === roomVal;
@@ -2356,7 +2260,7 @@ export default function BookingsPage() {
                                             ⚠️ กรุณาระบุวันที่ย้ายก่อนเพื่อดูห้องว่าง
                                         </p>
                                     ) : (() => {
-                                        const availableRooms = rooms.filter(r => isRoomAvailable(r.id, editForm.move_start_date, editForm.move_end_date, editForm.id) && applyRoomFilters(r));
+                                        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.move_start_date, editForm.move_end_date, editForm.id) && applyRoomFilters(r));
                                         return availableRooms.length > 0 ? (
                                             <>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">

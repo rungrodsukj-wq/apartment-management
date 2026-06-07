@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
+import { getRoomOccupancyIntervals, getRoomAvailability, getNextAvailableDate, getRoomAvailabilityText } from '../../../lib/availability';
 import { useAuth } from '../../../context/AuthContext';
 import { canEdit } from '../../../lib/permissions';
 import { logAudit, describeChanges } from '../../../lib/audit';
@@ -31,6 +32,7 @@ interface Room {
 }
 
 interface Contract {
+    id?: string;
     main_room_id?: string;
     main_start_date?: string;
     main_end_date?: string;
@@ -54,6 +56,7 @@ export default function AllocateRoomPage() {
     const [waitlist, setWaitlist] = useState<Waitlist | null>(null);
     const [rooms, setRooms] = useState<Room[]>([]);
     const [allContracts, setAllContracts] = useState<Contract[]>([]);
+    const [intentions, setIntentions] = useState<any[]>([]);
 
     const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
     const [assignAs, setAssignAs] = useState<'main' | 'temp'>('main');
@@ -134,98 +137,13 @@ export default function AllocateRoomPage() {
             .neq('status', 'cancelled');
         if (cData) setAllContracts(cData);
 
+        const { data: iData } = await supabase.from('renewal_intentions').select('*');
+        if (iData) setIntentions(iData);
+
         setLoading(false);
     }
 
-    const getRoomOccupancyIntervals = (roomId: string, contracts: Contract[]) => {
-        const intervals: { start: Date, end: Date }[] = [];
-
-        contracts.forEach(c => {
-            if (c.main_room_id === roomId) {
-                const s = c.main_start_date || c.actual_check_in_date || c.contract_start_date;
-                const e = c.contract_end_date || c.main_end_date;
-                if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
-            }
-            if (c.temp_room_id === roomId) {
-                const s = c.temp_start_date;
-                const e = c.temp_end_date;
-                if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
-            }
-            if (c.move_to_room_id === roomId) {
-                const s = c.move_start_date;
-                const e = c.contract_end_date || c.move_end_date;
-                if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
-            }
-        });
-
-        return intervals;
-    };
-
-    const getRoomAvailability = (roomId: string, targetDateStr: string) => {
-        const intervals = getRoomOccupancyIntervals(roomId, allContracts);
-
-        intervals.sort((a, b) => a.start.getTime() - b.start.getTime());
-        const merged: { start: Date, end: Date }[] = [];
-        intervals.forEach(curr => {
-            if (merged.length === 0) {
-                merged.push({ ...curr });
-            } else {
-                const prev = merged[merged.length - 1];
-                if (curr.start <= prev.end) {
-                    if (curr.end > prev.end) prev.end = curr.end;
-                } else {
-                    merged.push({ ...curr });
-                }
-            }
-        });
-
-        let availableFrom: Date;
-        let availableUntil: Date | null = null;
-        const target = new Date(targetDateStr);
-
-        const overlapping = merged.find(i => target >= i.start && target < i.end);
-
-        if (overlapping) {
-            availableFrom = new Date(overlapping.end);
-            const next = merged.find(i => i.start > availableFrom);
-            availableUntil = next ? new Date(next.start) : null;
-        } else {
-            const prev = [...merged].reverse().find(i => i.end <= target);
-            availableFrom = prev ? new Date(prev.end) : new Date(0);
-            const next = merged.find(i => i.start > target);
-            availableUntil = next ? new Date(next.start) : null;
-        }
-
-        return { availableFrom, availableUntil };
-    };
-
-    const getNextAvailableDate = (roomId: string, requestedStart: string) => {
-        const intervals = getRoomOccupancyIntervals(roomId, allContracts);
-        let currentStart = new Date(requestedStart);
-
-        intervals.sort((a, b) => a.start.getTime() - b.start.getTime());
-
-        for (const interval of intervals) {
-            if (currentStart >= interval.start && currentStart < interval.end) {
-                currentStart = new Date(interval.end);
-            }
-        }
-
-        const yyyy = currentStart.getFullYear();
-        const mm = String(currentStart.getMonth() + 1).padStart(2, '0');
-        const dd = String(currentStart.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
-    };
-
-    const getRoomAvailabilityText = (roomId: string, targetDateStr: string) => {
-        const { availableFrom, availableUntil } = getRoomAvailability(roomId, targetDateStr);
-
-        const formatD = (d: Date) => d.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
-        const fromStr = availableFrom.getTime() === 0 || availableFrom <= new Date() ? 'ปัจจุบัน' : formatD(availableFrom);
-        const untilStr = availableUntil ? formatD(availableUntil) : 'ไม่มีกำหนด';
-
-        return `ว่าง : ${fromStr} - ${untilStr}`;
-    };
+    
 
     const getSearchStartDate = () => {
         if (assignAs === 'main' && tempContractId && tempEndDate) {
@@ -239,12 +157,12 @@ export default function AllocateRoomPage() {
         setIsSubmitting(true);
 
         const referenceStart = assignAs === 'main' && tempContractId && tempEndDate ? tempEndDate : waitlist.start_date;
-        const { availableFrom } = getRoomAvailability(selectedRoomId, referenceStart);
+        const { availableFrom } = getRoomAvailability(allContracts, selectedRoomId, referenceStart);
         const reqStart = new Date(referenceStart);
         const isLate = reqStart < availableFrom;
 
         const finalMainStartDate = isLate
-            ? getNextAvailableDate(selectedRoomId, referenceStart)
+            ? getNextAvailableDate(allContracts, selectedRoomId, referenceStart)
             : (assignAs === 'main' && tempContractId && tempEndDate ? referenceStart : actualCheckInDate);
 
         const basePayload: any = {
@@ -344,10 +262,43 @@ export default function AllocateRoomPage() {
 
     const searchStartDate = getSearchStartDate();
 
+    // Build locked rooms set: any contract that ends on/after searchStartDate and
+    // whose intention is missing or not 'not_renew' will lock the associated room(s).
+    const lockedRoomIds = (() => {
+        const locked = new Set<string>();
+        if (!searchStartDate) return locked;
+
+        const byContract: Record<string, any> = {};
+        intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
+
+        for (const c of allContracts) {
+            const roomIds = [c.main_room_id, c.temp_room_id, c.move_to_room_id].filter(Boolean) as string[];
+            if (roomIds.length === 0) continue;
+
+            const endDate = c.contract_end_date || c.main_end_date || c.temp_end_date || c.move_end_date;
+            if (!endDate) continue;
+            if (endDate < searchStartDate) continue;
+
+            const intent = c.id ? byContract[c.id] : undefined;
+            if (!intent || intent.intention !== 'not_renew') {
+                roomIds.forEach(rid => locked.add(rid));
+            }
+        }
+
+        for (const intent of intentions) {
+            if (intent.room_id) {
+                if (!intent.intention || intent.intention !== 'not_renew') locked.add(intent.room_id);
+            }
+        }
+
+        return locked;
+    })();
+
     const matchedRooms = rooms.filter(r =>
         (!waitlist.room_type || waitlist.room_type === 'ไม่ระบุ' || r.room_type === waitlist.room_type) &&
         (!waitlist.kitchen_type || waitlist.kitchen_type === 'ไม่ระบุ' || r.kitchen_type === waitlist.kitchen_type) &&
-        (!waitlist.view_preference || waitlist.view_preference === 'ไม่ระบุ' || r.view_direction === waitlist.view_preference)
+        (!waitlist.view_preference || waitlist.view_preference === 'ไม่ระบุ' || r.view_direction === waitlist.view_preference) &&
+        !lockedRoomIds.has(r.id)
     );
 
     const perfectMatches: Room[] = [];
@@ -355,7 +306,7 @@ export default function AllocateRoomPage() {
     const availableLaterMatches: Room[] = [];
 
     matchedRooms.forEach(room => {
-        const { availableFrom, availableUntil } = getRoomAvailability(room.id, searchStartDate);
+        const { availableFrom, availableUntil } = getRoomAvailability(allContracts, room.id, searchStartDate);
         const reqStart = new Date(searchStartDate);
         const reqEnd = new Date(waitlist.end_date);
 
@@ -370,7 +321,8 @@ export default function AllocateRoomPage() {
 
     const otherRooms = rooms.filter(r => !matchedRooms.some(m => m.id === r.id));
     const alternativeMatches = otherRooms.filter(r => {
-        const { availableFrom } = getRoomAvailability(r.id, searchStartDate);
+        if (lockedRoomIds.has(r.id)) return false;
+        const { availableFrom } = getRoomAvailability(allContracts, r.id, searchStartDate);
         const reqStart = new Date(searchStartDate);
         return reqStart >= availableFrom;
     });
@@ -380,7 +332,7 @@ export default function AllocateRoomPage() {
     let expireDateStr = '';
 
     if (selectedRoomId) {
-        const { availableFrom, availableUntil } = getRoomAvailability(selectedRoomId, searchStartDate);
+        const { availableFrom, availableUntil } = getRoomAvailability(allContracts, selectedRoomId, searchStartDate);
         const reqStart = new Date(searchStartDate);
         const reqEnd = new Date(waitlist.end_date);
 
@@ -464,7 +416,7 @@ export default function AllocateRoomPage() {
                                         <span>🧭 {room.view_direction}</span>
                                     </div>
                                     <div className="text-xs font-semibold text-gray-600 mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex items-center gap-1.5 w-full">
-                                        📅 {getRoomAvailabilityText(room.id, searchStartDate)}
+                                        📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
                                     </div>
                                 </div>
                             )) : (
@@ -482,7 +434,7 @@ export default function AllocateRoomPage() {
                             </h2>
                             <div className="space-y-3">
                                 {partialMatches.map(room => {
-                                    const { availableUntil } = getRoomAvailability(room.id, waitlist.start_date);
+                                    const { availableUntil } = getRoomAvailability(allContracts, room.id, waitlist.start_date);
                                     return (
                                         <div
                                             key={room.id}
@@ -502,7 +454,7 @@ export default function AllocateRoomPage() {
                                                 <span>🧭 {room.view_direction}</span>
                                             </div>
                                             <div className="text-xs font-semibold text-yellow-800 mt-3 bg-yellow-50 p-2 rounded-lg border border-yellow-100 inline-flex items-center gap-1.5 w-full">
-                                                📅 {getRoomAvailabilityText(room.id, searchStartDate)}
+                                                📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
                                             </div>
                                         </div>
                                     );
@@ -533,7 +485,7 @@ export default function AllocateRoomPage() {
                                         <span className={waitlist.view_preference && waitlist.view_preference !== 'ไม่ระบุ' && waitlist.view_preference !== room.view_direction ? 'text-red-500' : ''}>🧭 {room.view_direction}</span>
                                     </div>
                                     <div className="text-xs font-semibold text-gray-600 mt-3 bg-white p-2 rounded-lg border border-gray-200 inline-flex items-center gap-1.5 w-full">
-                                        📅 {getRoomAvailabilityText(room.id, searchStartDate)}
+                                                📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
                                     </div>
                                 </div>
                             )) : (
@@ -550,7 +502,7 @@ export default function AllocateRoomPage() {
                         </h2>
                         <div className="space-y-3">
                             {availableLaterMatches.length > 0 ? availableLaterMatches.map(room => {
-                                const nextAvailDate = getNextAvailableDate(room.id, waitlist.start_date);
+                                const nextAvailDate = getNextAvailableDate(allContracts, room.id, waitlist.start_date);
                                 return (
                                     <div
                                         key={room.id}
@@ -570,7 +522,7 @@ export default function AllocateRoomPage() {
                                             <span>🧭 {room.view_direction}</span>
                                         </div>
                                         <div className="text-xs font-semibold text-orange-800 mt-3 bg-orange-50/50 p-2 rounded-lg border border-orange-100 inline-flex items-center gap-1.5 w-full">
-                                            📅 {getRoomAvailabilityText(room.id, searchStartDate)}
+                                            📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
                                         </div>
                                     </div>
                                 );

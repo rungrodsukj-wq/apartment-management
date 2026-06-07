@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { isOverlap, isRoomAvailable } from '../../lib/availability';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -42,58 +43,12 @@ export default function AvailableRoomsPage() {
         setLoading(false);
     }
 
-    const isOverlap = (start1: string, end1: string, start2: string, end2: string) => {
-        if (!start1 || !end1 || !start2 || !end2) return false;
-        return new Date(start1) < new Date(end2) && new Date(start2) < new Date(end1);
-    };
-
-    const isRoomAvailable = (roomId: string, checkStart: string, checkEnd: string) => {
-        for (const c of contracts) {
-            if (c.main_room_id === roomId && isOverlap(checkStart, checkEnd, c.main_start_date, c.main_end_date)) return false;
-            if (c.temp_room_id === roomId && isOverlap(checkStart, checkEnd, c.temp_start_date, c.temp_end_date)) return false;
-            if (c.move_to_room_id === roomId && isOverlap(checkStart, checkEnd, c.move_start_date, c.move_end_date)) return false;
-        }
-        return true;
-    };
-
     const calculateEndDate = (startDate: string) => {
         const start = new Date(startDate);
         const end = new Date(start);
         end.setFullYear(start.getFullYear() + 1);
         end.setDate(end.getDate() - 1);
         return end.toISOString().split('T')[0];
-    };
-
-    const getRoomFreeWindow = (roomId: string, searchStart: string, searchEnd: string) => {
-        const occupied = contracts
-            .flatMap(c => {
-                const periods: { start: string; end: string }[] = [];
-                if (c.main_room_id === roomId && c.main_start_date && c.main_end_date)
-                    periods.push({ start: c.main_start_date, end: c.main_end_date });
-                if (c.temp_room_id === roomId && c.temp_start_date && c.temp_end_date)
-                    periods.push({ start: c.temp_start_date, end: c.temp_end_date });
-                if (c.move_to_room_id === roomId && c.move_start_date && c.move_end_date)
-                    periods.push({ start: c.move_start_date, end: c.move_end_date });
-                return periods;
-            })
-            .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-
-        let freeStart = '2000-01-01';
-        let freeEnd = '2099-12-31';
-
-        for (const occ of occupied) {
-            if (new Date(occ.end) < new Date(searchStart)) {
-                const d = new Date(occ.end);
-                d.setDate(d.getDate() + 1);
-                freeStart = d.toISOString().split('T')[0];
-            } else if (new Date(occ.start) > new Date(searchEnd)) {
-                const d = new Date(occ.start);
-                d.setDate(d.getDate() - 1);
-                freeEnd = d.toISOString().split('T')[0];
-                break;
-            }
-        }
-        return { start: freeStart, end: freeEnd };
     };
 
     const formatDateTH = (dateStr: string) => {
@@ -106,31 +61,48 @@ export default function AvailableRoomsPage() {
     const checkStart = `${selectedYear}-${pad(selectedMonth)}-01`;
     const checkEnd = calculateEndDate(checkStart);
 
-    // Build a set of room IDs that are locked due to renewal intention (pending or renew)
-    // A room is locked if there's an active/upcoming contract for it ending after checkStart,
-    // and the intention is pending or renew (not confirmed to leave).
+    // Build a set of room IDs that are locked because an existing contract
+    // could reserve the room (tenant didn't explicitly mark 'not_renew').
+    // Rule: any contract tied to a room that ends on/after `checkStart` and
+    // whose renewal intention is missing or !== 'not_renew' should lock the room.
     const lockedRoomIds = useMemo(() => {
         const locked = new Set<string>();
-        for (const intent of intentions) {
-            if (intent.intention === 'pending' || intent.intention === 'not_asked' || intent.intention === 'renew' || intent.intention === 'renew_no_room') {
-                // Find the associated contract to check its end date overlaps our check window
-                const contract = contracts.find(c => c.id === intent.contract_id);
-                if (contract && contract.main_room_id) {
-                    // Only lock if the contract end date is within or after our check period
-                    if (contract.contract_end_date && contract.contract_end_date >= checkStart) {
-                        locked.add(contract.main_room_id);
-                    }
-                } else if (intent.room_id) {
-                    locked.add(intent.room_id);
-                }
+
+        // Index intentions by contract id for quick lookup
+        const byContract: Record<string, any> = {};
+        intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
+
+        for (const c of contracts) {
+            // consider main, temp and move_to room assignments
+            const roomIds = [c.main_room_id, c.temp_room_id, c.move_to_room_id].filter(Boolean) as string[];
+            if (roomIds.length === 0) continue;
+
+            // determine contract end date to compare with our window
+            const endDate = c.contract_end_date || c.main_end_date || c.temp_end_date || c.move_end_date;
+            if (!endDate) continue;
+            if (endDate < checkStart) continue;
+
+            const intent = byContract[c.id];
+            // lock if no intention or intention is not 'not_renew'
+            if (!intent || intent.intention !== 'not_renew') {
+                roomIds.forEach(rid => locked.add(rid));
             }
         }
+
+        // also include any explicit intention that references a room directly
+        for (const intent of intentions) {
+            if (intent.room_id) {
+                // if intention exists and is not 'not_renew', lock it
+                if (!intent.intention || intent.intention !== 'not_renew') locked.add(intent.room_id);
+            }
+        }
+
         return locked;
     }, [intentions, contracts, checkStart]);
 
     const summary = useMemo(() => {
         // Exclude locked rooms (pending/renew intention) from available rooms
-        const availableRooms = rooms.filter(r => isRoomAvailable(r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
+        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
         const overlappingWaitlists = waitlists.filter(w => isOverlap(checkStart, checkEnd, w.start_date, w.end_date));
 
         const roomTypes = [...new Set(rooms.map(r => r.room_type).filter(Boolean))];
@@ -191,7 +163,7 @@ export default function AvailableRoomsPage() {
         ];
 
         // Also exclude locked rooms in the matrix
-        const availableRooms = rooms.filter(r => isRoomAvailable(r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
+                const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
         const overlappingWaitlists = waitlists.filter(w => isOverlap(checkStart, checkEnd, w.start_date, w.end_date));
 
         return rowTypes.map(rt => {

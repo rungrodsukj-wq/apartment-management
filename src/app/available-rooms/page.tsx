@@ -102,19 +102,105 @@ export default function AvailableRoomsPage() {
         return locked;
     }, [intentions, contracts, checkStart]);
 
-    const overlappingWaitlists = waitlists.filter(w => {
-        if (!w.start_date) return false;
-        
-        const waitlistDate = new Date(w.start_date);
-        const targetDate = new Date(checkStart);
-        
-        // 🎯 แปลงให้อยู่ในรูป "จำนวนเดือนสะสม" เพื่อเทียบเดือนและปี
-        const wValue = waitlistDate.getFullYear() * 12 + waitlistDate.getMonth(); // เดือนของคิวจอง
-        const tValue = targetDate.getFullYear() * 12 + targetDate.getMonth();   // เดือนของรอบบิลที่เลือกดู
-        
-        // ให้คืนค่า true เฉพาะคิวจองที่ตรงกับเดือนและปีของรอบบิลที่เลือกพอดีเท่านั้น
-        return wValue === tValue;
-    });
+    const overlappingWaitlists = useMemo(() => {
+        // ฟังก์ชันช่วยจัดกลุ่มคิวจองให้ตรงกับ 5 ช่องในตารางเป๊ะๆ
+        const getBucket = (k: string | null | undefined, v: string | null | undefined) => {
+            if (k === 'ครัวหน้า' && v === 'ทิศตะวันตก') return 'frontWest';
+            if (k === 'ครัวหน้า' && v === 'ทิศตะวันออก') return 'frontEast';
+            if (k === 'ครัวหลัง' && v === 'ทิศตะวันตก') return 'backWest';
+            if (k === 'ครัวหลัง' && v === 'ทิศตะวันออก') return 'backEast';
+            return 'unspecified';
+        };
+
+        // 1. หาเดือน/ปีที่เก่าที่สุดที่มีคนยังรอคิวอยู่ เพื่อเป็นจุดเริ่มต้นการคำนวณ
+        let minYear = selectedYear;
+        let minMonth = selectedMonth;
+        waitlists.forEach(w => {
+            if (!w.start_date) return;
+            const d = new Date(w.start_date);
+            const y = d.getFullYear();
+            const m = d.getMonth() + 1;
+            if (y < minYear || (y === minYear && m < minMonth)) {
+                minYear = y;
+                minMonth = m;
+            }
+        });
+
+        let currY = minYear;
+        let currM = minMonth;
+
+        // ตัวแปรเก็บ "รายชื่อคนที่ยังไม่ได้ห้อง" เพื่อย้ายข้ามเดือน
+        let carriedOverWaitlists: any[] = [];
+
+        // 2. วนลูปจำลองแจกห้องตั้งแต่อดีต มาหยุดที่ "เดือนก่อนหน้า" เดือนที่เลือกดู
+        while (currY < selectedYear || (currY === selectedYear && currM < selectedMonth)) {
+            const checkStartStr = `${currY}-${pad(currM)}-01`;
+            const checkEndStr = calculateEndDate(currY, currM);
+
+            // หาห้องว่างทั้งหมดในเดือนอดีตนั้น
+            const monthAvailable = roomsL.filter(r => 
+                isRoomAvailable(contracts, intentions, r.id, checkStartStr, checkEndStr) &&
+                !lockedRoomIds.has(r.id)
+            );
+
+            // หาคิวใหม่ที่เกิดขึ้นในเดือนอดีตนั้น
+            const monthWaitlists = waitlists.filter(w => {
+                if (!w.start_date) return false;
+                const d = new Date(w.start_date);
+                return d.getFullYear() === currY && (d.getMonth() + 1) === currM;
+            });
+
+            // ความต้องการรวม = คิวตกค้างที่ยกมา + คิวใหม่ในเดือนนั้น
+            const currentDemand = [...carriedOverWaitlists, ...monthWaitlists];
+            let nextCarryOver: any[] = [];
+
+            const roomTypes = ['One Bedroom', 'One Bedroom Exclusive', 'One Bedroom Suite', 'Triple Bedroom'];
+            const buckets = ['frontWest', 'frontEast', 'backWest', 'backEast', 'unspecified'];
+
+            // 3. แจกแจงคิวตามสเปคเป๊ะๆ (Room Type + Kitchen + View)
+            roomTypes.forEach(rt => {
+                buckets.forEach(bucket => {
+                    // ดึงเฉพาะคนที่รอคิวสเปคนี้
+                    const matchedWaitlists = currentDemand.filter(w => w.room_type === rt && getBucket(w.kitchen_type, w.view_preference) === bucket);
+                    
+                    if (matchedWaitlists.length > 0) {
+                        let supply = 0;
+                        if (bucket === 'unspecified') {
+                            supply = monthAvailable.filter(r => r.room_type === rt && !r.kitchen_type && !r.view_direction).length;
+                        } else {
+                            const isFront = bucket.includes('front') ? 'ครัวหน้า' : 'ครัวหลัง';
+                            const isWest = bucket.includes('West') ? 'ทิศตะวันตก' : 'ทิศตะวันออก';
+                            supply = monthAvailable.filter(r => r.room_type === rt && (r.kitchen_type || null) === isFront && (r.view_direction || null) === isWest).length;
+                        }
+
+                        // 🎯 ทริคสำคัญ: ถ้าคิวรอ (เช่น 3 คน) มีมากกว่า ห้องว่าง (เช่น 1 ห้อง)
+                        // แปลว่า 2 คนหลังจะ "ไม่ได้ห้อง" ให้จับ 2 คนนี้ยัดใส่ตะกร้าตกค้างไปยังเดือนถัดไป
+                        if (matchedWaitlists.length > supply) {
+                            nextCarryOver.push(...matchedWaitlists.slice(supply));
+                        }
+                    }
+                });
+            });
+
+            carriedOverWaitlists = nextCarryOver; // ส่งคิวตกค้างข้ามไปวงลูปเดือนหน้า
+
+            currM++;
+            if (currM > 12) {
+                currM = 1;
+                currY++;
+            }
+        }
+
+        // 4. เมื่อวงลูปวิ่งมาจนถึง "เดือนปัจจุบันที่เลือกดู" เราจะนำคิวตกค้างจากข้อ 3 มารวมกับคิวเดือนปัจจุบัน
+        const targetWaitlists = waitlists.filter(w => {
+            if (!w.start_date) return false;
+            const d = new Date(w.start_date);
+            return d.getFullYear() === selectedYear && (d.getMonth() + 1) === selectedMonth;
+        });
+
+        return [...carriedOverWaitlists, ...targetWaitlists];
+
+    }, [waitlists, contracts, intentions, roomsL, lockedRoomIds, selectedYear, selectedMonth]);
 
     const matrixData = useMemo(() => {
         const rowTypes = [

@@ -70,15 +70,29 @@ export const isRoomAvailable = (
         }
     }
 
-    // 🎯 LOGIC ใหม่: บังคับห้องว่างแบบ Month-to-Month (ป้องกันฟันหลอ)
+    // 🎯 LOGIC ใหม่: ทบยอดห้องว่างเฉพาะเดือนที่ "ผ่านไปแล้วในโลกจริง"
     if (latestEndStr) {
-        const expectedEnd = new Date(checkStart);
-        expectedEnd.setDate(expectedEnd.getDate() - 1); // ถอยหลัง 1 วัน (เช่น เข้าพัก 1 ก.ย. ต้องหมดสัญญา 31 ส.ค.)
-        
+        const targetStart = new Date(checkStart);
         const latestEnd = new Date(latestEndStr);
+        const today = new Date();
         
-        // ถ้าเดือนและปีของสัญญาที่เพิ่งหมด ไม่ตรงกับเดือนก่อนหน้าที่จะเข้าพัก -> ข้ามห้องนี้ไปเลย
-        if (latestEnd.getMonth() !== expectedEnd.getMonth() || latestEnd.getFullYear() !== expectedEnd.getFullYear()) {
+        // หาวันสิ้นเดือนของเดือนก่อนหน้า (เพื่อเป็นเกณฑ์โควต้าปกติ)
+        const expectedEnd = new Date(targetStart);
+        expectedEnd.setDate(expectedEnd.getDate() - 1); 
+        
+        expectedEnd.setHours(0, 0, 0, 0);
+        latestEnd.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        
+        // 1. โควต้าปกติ: ห้องหมดสัญญาเดือนก่อนหน้าเป๊ะๆ (เช่น ดู ส.ค. ห้องต้องหมด ก.ค.)
+        const isNormalQuota = latestEnd.getMonth() === expectedEnd.getMonth() && 
+                              latestEnd.getFullYear() === expectedEnd.getFullYear();
+        
+        // 2. โควต้าตกค้าง: ห้องหมดสัญญาก่อนหน้านั้น **และ** วันที่หมดสัญญา "ผ่านพ้นวันปัจจุบัน" มาแล้ว
+        const isLeftover = latestEnd < expectedEnd && latestEnd < today;
+        
+        // ถ้าไม่เข้าเงื่อนไขเลย (เช่น เป็นของเดือนในอนาคต หรือเป็นของเดือนที่ยังไม่ถึงในโลกจริง) -> ซ่อนห้องนี้
+        if (!isNormalQuota && !isLeftover) {
             return false; 
         }
     }

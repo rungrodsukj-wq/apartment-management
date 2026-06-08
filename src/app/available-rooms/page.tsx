@@ -106,12 +106,21 @@ export default function AvailableRoomsPage() {
         const overlappingWaitlists = waitlists.filter(w => {
             if (!w.start_date) return false;
             
-            const waitlistStart = new Date(w.start_date);
-            const targetStart = new Date(checkStart);
+            const waitlistDate = new Date(w.start_date);
+            const targetDate = new Date(checkStart); // รอบบิลที่กำลังดูข้อมูล
+            const today = new Date(); // วันที่ปัจจุบันในโลกจริง
+            today.setHours(0, 0, 0, 0); // รีเซ็ตเวลาให้เหลือแต่วันที่
             
-            // ดึงมาเฉพาะ Waitlist ที่มีคิวเข้าพัก "เดือนและปี" ตรงกับรอบบิลที่เลือกเท่านั้น
-            return waitlistStart.getMonth() === targetStart.getMonth() && 
-                waitlistStart.getFullYear() === targetStart.getFullYear();
+            // 1. คิวตรงรอบพอดี (Month-to-Month) เช่น ดูเดือน ก.ค. คิวก็เป็นของ ก.ค.
+            const isThisMonth = waitlistDate.getMonth() === targetDate.getMonth() && 
+                               waitlistDate.getFullYear() === targetDate.getFullYear();
+            
+            // 2. คิวตกค้าง (Rollover): ต้องเก่ากว่าเดือนที่กำลังดูข้อมูล **และ** ต้องเก่ากว่าวันนี้จริงๆ
+            const isPastMonth = waitlistDate < targetDate;
+            const isPassedInRealLife = waitlistDate < today; 
+            
+            // ดึงมาแสดงถ้าเป็นคิวเดือนนี้ หรือ เป็นคิวตกค้างที่เลยวันปัจจุบันมาแล้ว
+            return isThisMonth || (isPastMonth && isPassedInRealLife);
         });
 
         return rowTypes.map(rt => {

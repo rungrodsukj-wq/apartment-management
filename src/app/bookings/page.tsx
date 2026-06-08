@@ -831,8 +831,10 @@ export default function BookingsPage() {
         if (!intentionObj) return null;
 
         const config: any = {
+            not_asked: { label: 'ยังไม่สอบถาม', color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-300', icon: '❔' },
             pending: { label: 'รอตอบกลับ', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', icon: '⏳' },
-            renew: { label: 'ต่อสัญญา', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300', icon: '✅' },
+            renew: { label: 'ต่อสัญญาห้องเดิม', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300', icon: '✅' },
+            renew_no_room: { label: 'ต่อสัญญาไม่ระบุห้อง', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', icon: '🔄' },
             not_renew: { label: 'ไม่ต่อสัญญา', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-300', icon: '🚪' },
         };
 

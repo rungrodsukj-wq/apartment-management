@@ -25,11 +25,13 @@ export const isRoomAvailable = (
 ) => {
     if (!checkStart || !checkEnd) return true;
 
+    // ตัวแปรสำหรับเก็บ "วันที่หมดสัญญาล่าสุด" ที่เกิดก่อนวันเข้าพัก
+    let latestEndStr: string | null = null;
+
     for (const c of contracts) {
         if (currentContractId && c.id === currentContractId) continue;
         if (c.status === 'cancelled') continue;
         
-        // ✅ เพิ่มบรรทัดนี้: ถ้าสัญญาไม่ได้ผูกกับห้องนี้เลย ให้ข้ามไป
         if (c.main_room_id !== roomId && c.temp_room_id !== roomId && c.move_to_room_id !== roomId) {
             continue;
         }
@@ -41,7 +43,15 @@ export const isRoomAvailable = (
         ].filter(Boolean) as { start: string; end: string }[];
 
         for (const period of periods) {
+            // 1. ถ้ามีสัญญาช่วงเวลาทับซ้อน = ไม่ว่างแน่นอน
             if (isOverlap(checkStart, checkEnd, period.start, period.end)) return false;
+
+            // 2. หาวันที่หมดสัญญาล่าสุด ที่เกิดก่อน checkStart
+            if (new Date(period.end) < new Date(checkStart)) {
+                if (!latestEndStr || new Date(period.end) > new Date(latestEndStr)) {
+                    latestEndStr = period.end;
+                }
+            }
         }
 
         const contractEnd = c.contract_end_date || c.main_end_date || c.temp_end_date || c.move_end_date;
@@ -57,6 +67,19 @@ export const isRoomAvailable = (
                 const nonLockIntents = ['not_renew', 'renew_no_room'];
                 if (!nonLockIntents.includes(intention)) return false;
             }
+        }
+    }
+
+    // 🎯 LOGIC ใหม่: บังคับห้องว่างแบบ Month-to-Month (ป้องกันฟันหลอ)
+    if (latestEndStr) {
+        const expectedEnd = new Date(checkStart);
+        expectedEnd.setDate(expectedEnd.getDate() - 1); // ถอยหลัง 1 วัน (เช่น เข้าพัก 1 ก.ย. ต้องหมดสัญญา 31 ส.ค.)
+        
+        const latestEnd = new Date(latestEndStr);
+        
+        // ถ้าเดือนและปีของสัญญาที่เพิ่งหมด ไม่ตรงกับเดือนก่อนหน้าที่จะเข้าพัก -> ข้ามห้องนี้ไปเลย
+        if (latestEnd.getMonth() !== expectedEnd.getMonth() || latestEnd.getFullYear() !== expectedEnd.getFullYear()) {
+            return false; 
         }
     }
 

@@ -103,7 +103,16 @@ export default function AvailableRoomsPage() {
         ];
 
         const availableRooms = roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
-        const overlappingWaitlists = waitlists.filter(w => isOverlap(checkStart, checkEnd, w.start_date, w.end_date));
+        const overlappingWaitlists = waitlists.filter(w => {
+            if (!w.start_date) return false;
+            
+            const waitlistStart = new Date(w.start_date);
+            const targetStart = new Date(checkStart);
+            
+            // ดึงมาเฉพาะ Waitlist ที่มีคิวเข้าพัก "เดือนและปี" ตรงกับรอบบิลที่เลือกเท่านั้น
+            return waitlistStart.getMonth() === targetStart.getMonth() && 
+                waitlistStart.getFullYear() === targetStart.getFullYear();
+        });
 
         return rowTypes.map(rt => {
             const rOfType = roomsL.filter(r => r.room_type === rt.key);

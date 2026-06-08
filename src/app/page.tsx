@@ -66,6 +66,7 @@ export default function DashboardPage() {
   const [filterRoomType, setFilterRoomType] = useState('');
   const [filterKitchen, setFilterKitchen] = useState('');
   const [filterView, setFilterView] = useState('');
+  const [filterGap, setFilterGap] = useState('');
 
   const [dayWidth, setDayWidth] = useState(3);
 
@@ -410,6 +411,33 @@ export default function DashboardPage() {
   const showTodayLine = todayOffset >= 0 && todayOffset <= totalDays;
   const showDayDetails = dayWidth >= 15;
 
+  const displayedRooms = useMemo(() => {
+    if (!filterGap) return filteredRooms;
+    if (filterGap === 'shortGap') {
+      const thresholdDays = 365;
+      return filteredRooms.filter(room => {
+        const blocks = getBlocksForRoom(room.id)
+          .map(b => ({ start: b.start, end: b.end }))
+          .map(b => ({ start: b.start < chartRange.start ? chartRange.start : b.start, end: b.end > chartRange.end ? chartRange.end : b.end }))
+          .filter(b => b.end >= b.start)
+          .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+        if (blocks.length < 2) return false;
+
+        for (let i = 0; i < blocks.length - 1; i++) {
+          const prev = blocks[i];
+          const next = blocks[i + 1];
+          const gapDays = getDaysDiff(prev.end, next.start) - 1;
+          if (gapDays > 0 && gapDays < thresholdDays) return true;
+        }
+
+        return false;
+      });
+    }
+
+    return filteredRooms;
+  }, [filteredRooms, filterGap, allContracts, chartRange]);
+
   return (
     <div className="flex-1 p-8 md:p-10 max-w-[1600px] mx-auto w-full space-y-8">
       {/* Header & Filters Section */}
@@ -726,7 +754,11 @@ export default function DashboardPage() {
             <option value="">ทุกทิศ (View)</option>
             {uniqueViews.map((v, i) => <option key={i} value={v}>{v}</option>)}
           </select>
-          <span className="text-xs text-slate-400 font-medium ml-auto">พบ {filteredRooms.length} ห้อง</span>
+          <select value={filterGap} onChange={(e) => setFilterGap(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[140px]">
+            <option value="">ทุกช่องว่าง</option>
+            <option value="shortGap">ช่องว่าง &lt; 1 ปี</option>
+          </select>
+          <span className="text-xs text-slate-400 font-medium ml-auto">พบ {displayedRooms ? displayedRooms.length : filteredRooms.length} ห้อง</span>
         </div>
 
         {/* Toolbar (Zoom & Legend) */}
@@ -779,7 +811,7 @@ export default function DashboardPage() {
                 เลขห้อง
               </div>
               <div className="divide-y divide-slate-100 bg-white">
-                {filteredRooms.map(room => (
+                {displayedRooms.map(room => (
                   <div key={room.id} className="h-12 flex items-center justify-center font-bold text-sm text-[#0A2647] hover:bg-blue-50/50 transition-colors bg-white">
                     {room.room_number}
                   </div>
@@ -817,7 +849,7 @@ export default function DashboardPage() {
 
               {/* Rooms Rows */}
               <div className="divide-y divide-slate-100/60 relative">
-                {filteredRooms.map(room => {
+                {displayedRooms.map(room => {
                   const roomBlocks = getBlocksForRoom(room.id);
                   return (
                     <div key={room.id} className="h-12 relative group w-full hover:bg-white/50 overflow-hidden transition-colors">
@@ -859,7 +891,7 @@ export default function DashboardPage() {
                     </div>
                   );
                 })}
-                {filteredRooms.length === 0 && (
+                {displayedRooms.length === 0 && (
                   <div className="p-10 text-center text-slate-400 font-medium bg-slate-50/50">
                     ไม่พบห้องพักที่ตรงกับตัวกรองที่คุณเลือก
                   </div>
@@ -1003,9 +1035,9 @@ export default function DashboardPage() {
                     ) : modalRenewalIntent === 'not_asked' ? (
                       <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200/60">ยังไม่ได้สอบถาม</span>
                     ) : modalRenewalIntent === 'renew' ? (
-                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">ต้องการต่อสัญญา</span>
+                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">ต่อสัญญาห้องเดิม</span>
                     ) : modalRenewalIntent === 'renew_no_room' ? (
-                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200/60">ต้องการต่อ (ยังไม่มีห้อง)</span>
+                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200/60">ต่อสัญญาไม่ระบุห้อง</span>
                     ) : modalRenewalIntent === 'not_renew' ? (
                       <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-red-50 text-red-600 border border-red-200/60">ไม่ต้องการต่อ</span>
                     ) : (

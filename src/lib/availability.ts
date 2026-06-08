@@ -70,30 +70,30 @@ export const isRoomAvailable = (
         }
     }
 
-    // 🎯 LOGIC ใหม่: ทบยอดห้องว่างเฉพาะเดือนที่ "ผ่านไปแล้วในโลกจริง"
+    // 🎯 LOGIC ใหม่: ทบยอดห้องว่างสะสม (Rollover) ป้องกันปัญหา Timezone บั๊ก
     if (latestEndStr) {
-        const targetStart = new Date(checkStart);
-        const latestEnd = new Date(latestEndStr);
+        const targetDate = new Date(checkStart);
+        const latestEndDate = new Date(latestEndStr);
         const today = new Date();
         
-        // หาวันสิ้นเดือนของเดือนก่อนหน้า (เพื่อเป็นเกณฑ์โควต้าปกติ)
-        const expectedEnd = new Date(targetStart);
-        expectedEnd.setDate(expectedEnd.getDate() - 1); 
+        const lValue = latestEndDate.getFullYear() * 12 + latestEndDate.getMonth(); // เดือนที่หมดสัญญาล่าสุด
+        const tValue = targetDate.getFullYear() * 12 + targetDate.getMonth();       // เดือนของรอบบิลที่เลือกดู
+        const cValue = today.getFullYear() * 12 + today.getMonth();                 // เดือนปัจจุบันในโลกจริง
         
-        expectedEnd.setHours(0, 0, 0, 0);
-        latestEnd.setHours(0, 0, 0, 0);
-        today.setHours(0, 0, 0, 0);
+        // โควต้าปกติ: ห้องต้องหมดสัญญาใน "เดือนก่อนหน้า" ของรอบบิลที่เลือกพอดี (เช่น ดูรอบ ก.ค. ห้องต้องหมด มิ.ย.)
+        const isNormalQuota = (lValue === tValue - 1);
         
-        // 1. โควต้าปกติ: ห้องหมดสัญญาเดือนก่อนหน้าเป๊ะๆ (เช่น ดู ส.ค. ห้องต้องหมด ก.ค.)
-        const isNormalQuota = latestEnd.getMonth() === expectedEnd.getMonth() && 
-                              latestEnd.getFullYear() === expectedEnd.getFullYear();
+        // โควต้าตกค้าง: ห้องหมดสัญญาก่อนหน้านั้นลงไปอีก (ค้างสต๊อก)
+        const isLeftover = (lValue < tValue - 1);
         
-        // 2. โควต้าตกค้าง: ห้องหมดสัญญาก่อนหน้านั้น **และ** วันที่หมดสัญญา "ผ่านพ้นวันปัจจุบัน" มาแล้ว
-        const isLeftover = latestEnd < expectedEnd && latestEnd < today;
-        
-        // ถ้าไม่เข้าเงื่อนไขเลย (เช่น เป็นของเดือนในอนาคต หรือเป็นของเดือนที่ยังไม่ถึงในโลกจริง) -> ซ่อนห้องนี้
-        if (!isNormalQuota && !isLeftover) {
-            return false; 
+        if (isLeftover) {
+            // จะทบยอดห้องว่างค้างสต๊อกมาโชว์ได้ ก็ต่อเมื่อรอบเดือนที่เลือก ได้เริ่มต้นขึ้นแล้วในโลกจริงเท่านั้น
+            if (tValue > cValue) {
+                return false;
+            }
+        } else if (!isNormalQuota) {
+            // ถ้าหมดสัญญาทีหลังรอบปกติ (เป็นโควต้าของเดือนในอนาคตถัดไปอีก) -> ซ่อนห้องนี้ไว้ก่อน
+            return false;
         }
     }
 

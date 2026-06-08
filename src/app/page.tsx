@@ -835,12 +835,12 @@ export default function DashboardPage() {
             <option value="shortGap">ช่องว่าง &lt; 1 ปี</option>
           </select>
           <select value={filterRenewal} onChange={(e) => setFilterRenewal(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[160px]">
-            <option value="">ทุกการต่อสัญญา</option>
-            <option value="renew">ต้องการต่อ (renew)</option>
-            <option value="renew_no_room">ต่อแต่ไม่ระบุห้อง (renew_no_room)</option>
-            <option value="not_renew">ไม่ต้องการต่อ (not_renew)</option>
-            <option value="not_asked">ยังไม่ได้สอบถาม (not_asked)</option>
-            <option value="pending">รอดำเนินการ (pending)</option>
+            <option value="">ทุกความประสงค์</option>
+            <option value="renew">ต่อสัญญาห้องเดิม</option>
+            <option value="renew_no_room">แต่สัญญาไม่ระบุห้อง</option>
+            <option value="not_renew">ไม่ต่อสัญญา</option>
+            <option value="not_asked">ยังไม่ได้สอบถาม</option>
+            <option value="pending">รอตอบกลับ</option>
           </select>
           <span className="text-xs text-slate-400 font-medium ml-auto">พบ {displayedRooms ? displayedRooms.length : filteredRooms.length} ห้อง</span>
         </div>

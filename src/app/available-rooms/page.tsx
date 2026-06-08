@@ -44,17 +44,23 @@ export default function AvailableRoomsPage() {
         setLoading(false);
     }
 
-    const calculateEndDate = (startDate: string) => {
-        const start = new Date(startDate);
-        const end = new Date(start);
-        end.setFullYear(start.getFullYear() + 1);
-        end.setDate(end.getDate() - 1);
+    // เปลี่ยนฟังก์ชันคำนวณวันสิ้นสุด โดยกำหนดเป็นแบบเลข Local Time
+    const calculateEndDate = (year: number, month: number) => {
+        // เดือนใน Date ของ JS จะเป็น 0-indexed (ม.ค. = 0) ดังนั้นต้อง -1 
+        const end = new Date(year + 1, month - 1, 1); // ตั้งต้นเป็นวันที่ 1 ของเดือนเดิมในปีถัดไป
+        end.setDate(end.getDate() - 1); // ถอยหลัง 1 วัน จะได้วันสุดท้ายของเดือนก่อนหน้าพอดี
         return end.toISOString().split('T')[0];
     };
 
+    // แก้ไขฟังก์ชันแปลงวันที่ไทย เพื่อป้องกันปัญหา Timezone เพี้ยนจาก String ISO
     const formatDateTH = (dateStr: string) => {
         if (!dateStr || dateStr === '2000-01-01' || dateStr === '2099-12-31') return null;
-        return new Date(dateStr).toLocaleDateString('th-TH', {
+        
+        // แยกชิ้นส่วนข้อความ "YYYY-MM-DD" ออกมาสร้างด้วยตัวเลข
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const localDate = new Date(y, m - 1, d); // ใช้ Local Time ของเครื่องเสมอ
+        
+        return localDate.toLocaleDateString('th-TH', {
             day: 'numeric', month: 'short', year: '2-digit'
         });
     };
@@ -62,7 +68,8 @@ export default function AvailableRoomsPage() {
     const roomsL = rooms.filter(r => r.building === 'L');
 
     const checkStart = `${selectedYear}-${pad(selectedMonth)}-01`;
-    const checkEnd = calculateEndDate(checkStart);
+    // ส่งเลข ปี และ เดือน เข้าไปคำนวณแทนการส่ง String ISO
+    const checkEnd = calculateEndDate(selectedYear, selectedMonth);
 
     const lockedRoomIds = useMemo(() => {
         const locked = new Set<string>();
@@ -95,24 +102,19 @@ export default function AvailableRoomsPage() {
         return locked;
     }, [intentions, contracts, checkStart]);
 
-    const overlappingWaitlists = useMemo(() => {
-        return waitlists.filter(w => {
-            if (!w.start_date) return false;
-
-            const waitlistDate = new Date(w.start_date);
-            const targetDate = new Date(checkStart);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const isThisMonth = waitlistDate.getMonth() === targetDate.getMonth() &&
-                                waitlistDate.getFullYear() === targetDate.getFullYear();
-
-            const isPastMonth = waitlistDate < targetDate;
-            const isPassedInRealLife = waitlistDate < today;
-
-            return isThisMonth || (isPastMonth && isPassedInRealLife);
-        });
-    }, [waitlists, checkStart]);
+    const overlappingWaitlists = waitlists.filter(w => {
+        if (!w.start_date) return false;
+        
+        const waitlistDate = new Date(w.start_date);
+        const targetDate = new Date(checkStart);
+        
+        // 🎯 แปลงให้อยู่ในรูป "จำนวนเดือนสะสม" เพื่อเทียบเดือนและปี
+        const wValue = waitlistDate.getFullYear() * 12 + waitlistDate.getMonth(); // เดือนของคิวจอง
+        const tValue = targetDate.getFullYear() * 12 + targetDate.getMonth();   // เดือนของรอบบิลที่เลือกดู
+        
+        // ให้คืนค่า true เฉพาะคิวจองที่ตรงกับเดือนและปีของรอบบิลที่เลือกพอดีเท่านั้น
+        return wValue === tValue;
+    });
 
     const matrixData = useMemo(() => {
         const rowTypes = [

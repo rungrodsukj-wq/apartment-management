@@ -67,6 +67,11 @@ export default function DashboardPage() {
   const [filterKitchen, setFilterKitchen] = useState('');
   const [filterView, setFilterView] = useState('');
   const [filterGap, setFilterGap] = useState('');
+  // Renewal filter: '', 'renew', 'not_renew', 'not_asked', 'pending', 'renew_no_room'
+  const [filterRenewal, setFilterRenewal] = useState<string>('');
+
+  // Map of contractId -> intention string
+  const [renewalIntentsMap, setRenewalIntentsMap] = useState<Record<string, string | null>>({});
 
   const [dayWidth, setDayWidth] = useState(3);
 
@@ -213,6 +218,20 @@ export default function DashboardPage() {
 
     const { data: contractsData } = await supabase.from('contracts').select('*');
     if (contractsData) setAllContracts(contractsData);
+
+    // Fetch renewal intentions and build a map for quick lookup
+    try {
+      const { data: intents } = await supabase.from('renewal_intentions').select('contract_id,intention');
+      const map: Record<string, string | null> = {};
+      if (intents && Array.isArray(intents)) {
+        intents.forEach((it: any) => {
+          map[it.contract_id] = it.intention || null;
+        });
+      }
+      setRenewalIntentsMap(map);
+    } catch (err) {
+      setRenewalIntentsMap({});
+    }
 
     const occupiedRoomIds = new Set<string>();
     contractsData?.forEach(c => {
@@ -412,10 +431,67 @@ export default function DashboardPage() {
   const showDayDetails = dayWidth >= 15;
 
   const displayedRooms = useMemo(() => {
-    if (!filterGap) return filteredRooms;
+    let baseRooms = filteredRooms;
+
+    // Apply renewal filter first if present
+    if (filterRenewal) {
+      const desired = filterRenewal; // e.g. 'renew', 'not_renew', etc.
+      baseRooms = baseRooms.filter(room => {
+        // Find contracts for this room that overlap the current chartRange
+        const contractsForRoom = allContracts.filter(c => {
+          const isAssigned = c.main_room_id === room.id || c.temp_room_id === room.id || c.move_to_room_id === room.id;
+          if (!isAssigned) return false;
+
+          try {
+              if (c.main_room_id === room.id && c.main_start_date && (c.main_end_date || c.contract_end_date)) {
+                const s = new Date(c.main_start_date);
+                const endStr = c.contract_end_date || c.main_end_date;
+                if (!endStr) return false;
+                const e = new Date(endStr);
+                return s <= chartRange.end && e >= chartRange.start;
+              }
+              if (c.temp_room_id === room.id && c.temp_start_date && (c.temp_end_date || c.contract_end_date)) {
+                const s = new Date(c.temp_start_date);
+                const endStr = c.contract_end_date || c.temp_end_date;
+                if (!endStr) return false;
+                const e = new Date(endStr);
+                return s <= chartRange.end && e >= chartRange.start;
+              }
+              if (c.move_to_room_id === room.id && c.move_start_date && (c.move_end_date || c.contract_end_date)) {
+                const s = new Date(c.move_start_date);
+                const endStr = c.contract_end_date || c.move_end_date;
+                if (!endStr) return false;
+                const e = new Date(endStr);
+                return s <= chartRange.end && e >= chartRange.start;
+              }
+          } catch (err) {
+            return false;
+          }
+
+          return false;
+        });
+
+        // If no relevant contracts overlapping the chart range, exclude the room when filtering by renewal
+        if (contractsForRoom.length === 0) return false;
+
+        // If any contract matches the desired renewal intent, include the room
+        for (const c of contractsForRoom) {
+          const intent = renewalIntentsMap[c.id] ?? null;
+          if (desired === 'renew' && intent === 'renew') return true;
+          if (desired === 'renew_no_room' && intent === 'renew_no_room') return true;
+          if (desired === 'not_renew' && intent === 'not_renew') return true;
+          if (desired === 'not_asked' && intent === 'not_asked') return true;
+          if (desired === 'pending' && intent === 'pending') return true;
+        }
+
+        return false;
+      });
+    }
+
+    if (!filterGap) return baseRooms;
     if (filterGap === 'shortGap') {
       const thresholdDays = 365;
-      return filteredRooms.filter(room => {
+      return baseRooms.filter(room => {
         const blocks = getBlocksForRoom(room.id)
           .map(b => ({ start: b.start, end: b.end }))
           .map(b => ({ start: b.start < chartRange.start ? chartRange.start : b.start, end: b.end > chartRange.end ? chartRange.end : b.end }))
@@ -435,8 +511,8 @@ export default function DashboardPage() {
       });
     }
 
-    return filteredRooms;
-  }, [filteredRooms, filterGap, allContracts, chartRange]);
+    return baseRooms;
+  }, [filteredRooms, filterGap, allContracts, chartRange, filterRenewal, renewalIntentsMap]);
 
   return (
     <div className="flex-1 p-8 md:p-10 max-w-[1600px] mx-auto w-full space-y-8">
@@ -757,6 +833,14 @@ export default function DashboardPage() {
           <select value={filterGap} onChange={(e) => setFilterGap(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[140px]">
             <option value="">ทุกช่องว่าง</option>
             <option value="shortGap">ช่องว่าง &lt; 1 ปี</option>
+          </select>
+          <select value={filterRenewal} onChange={(e) => setFilterRenewal(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[160px]">
+            <option value="">ทุกการต่อสัญญา</option>
+            <option value="renew">ต้องการต่อ (renew)</option>
+            <option value="renew_no_room">ต่อแต่ไม่ระบุห้อง (renew_no_room)</option>
+            <option value="not_renew">ไม่ต้องการต่อ (not_renew)</option>
+            <option value="not_asked">ยังไม่ได้สอบถาม (not_asked)</option>
+            <option value="pending">รอดำเนินการ (pending)</option>
           </select>
           <span className="text-xs text-slate-400 font-medium ml-auto">พบ {displayedRooms ? displayedRooms.length : filteredRooms.length} ห้อง</span>
         </div>

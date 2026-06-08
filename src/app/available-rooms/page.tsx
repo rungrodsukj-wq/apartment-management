@@ -12,6 +12,7 @@ export default function AvailableRoomsPage() {
     const [waitlists, setWaitlists] = useState<any[]>([]);
     const [intentions, setIntentions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showWaitlistModal, setShowWaitlistModal] = useState(false);
 
     // Default to next month
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -94,6 +95,25 @@ export default function AvailableRoomsPage() {
         return locked;
     }, [intentions, contracts, checkStart]);
 
+    const overlappingWaitlists = useMemo(() => {
+        return waitlists.filter(w => {
+            if (!w.start_date) return false;
+
+            const waitlistDate = new Date(w.start_date);
+            const targetDate = new Date(checkStart);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const isThisMonth = waitlistDate.getMonth() === targetDate.getMonth() &&
+                                waitlistDate.getFullYear() === targetDate.getFullYear();
+
+            const isPastMonth = waitlistDate < targetDate;
+            const isPassedInRealLife = waitlistDate < today;
+
+            return isThisMonth || (isPastMonth && isPassedInRealLife);
+        });
+    }, [waitlists, checkStart]);
+
     const matrixData = useMemo(() => {
         const rowTypes = [
             { key: 'One Bedroom', display: 'ONE BEDROOM' },
@@ -103,25 +123,6 @@ export default function AvailableRoomsPage() {
         ];
 
         const availableRooms = roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
-        const overlappingWaitlists = waitlists.filter(w => {
-            if (!w.start_date) return false;
-            
-            const waitlistDate = new Date(w.start_date);
-            const targetDate = new Date(checkStart); // รอบบิลที่กำลังดูข้อมูล
-            const today = new Date(); // วันที่ปัจจุบันในโลกจริง
-            today.setHours(0, 0, 0, 0); // รีเซ็ตเวลาให้เหลือแต่วันที่
-            
-            // 1. คิวตรงรอบพอดี (Month-to-Month) เช่น ดูเดือน ก.ค. คิวก็เป็นของ ก.ค.
-            const isThisMonth = waitlistDate.getMonth() === targetDate.getMonth() && 
-                               waitlistDate.getFullYear() === targetDate.getFullYear();
-            
-            // 2. คิวตกค้าง (Rollover): ต้องเก่ากว่าเดือนที่กำลังดูข้อมูล **และ** ต้องเก่ากว่าวันนี้จริงๆ
-            const isPastMonth = waitlistDate < targetDate;
-            const isPassedInRealLife = waitlistDate < today; 
-            
-            // ดึงมาแสดงถ้าเป็นคิวเดือนนี้ หรือ เป็นคิวตกค้างที่เลยวันปัจจุบันมาแล้ว
-            return isThisMonth || (isPastMonth && isPassedInRealLife);
-        });
 
         return rowTypes.map(rt => {
             const rOfType = roomsL.filter(r => r.room_type === rt.key);
@@ -280,7 +281,13 @@ export default function AvailableRoomsPage() {
                                     </div>
                                 </div>
 
-                                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col relative overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowWaitlistModal(true)}
+                                    className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col relative overflow-hidden text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                                    aria-expanded={showWaitlistModal}
+                                    title="ดูรายละเอียดคิวจองล่วงหน้า"
+                                >
                                     <div className="absolute top-0 right-0 p-6 opacity-10">
                                         <svg className="w-16 h-16 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"></path></svg>
                                     </div>
@@ -289,7 +296,7 @@ export default function AvailableRoomsPage() {
                                         <span className="text-4xl font-black text-amber-500">{totalWaitlists}</span>
                                         <span className="text-sm font-medium text-slate-400">คิว</span>
                                     </div>
-                                </div>
+                                </button>
 
                                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-6 opacity-10">
@@ -304,6 +311,61 @@ export default function AvailableRoomsPage() {
                                     </div>
                                 </div>
                             </div>
+
+                            {showWaitlistModal && (
+                                <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                                    <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[80vh] overflow-auto shadow-2xl">
+                                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                                            <h2 className="text-lg font-bold text-gray-900">รายละเอียดคิวจองล่วงหน้า</h2>
+                                            <button onClick={() => setShowWaitlistModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+                                        </div>
+
+                                        <div className="p-4">
+                                            <div className="mb-3 text-sm text-slate-500">รอบบิล: {monthsTH[selectedMonth - 1]} {selectedYear} — แสดง {overlappingWaitlists.length} คิว</div>
+                                            <div className="overflow-x-auto">
+                                                <table className="min-w-full text-left text-sm text-slate-700 border-collapse">
+                                                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                                                        <tr>
+                                                            <th className="p-3 border-b border-slate-200">#</th>
+                                                            <th className="p-3 border-b border-slate-200">ชื่อ</th>
+                                                            <th className="p-3 border-b border-slate-200">ประเภทห้อง</th>
+                                                            <th className="p-3 border-b border-slate-200">ครัว</th>
+                                                            <th className="p-3 border-b border-slate-200">วิว</th>
+                                                            <th className="p-3 border-b border-slate-200">วันที่เริ่ม</th>
+                                                            <th className="p-3 border-b border-slate-200">วันที่สิ้นสุด</th>
+                                                            <th className="p-3 border-b border-slate-200">สถานะ</th>
+                                                            <th className="p-3 border-b border-slate-200">เมนู</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {overlappingWaitlists.map((w, idx) => (
+                                                            <tr key={w.id} className="hover:bg-slate-50">
+                                                                <td className="p-3 border-b border-slate-100 align-top">{idx + 1}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">
+                                                                    <div className="font-bold">{w.name || '-'}</div>
+                                                                    <div className="text-xs text-slate-400">ID: {w.id}</div>
+                                                                </td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{w.room_type || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{w.kitchen_type || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{w.view_preference || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{formatDateTH(w.start_date) || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{formatDateTH(w.end_date) || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{w.status || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">
+                                                                    <a href={`/allocate/${w.id}`} className="text-sm font-bold text-blue-600 hover:underline">จัดสรร</a>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        {overlappingWaitlists.length === 0 && (
+                                                            <tr><td colSpan={9} className="p-6 text-center text-slate-400">ไม่มีคิวที่ตรงกับเงื่อนไขในรอบนี้</td></tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <h2 className="text-lg font-bold text-[#0A2647] mb-4 flex items-center gap-2">
                                 <svg className="w-5 h-5 text-[#4F81FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>

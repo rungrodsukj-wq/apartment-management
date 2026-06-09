@@ -196,15 +196,72 @@ export default function RenewalCheckPage() {
     };
 
     const deleteRenewalWaitlists = async (contractId: string) => {
-        const { error } = await supabase
-            .from('waitlists')
-            .delete()
-            .eq('contract_id', contractId);
-        if (error) {
-            alert('เกิดข้อผิดพลาดเมื่อพยายามลบ waitlist ที่สร้างจาก renewal_no_room: ' + error.message);
-            return false;
+        // Try deleting by contract_id first. If the column doesn't exist in the DB,
+        // fall back to deleting by tenant name and start/end dates derived from the contract.
+        const tryDeleteByContractId = async () => {
+            const { error } = await supabase
+                .from('waitlists')
+                .delete()
+                .eq('contract_id', contractId);
+            return error;
+        };
+
+        const err = await tryDeleteByContractId();
+        if (!err) return true;
+
+        // If the error indicates the column doesn't exist, attempt a safer fallback.
+        const msg = String(err.message || '').toLowerCase();
+        if (msg.includes('does not exist') && msg.includes('contract_id')) {
+            // Fetch contract to get tenant name and contract_end_date
+            const { data: contractData, error: cErr } = await supabase
+                .from('contracts')
+                .select('*')
+                .eq('id', contractId)
+                .single();
+            if (cErr || !contractData) {
+                alert('เกิดข้อผิดพลาดเมื่อพยายามลบ waitlist: ไม่สามารถดึงข้อมูลสัญญาได้ ' + (cErr?.message ?? ''));
+                return false;
+            }
+
+            const tenantName = contractData.tenant_name || '';
+            let startStr: string | null = null;
+            let endStr: string | null = null;
+            if (contractData.contract_end_date) {
+                const newStart = new Date(contractData.contract_end_date);
+                newStart.setDate(newStart.getDate() + 1);
+                startStr = newStart.toISOString().split('T')[0];
+
+                const calcEnd = new Date(startStr);
+                calcEnd.setFullYear(calcEnd.getFullYear() + 1);
+                calcEnd.setDate(calcEnd.getDate() - 1);
+                endStr = calcEnd.toISOString().split('T')[0];
+            }
+
+            // Build delete query using known fields (`name`, `start_date`, `end_date`).
+            // Avoid referencing `tenant_name` which does not exist in the current schema.
+            if (!tenantName && !startStr && !endStr) {
+                // Nothing safe to match on — do not delete entire table
+                alert('ไม่สามารถลบ waitlist โดย fallback: ไม่มีข้อมูลเพียงพอสำหรับระบุรายการ');
+                return false;
+            }
+
+            let query: any = supabase.from('waitlists').delete();
+            if (tenantName) query = query.eq('name', tenantName);
+            if (startStr) query = query.eq('start_date', startStr);
+            if (endStr) query = query.eq('end_date', endStr);
+
+            const { error: delErr } = await query;
+            if (delErr) {
+                alert('เกิดข้อผิดพลาดเมื่อพยายามลบ waitlist โดย fallback: ' + delErr.message);
+                return false;
+            }
+
+            return true;
         }
-        return true;
+
+        // Other errors: surface them
+        alert('เกิดข้อผิดพลาดเมื่อพยายามลบ waitlist ที่สร้างจาก renewal_no_room: ' + err.message);
+        return false;
     };
 
     const upsertIntention = async (contractId: string, roomId: string, tenantName: string, intention: Intention, note?: string, plannedMoveOutDate?: string) => {

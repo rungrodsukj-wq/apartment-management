@@ -1746,6 +1746,44 @@ export default function BookingsPage() {
                                     <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_end_date || ''} onChange={(e) => setEditForm({ ...editForm, main_end_date: e.target.value })} />
                                 </div>
                             </div>
+
+                            {/* Move Room section inside Edit */}
+                            <div className="pt-4 border-t border-slate-100">
+                                <p className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-3">ย้ายห้อง (ถ้ามี)</p>
+                                <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4">
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className={labelCls}>วันที่ย้ายเข้าห้องใหม่</label>
+                                            <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg w-full"
+                                                value={editForm.move_start_date || ''}
+                                                onChange={(e) => setEditForm({ ...editForm, move_start_date: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>ถึงวันที่</label>
+                                            <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg w-full"
+                                                value={editForm.move_end_date || ''}
+                                                onChange={(e) => setEditForm({ ...editForm, move_end_date: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>เลือกห้องใหม่</label>
+                                            {(!editForm.move_start_date || !editForm.move_end_date) ? (
+                                                <p className="py-2 px-3 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs">
+                                                    ⚠️ ใส่วันที่ก่อน
+                                                </p>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditRoomPicker('move')}
+                                                    className="w-full inline-flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                                >
+                                                    <span>{editForm.move_to_room_id ? `ห้อง ${getRoomNumber(editForm.move_to_room_id)}` : 'เลือกห้องใหม่'}</span>
+                                                    <span className="text-purple-500">เลือก</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </form>
 
                         <div className="px-8 py-5 border-t border-slate-100 flex gap-3 bg-slate-50">

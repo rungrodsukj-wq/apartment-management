@@ -183,6 +183,7 @@ export default function ClientLayoutWrapper({
                   src="/logo/salaya-one-logo.png"
                   alt="Salaya One"
                   fill
+                  sizes="60px"
                   className="object-contain"
                   priority
                 />

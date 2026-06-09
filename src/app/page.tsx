@@ -892,7 +892,7 @@ export default function DashboardPage() {
         {/* Chart Body 🌟 เพิ่ม onScroll เพื่อเก็บ state เตรียมทำ Windowing */}
         <div
           ref={scrollContainerRef}
-          className="overflow-auto max-h-[100vh] relative select-none custom-scrollbar bg-[#F8FAFC]"
+          className="overflow-auto max-h-[100vh] relative select-none custom-scrollbar bg-[#F8FAFC] dark:bg-[#031222]"
           style={{ cursor: 'grab' }}
           onMouseDown={handleMouseDown}
           onMouseLeave={handleMouseLeaveOrUp}
@@ -903,16 +903,16 @@ export default function DashboardPage() {
           <div style={{ width: `${110 + totalDays * dayWidth}px` }} className="flex relative min-w-full">
 
             {/* Sidebar Room Numbers */}
-            <div className="w-[110px] shrink-0 sticky left-0 z-30 bg-white border-r border-slate-200 shadow-[4px_0_15px_-5px_rgba(0,0,0,0.05)]">
-              <div className={`sticky top-0 z-40 border-b border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase tracking-widest ${showDayDetails ? 'h-[48px]' : 'h-[32px]'}`}>
+            <div className="w-[110px] shrink-0 sticky left-0 z-30 bg-white dark:bg-[#001128] border-r border-slate-200 dark:border-slate-800 shadow-[4px_0_15px_-5px_rgba(0,0,0,0.05)]">
+              <div className={`sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#001128] flex items-center justify-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ${showDayDetails ? 'h-[48px]' : 'h-[32px]'}`}>
                 เลขห้อง
               </div>
               
               {/* 🌟 ประยุกต์ใช้ Virtual Scroll ปรับความสูงรวมและดันบรรทัดที่ไม่แสดงออก */}
-              <div className="divide-y divide-slate-100 bg-white relative" style={{ height: displayedRooms.length * rowHeight }}>
+              <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-[#001128] relative" style={{ height: displayedRooms.length * rowHeight }}>
                 {startIndex > 0 && <div style={{ height: startIndex * rowHeight }} />}
                 {visibleRooms.map(room => (
-                  <div key={room.id} className="h-12 flex items-center justify-center font-bold text-sm text-[#0A2647] hover:bg-blue-50/50 transition-colors bg-white">
+                  <div key={room.id} className="h-12 flex items-center justify-center font-bold text-sm text-[#0A2647] dark:text-slate-200 hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors bg-white dark:bg-[#001128]">
                     {room.room_number}
                   </div>
                 ))}
@@ -922,18 +922,18 @@ export default function DashboardPage() {
             {/* Scrollable Timeline */}
             <div className="flex-1 relative">
               <div className="sticky top-0 z-30 shadow-sm">
-                <div className={`flex bg-slate-100/95 backdrop-blur-md border-b border-slate-200 ${showDayDetails ? 'h-6' : 'h-[32px]'}`}>
+                <div className={`flex bg-slate-100/95 dark:bg-[#001128]/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 ${showDayDetails ? 'h-6' : 'h-[32px]'}`}>
                   {timelineMonths.map((m, idx) => (
-                    <div key={idx} style={{ width: `${m.days * dayWidth}px` }} className="border-r border-slate-200 text-[10px] font-bold text-slate-500 flex items-center px-2 shrink-0 overflow-hidden">
+                    <div key={idx} style={{ width: `${m.days * dayWidth}px` }} className="border-r border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center px-2 shrink-0 overflow-hidden">
                       {dayWidth < 5 ? m.label.split(' ')[0] : m.label}
                     </div>
                   ))}
                 </div>
 
                 {showDayDetails && (
-                  <div className="flex h-6 bg-white/95 backdrop-blur-md border-b border-slate-200">
+                  <div className="flex h-6 bg-white/95 dark:bg-[#001128]/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
                     {daysArray.map((dayNum, idx) => (
-                      <div key={idx} style={{ width: `${dayWidth}px` }} className="border-r border-slate-100 text-[9px] font-medium flex items-center justify-center shrink-0 text-slate-400">
+                      <div key={idx} style={{ width: `${dayWidth}px` }} className="border-r border-slate-100 dark:border-slate-800/50 text-[9px] font-medium flex items-center justify-center shrink-0 text-slate-400 dark:text-slate-500">
                         {dayNum}
                       </div>
                     ))}
@@ -948,12 +948,12 @@ export default function DashboardPage() {
               )}
 
               {/* Rooms Rows 🌟 ใช้ Virtual Scroll ในฝั่ง Timeline เช่นกัน */}
-              <div className="divide-y divide-slate-100/60 relative" style={{ height: displayedRooms.length * rowHeight }}>
+              <div className="divide-y divide-slate-100/60 dark:divide-slate-800/40 relative" style={{ height: displayedRooms.length * rowHeight }}>
                 {startIndex > 0 && <div style={{ height: startIndex * rowHeight }} />}
                 {visibleRooms.map(room => {
                   const roomBlocks = getBlocksForRoom(room.id);
                   return (
-                    <div key={room.id} className="h-12 relative group w-full hover:bg-white/50 overflow-hidden transition-colors">
+                    <div key={room.id} className="h-12 relative group w-full hover:bg-white/50 dark:hover:bg-white/5 overflow-hidden transition-colors">
                       {roomBlocks.map((block, idx) => {
                         const offsetDays = getDaysDiff(startDate, block.start);
                         const durationDays = getDaysDiff(block.start, block.end) + 1;

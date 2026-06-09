@@ -975,7 +975,7 @@ export default function BookingsPage() {
     };
 
     return (
-        <div className="min-h-full flex flex-col bg-slate-50/50">
+        <div className="min-h-full flex flex-col bg-slate-50/50 dark:bg-transparent">
             {/* ฝังฟอนต์ K2D ลงในสไตล์ชีทท้องถิ่นเพื่อรับประกันความสวยงาม */}
             <style jsx global>{`
                 @import url('https://fonts.googleapis.com/css2?family=K2D:wght@300;400;500;600;700;800&display=swap');
@@ -1199,16 +1199,16 @@ export default function BookingsPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRoomClick(contract.temp_room_id)}
-                                                        className="shrink-0 w-[160px] rounded-xl border border-amber-200 bg-amber-50/50 p-3 flex flex-col justify-between text-left hover:bg-amber-100/50 transition-all"
+                                                        className="shrink-0 w-[160px] rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 p-3 flex flex-col justify-between text-left hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-all"
                                                     >
                                                         <div>
-                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-0.5 flex items-center gap-1">
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5 flex items-center gap-1">
                                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                                                 ห้องชั่วคราว
                                                             </div>
-                                                            <div className="font-extrabold text-slate-900">{getRoomNumber(contract.temp_room_id)}</div>
+                                                            <div className="font-extrabold text-slate-900 dark:text-slate-100">{getRoomNumber(contract.temp_room_id)}</div>
                                                         </div>
-                                                        <div className="text-[11px] font-semibold text-slate-500 mt-2 truncate">
+                                                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-2 truncate">
                                                             {formatDateTH(contract.temp_start_date) || '-'} - {formatDateTH(contract.temp_end_date) || '-'}
                                                         </div>
                                                     </button>
@@ -1218,26 +1218,26 @@ export default function BookingsPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRoomClick(contract.main_room_id)}
-                                                        className="shrink-0 w-[160px] rounded-xl border border-slate-200 bg-slate-50/70 p-3 flex flex-col justify-between text-left hover:bg-slate-100 transition-all"
+                                                        className="shrink-0 w-[160px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/30 p-3 flex flex-col justify-between text-left hover:bg-slate-100 dark:hover:bg-slate-800/30 transition-all"
                                                     >
                                                         <div>
-                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5 flex items-center gap-1">
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 flex items-center gap-1">
                                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
                                                                 ห้องพักหลัก
                                                             </div>
-                                                            <div className="font-extrabold text-slate-900 truncate">{getRoomNumber(contract.main_room_id)}</div>
+                                                            <div className="font-extrabold text-slate-900 dark:text-slate-100 truncate">{getRoomNumber(contract.main_room_id)}</div>
                                                         </div>
-                                                        <div className="text-[11px] font-semibold text-slate-500 mt-2 truncate">
+                                                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-2 truncate">
                                                             {formatDateTH(contract.main_start_date) || '-'} - {formatDateTH(contract.main_end_date) || '-'}
                                                         </div>
                                                     </button>
                                                 ) : (
-                                                    <div className="shrink-0 w-[160px] rounded-xl border border-dashed border-slate-200 bg-slate-50/30 p-3 flex flex-col justify-between opacity-60">
+                                                    <div className="shrink-0 w-[160px] rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/5 p-3 flex flex-col justify-between opacity-60">
                                                         <div>
-                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">ห้องพักหลัก</div>
-                                                            <div className="font-bold text-slate-400 truncate">ยังไม่ระบุห้อง</div>
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">ห้องพักหลัก</div>
+                                                            <div className="font-bold text-slate-400 dark:text-slate-500 truncate">ยังไม่ระบุห้อง</div>
                                                         </div>
-                                                        <div className="text-[11px] text-slate-400 mt-2 truncate">
+                                                        <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 truncate">
                                                             {formatDateTH(contract.main_start_date) || '-'} - {formatDateTH(contract.main_end_date) || '-'}
                                                         </div>
                                                     </div>
@@ -1247,16 +1247,16 @@ export default function BookingsPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRoomClick(contract.move_to_room_id)}
-                                                        className="shrink-0 w-[160px] rounded-xl border border-sky-200 bg-sky-50/50 p-3 flex flex-col justify-between text-left hover:bg-sky-100/50 transition-all"
+                                                        className="shrink-0 w-[160px] rounded-xl border border-sky-200 dark:border-sky-900/50 bg-sky-50/50 dark:bg-sky-950/20 p-3 flex flex-col justify-between text-left hover:bg-sky-100/50 dark:hover:bg-sky-900/30 transition-all"
                                                     >
                                                         <div>
-                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-sky-700 mb-0.5 flex items-center gap-1">
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400 mb-0.5 flex items-center gap-1">
                                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                                                                 ย้ายห้องไปที่
                                                             </div>
-                                                            <div className="font-extrabold text-slate-900">{getRoomNumber(contract.move_to_room_id)}</div>
+                                                            <div className="font-extrabold text-slate-900 dark:text-slate-100">{getRoomNumber(contract.move_to_room_id)}</div>
                                                         </div>
-                                                        <div className="text-[11px] font-semibold text-slate-500 mt-2 truncate">
+                                                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-2 truncate">
                                                             {formatDateTH(contract.move_start_date) || '-'} - {formatDateTH(contract.move_end_date) || '-'}
                                                         </div>
                                                     </button>

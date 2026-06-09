@@ -704,15 +704,15 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-rose-100 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-rose-50 to-white opacity-50"></div>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-rose-100 dark:border-rose-900/30 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/20 dark:to-slate-900/40 opacity-50"></div>
           <div className="relative z-10 flex justify-between items-start mb-2">
             <div className="text-sm font-bold text-rose-500">Waitlist</div>
-            <a href="/waitlists" className="bg-rose-100 text-rose-600 px-3 py-1 rounded-lg text-xs font-bold hover:bg-rose-500 hover:text-white transition-colors">
+            <a href="/waitlists" className="bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-3 py-1 rounded-lg text-xs font-bold hover:bg-rose-500 hover:text-white transition-colors">
               จัดการคิว ➔
             </a>
           </div>
-          <div className="relative z-10 text-3xl font-extrabold text-rose-600">
+          <div className="relative z-10 text-3xl font-extrabold text-rose-600 dark:text-rose-400">
             {loading ? '-' : waitlistCount} <span className="text-sm font-medium opacity-70">คิว</span>
           </div>
         </div>
@@ -817,7 +817,7 @@ export default function DashboardPage() {
       <section className="bg-white border border-slate-100 rounded-[2rem] shadow-[0_8px_30px_-4px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col">
 
         {/* Room Filters Bar */}
-        <div className="p-4 px-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center gap-4 z-20">
+        <div className="p-4 px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-wrap items-center gap-4 z-20">
           <span className="text-sm font-bold text-slate-500 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
             กรองห้องพัก:

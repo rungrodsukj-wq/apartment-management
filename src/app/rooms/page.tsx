@@ -331,10 +331,10 @@ export default function RoomsPage() {
                 {loading ? (
                     <div className="flex justify-center p-20"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-[#4F81FF]"></div></div>
                 ) : (
-                    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm text-slate-600">
-                                <thead className="bg-slate-50/80 text-slate-500 font-bold border-b border-slate-100 text-xs uppercase tracking-wider">
+                            <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                                <thead className="bg-slate-50/80 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-100 dark:border-slate-800 text-xs uppercase tracking-wider">
                                     <tr>
                                         <th className="p-5 pl-8">หมายเลขห้อง</th>
                                         <th className="p-5">ตึก</th>

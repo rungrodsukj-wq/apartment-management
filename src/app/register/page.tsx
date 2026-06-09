@@ -110,7 +110,7 @@ export default function RegisterPage() {
       
       {/* Background Image Pattern with Filter */}
       <div 
-        className="absolute inset-0 z-0 pointer-events-none opacity-40 bg-[url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=2070')] bg-cover bg-center" 
+        className="absolute inset-0 z-0 pointer-events-none opacity-40 bg-[url('https://salayaone.com/img/banner.jpg')] bg-cover bg-center" 
         style={{ filter: 'grayscale(100%) contrast(1.2) brightness(0.4)' }}
       />
       <div className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-b from-[#031222]/80 via-[#031222]/90 to-[#031222]" />

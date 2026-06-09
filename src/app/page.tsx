@@ -438,34 +438,34 @@ export default function DashboardPage() {
     let baseRooms = filteredRooms;
 
     if (filterRenewal) {
-      const desired = filterRenewal; 
+      const desired = filterRenewal;
       baseRooms = baseRooms.filter(room => {
         const contractsForRoom = allContracts.filter(c => {
           const isAssigned = c.main_room_id === room.id || c.temp_room_id === room.id || c.move_to_room_id === room.id;
           if (!isAssigned) return false;
 
           try {
-              if (c.main_room_id === room.id && c.main_start_date && (c.main_end_date || c.contract_end_date)) {
-                const s = new Date(c.main_start_date);
-                const endStr = c.contract_end_date || c.main_end_date;
-                if (!endStr) return false;
-                const e = new Date(endStr);
-                return s <= chartRange.end && e >= chartRange.start;
-              }
-              if (c.temp_room_id === room.id && c.temp_start_date && (c.temp_end_date || c.contract_end_date)) {
-                const s = new Date(c.temp_start_date);
-                const endStr = c.contract_end_date || c.temp_end_date;
-                if (!endStr) return false;
-                const e = new Date(endStr);
-                return s <= chartRange.end && e >= chartRange.start;
-              }
-              if (c.move_to_room_id === room.id && c.move_start_date && (c.move_end_date || c.contract_end_date)) {
-                const s = new Date(c.move_start_date);
-                const endStr = c.contract_end_date || c.move_end_date;
-                if (!endStr) return false;
-                const e = new Date(endStr);
-                return s <= chartRange.end && e >= chartRange.start;
-              }
+            if (c.main_room_id === room.id && c.main_start_date && (c.main_end_date || c.contract_end_date)) {
+              const s = new Date(c.main_start_date);
+              const endStr = c.contract_end_date || c.main_end_date;
+              if (!endStr) return false;
+              const e = new Date(endStr);
+              return s <= chartRange.end && e >= chartRange.start;
+            }
+            if (c.temp_room_id === room.id && c.temp_start_date && (c.temp_end_date || c.contract_end_date)) {
+              const s = new Date(c.temp_start_date);
+              const endStr = c.contract_end_date || c.temp_end_date;
+              if (!endStr) return false;
+              const e = new Date(endStr);
+              return s <= chartRange.end && e >= chartRange.start;
+            }
+            if (c.move_to_room_id === room.id && c.move_start_date && (c.move_end_date || c.contract_end_date)) {
+              const s = new Date(c.move_start_date);
+              const endStr = c.contract_end_date || c.move_end_date;
+              if (!endStr) return false;
+              const e = new Date(endStr);
+              return s <= chartRange.end && e >= chartRange.start;
+            }
           } catch (err) {
             return false;
           }
@@ -518,10 +518,10 @@ export default function DashboardPage() {
   // 🌟 Logic การทำ Windowing / Virtual Scroll เรนเดอร์เฉพาะแถวที่ปรากฏบนหน้าจอ
   const rowHeight = 48; // อ้างอิงจาก h-12 = 48px
   const overscan = 10; // สำรองบรรทัดไว้เรนเดอร์ล่วงหน้ากันกระตุก
-  const containerViewportHeight = typeof window !== 'undefined' ? window.innerHeight : 1000; 
+  const containerViewportHeight = typeof window !== 'undefined' ? window.innerHeight : 1000;
   const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
   const endIndex = Math.min(displayedRooms.length - 1, Math.floor((scrollTop + containerViewportHeight) / rowHeight) + overscan);
-  
+
   // ตัดข้อมูลเฉพาะห้องพักที่ต้องเรนเดอร์
   const visibleRooms = displayedRooms.slice(startIndex, endIndex + 1);
 
@@ -889,7 +889,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Chart Body 🌟 เพิ่ม onScroll เพื่อเก็บ state เตรียมทำ Windowing */}
+        {/* Chart Body 🌟 เพิ่ม onScroll เพื่อเก็บ state เตรียมทำ Windowingเเ */}
         <div
           ref={scrollContainerRef}
           className="overflow-auto max-h-[100vh] relative select-none custom-scrollbar bg-[#F8FAFC] dark:bg-[#031222]"
@@ -907,7 +907,7 @@ export default function DashboardPage() {
               <div className={`sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#001128] flex items-center justify-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ${showDayDetails ? 'h-[48px]' : 'h-[32px]'}`}>
                 เลขห้อง
               </div>
-              
+
               {/* 🌟 ประยุกต์ใช้ Virtual Scroll ปรับความสูงรวมและดันบรรทัดที่ไม่แสดงออก */}
               <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-[#001128] relative" style={{ height: displayedRooms.length * rowHeight }}>
                 {startIndex > 0 && <div style={{ height: startIndex * rowHeight }} />}
@@ -971,9 +971,9 @@ export default function DashboardPage() {
                             onClick={() => setSelectedBlockForDetail(block)}
                             style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
                             className={`absolute top-2 bottom-2 overflow-hidden rounded-md shadow-md text-xs text-white flex items-center px-2 cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:brightness-110 hover:z-30 hover:shadow-lg border border-white/30
-                            ${block.type === 'TEMP' ? 'bg-gradient-to-r from-orange-400 to-orange-500' : 
-                              block.type === 'MOVE' ? 'bg-gradient-to-r from-purple-500 to-purple-600' : 
-                              'bg-gradient-to-r from-blue-500 to-blue-600'}
+                            ${block.type === 'TEMP' ? 'bg-gradient-to-r from-orange-400 to-orange-500' :
+                                block.type === 'MOVE' ? 'bg-gradient-to-r from-purple-500 to-purple-600' :
+                                  'bg-gradient-to-r from-blue-500 to-blue-600'}
                           `}
                             title={`คลิกเพื่อดูรายละเอียดคุณ ${block.name} ${block.isCancelled ? '(ยกเลิก)' : ''} | เข้า: ${block.start.toLocaleDateString('th-TH')} | ออก: ${block.end.toLocaleDateString('th-TH')}`}
                           >

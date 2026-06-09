@@ -68,6 +68,8 @@ export default function DashboardPage() {
   const [filterGap, setFilterGap] = useState('');
   // Renewal filter: '', 'renew', 'not_renew', 'not_asked', 'pending', 'renew_no_room'
   const [filterRenewal, setFilterRenewal] = useState<string>('');
+  const [roomSearch, setRoomSearch] = useState('');
+  const [vacantMonth, setVacantMonth] = useState('');
 
   // Map of contractId -> intention string
   const [renewalIntentsMap, setRenewalIntentsMap] = useState<Record<string, string | null>>({});
@@ -274,7 +276,11 @@ export default function DashboardPage() {
     const matchRoomType = filterRoomType === '' || room.room_type === filterRoomType;
     const matchKitchen = filterKitchen === '' || room.kitchen_type === filterKitchen;
     const matchView = filterView === '' || room.view_direction === filterView;
-    return matchBuilding && matchFloor && matchRoomType && matchKitchen && matchView;
+    const q = roomSearch.trim().toLowerCase();
+    const matchSearch = q === '' || (room.room_number && String(room.room_number).toLowerCase().includes(q)) || allContracts.some(c => (
+      (c.main_room_id === room.id || c.temp_room_id === room.id || c.move_to_room_id === room.id) && c.tenant_name && c.tenant_name.toLowerCase().includes(q)
+    ));
+    return matchBuilding && matchFloor && matchRoomType && matchKitchen && matchView && matchSearch;
   });
 
   const occupancyData = useMemo(() => {
@@ -399,6 +405,20 @@ export default function DashboardPage() {
     return d.getDate();
   });
 
+  const monthOptions = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const opts: { value: string; label: string }[] = [];
+    let cur = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    while (cur <= endDate) {
+      opts.push({
+        value: `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}`,
+        label: cur.toLocaleDateString('th-TH', { month: 'short', year: '2-digit' }),
+      });
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    }
+    return opts;
+  }, [startDate, endDate]);
+
   const getBlocksForRoom = (roomId: string) => {
     const blocks: Block[] = [];
 
@@ -485,6 +505,19 @@ export default function DashboardPage() {
         }
 
         return false;
+      });
+    }
+
+    if (vacantMonth) {
+      const [yStr, mStr] = vacantMonth.split('-');
+      const y = Number(yStr);
+      const m = Number(mStr);
+      const monthStart = new Date(y, m - 1, 1);
+      const monthEnd = new Date(y, m, 0);
+      baseRooms = baseRooms.filter(room => {
+        const blocks = getBlocksForRoom(room.id);
+        const occupied = blocks.some(b => !(b.end < monthStart || b.start > monthEnd));
+        return !occupied;
       });
     }
 
@@ -854,6 +887,20 @@ export default function DashboardPage() {
             <option value="not_asked">ยังไม่ได้สอบถาม</option>
             <option value="pending">รอตอบกลับ</option>
           </select>
+          <select value={vacantMonth} onChange={(e) => setVacantMonth(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[160px]">
+            <option value="">ทุกเดือน</option>
+            {monthOptions.map((m, i) => (
+              <option key={i} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+          <input
+            type="search"
+            value={roomSearch}
+            onChange={(e) => setRoomSearch(e.target.value)}
+            placeholder="ค้นหาเลขห้องหรือชื่อ"
+            aria-label="ค้นหาเลขห้องหรือชื่อ"
+            className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4F81FF]/50 min-w-[200px]"
+          />
           <span className="text-xs text-slate-400 font-medium ml-auto">พบ {displayedRooms.length} ห้อง</span>
         </div>
 
@@ -892,7 +939,7 @@ export default function DashboardPage() {
         {/* Chart Body 🌟 เพิ่ม onScroll เพื่อเก็บ state เตรียมทำ Windowingเเ */}
         <div
           ref={scrollContainerRef}
-          className="overflow-auto max-h-[100vh] relative select-none custom-scrollbar bg-[#F8FAFC] dark:bg-[#031222]"
+          className="overflow-auto max-h-[75vh] relative select-none custom-scrollbar bg-[#F8FAFC] dark:bg-[#031222]"
           style={{ cursor: 'grab' }}
           onMouseDown={handleMouseDown}
           onMouseLeave={handleMouseLeaveOrUp}

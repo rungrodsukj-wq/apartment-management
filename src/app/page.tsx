@@ -558,6 +558,40 @@ export default function DashboardPage() {
   // ตัดข้อมูลเฉพาะห้องพักที่ต้องเรนเดอร์
   const visibleRooms = displayedRooms.slice(startIndex, endIndex + 1);
 
+  const renewalMetrics = useMemo(() => {
+    const notAsked = new Set<string>();
+    const notRenew = new Set<string>();
+    const renewRoomIds = new Set<string>();
+    let renewUnassigned = 0;
+
+    allContracts.forEach(c => {
+      const intent = renewalIntentsMap[c.id] ?? null;
+      if (intent === null || intent === 'not_asked') {
+        notAsked.add(c.id);
+        return;
+      }
+
+      if (intent === 'not_renew') {
+        notRenew.add(c.id);
+        return;
+      }
+
+      if (intent === 'renew' || intent === 'renew_no_room') {
+        let added = false;
+        if (c.main_room_id) { renewRoomIds.add(c.main_room_id); added = true; }
+        if (c.move_to_room_id) { renewRoomIds.add(c.move_to_room_id); added = true; }
+        if (c.temp_room_id) { renewRoomIds.add(c.temp_room_id); added = true; }
+        if (!added) renewUnassigned += 1;
+      }
+    });
+
+    return {
+      notAskedCount: notAsked.size,
+      notRenewCount: notRenew.size,
+      renewRoomsCount: renewRoomIds.size + renewUnassigned,
+    };
+  }, [allContracts, renewalIntentsMap]);
+
 
   return (
     <div className="flex-1 p-8 md:p-10 max-w-[1600px] mx-auto w-full space-y-8">
@@ -699,55 +733,38 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Stats Cards Section (ยังคงเดิมทั้งหมด) */}
+      {/* Renewal / Waitlist Cards */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-emerald-500 rounded-3xl p-6 shadow-lg shadow-emerald-500/20 text-white relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="text-emerald-100 font-medium text-sm mb-1">ห้องว่างช่วงที่เลือก</div>
-            <div className="text-4xl font-extrabold">{loading ? '-' : stats.totalVacant} <span className="text-base font-medium opacity-80">ห้อง</span></div>
+        <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-sm font-bold text-rose-500">Waitlist</div>
+            </div>
+            <a href="/waitlists" className="bg-rose-100 text-rose-600 px-3 py-1 rounded-lg text-xs font-bold hover:bg-rose-500 hover:text-white transition-colors">จัดการคิว ➔</a>
           </div>
-          <div className="absolute -bottom-4 -right-4 opacity-20">
-            <svg className="w-20 h-20 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4M4 19h4M13 12l3 3-3 3M19 3l-3 3 3 3M11 5l1.5 1.5L11 8l-1.5-1.5L11 5z" />
-            </svg>
-          </div>
+          <div className="text-3xl font-extrabold text-rose-600 mt-4">{loading ? '-' : waitlistCount} <span className="text-sm font-medium opacity-70">คิว</span></div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center justify-between">
+        <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-amber-50 flex flex-col justify-between">
           <div>
-            <div className="text-sm font-bold text-sky-500 mb-1">ว่าง: ครัวหน้า</div>
-            <div className="text-3xl font-extrabold text-[#0A2647]">{loading ? '-' : stats.frontKitchen}</div>
+            <div className="text-sm font-bold text-amber-600">ลูกบ้านยังไม่แจ้งความประสงค์</div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-500 flex items-center justify-center">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          </div>
+          <div className="text-3xl font-extrabold text-[#0A2647] mt-4">{loading ? '-' : renewalMetrics.notAskedCount} <span className="text-sm font-medium opacity-70">คน</span></div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center justify-between">
+        <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-emerald-50 flex flex-col justify-between">
           <div>
-            <div className="text-sm font-bold text-indigo-500 mb-1">ว่าง: ครัวหลัง</div>
-            <div className="text-3xl font-extrabold text-[#0A2647]">{loading ? '-' : stats.backKitchen}</div>
+            <div className="text-sm font-bold text-emerald-600">ต่อสัญญา</div>
+            <div className="text-xs text-slate-400">นับทั้งห้องเดิมและห้องใหม่</div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4h12m0 0a2 2 0 100-4m0 4a2 2 0 110-4M6 14V6a2 2 0 012-2h8a2 2 0 012 2v8" />
-            </svg>
-          </div>
+          <div className="text-3xl font-extrabold text-emerald-700 mt-4">{loading ? '-' : renewalMetrics.renewRoomsCount} <span className="text-sm font-medium opacity-70">ห้อง/รายการ</span></div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-rose-100 dark:border-rose-900/30 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/20 dark:to-slate-900/40 opacity-50"></div>
-          <div className="relative z-10 flex justify-between items-start mb-2">
-            <div className="text-sm font-bold text-rose-500">Waitlist</div>
-            <a href="/waitlists" className="bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-3 py-1 rounded-lg text-xs font-bold hover:bg-rose-500 hover:text-white transition-colors">
-              จัดการคิว ➔
-            </a>
+        <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-red-50 flex flex-col justify-between">
+          <div>
+            <div className="text-sm font-bold text-red-600">ไม่ต่อสัญญา</div>
           </div>
-          <div className="relative z-10 text-3xl font-extrabold text-rose-600 dark:text-rose-400">
-            {loading ? '-' : waitlistCount} <span className="text-sm font-medium opacity-70">คิว</span>
-          </div>
+          <div className="text-3xl font-extrabold text-red-600 mt-4">{loading ? '-' : renewalMetrics.notRenewCount} <span className="text-sm font-medium opacity-70">คน</span></div>
         </div>
       </section>
 

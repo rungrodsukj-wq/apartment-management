@@ -210,8 +210,9 @@ export default function RenewalCheckPage() {
         if (!err) return true;
 
         // If the error indicates the column doesn't exist, attempt a safer fallback.
-        const msg = String(err.message || '').toLowerCase();
-        if (msg.includes('does not exist') && msg.includes('contract_id')) {
+        const combined = `${String(err.message || '')} ${String((err as any)?.details || '')}`.toLowerCase();
+        // Postgres undefined_column has code 42703; also handle Supabase schema-cache messages
+        if ((err as any)?.code === '42703' || (combined.includes('contract_id') && (combined.includes('does not exist') || combined.includes('could not find') || combined.includes('schema cache') || combined.includes('column') || combined.includes('missing')))) {
             // Fetch contract to get tenant name and contract_end_date
             const { data: contractData, error: cErr } = await supabase
                 .from('contracts')

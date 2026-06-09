@@ -44,6 +44,8 @@ export default function BookingsPage() {
     const [filterView, setFilterView] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [startDate, setStartDate] = useState<string | null>(null);
+    // runtime detection: some deployments schemas may omit `contract_id` on `waitlists`
+    const [waitlistsHasContractId, setWaitlistsHasContractId] = useState<boolean | null>(null);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -118,6 +120,34 @@ export default function BookingsPage() {
             initializeForm();
         }
     }, [searchParams, isEditable]);
+
+    // Detect whether the `waitlists` table has a `contract_id` column.
+    useEffect(() => {
+        let mounted = true;
+        const check = async () => {
+            try {
+                const { error } = await supabase.from('waitlists').select('contract_id').limit(1);
+                if (!mounted) return;
+                if (error) {
+                    const msg = String(error.message || '').toLowerCase();
+                    if (msg.includes('does not exist') || msg.includes('could not find') || msg.includes('schema cache') || msg.includes('column')) {
+                        setWaitlistsHasContractId(false);
+                    } else {
+                        // unexpected error — assume column exists to avoid hiding other problems
+                        console.warn('Unexpected error checking waitlists.contract_id:', error);
+                        setWaitlistsHasContractId(true);
+                    }
+                } else {
+                    setWaitlistsHasContractId(true);
+                }
+            } catch (e) {
+                console.warn('Failed to check waitlists.contract_id presence', e);
+                if (mounted) setWaitlistsHasContractId(false);
+            }
+        };
+        check();
+        return () => { mounted = false; };
+    }, []);
 
     const calculateEndDate = (startDate: string) => {
         if (!startDate) return '';
@@ -268,7 +298,8 @@ export default function BookingsPage() {
             }
         } else {
             const contractId = searchParams.get('contractId');
-            if (contractId) {
+            // Only attach `contract_id` if we've detected the column exists.
+            if (contractId && waitlistsHasContractId === true) {
                 (payload as any).contract_id = contractId;
             }
             const { data, error } = await supabase.from('waitlists').insert([payload]).select('id');

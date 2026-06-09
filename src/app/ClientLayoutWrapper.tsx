@@ -202,9 +202,14 @@ export default function ClientLayoutWrapper({
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 flex items-center justify-center shrink-0">
                 <svg className="w-10 h-10" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <polygon points="50,5 90,28 90,72 50,95 10,72 10,28" className="stroke-[#0A2647] dark:stroke-[#e8d8c3]" strokeWidth="6" strokeLinejoin="round" />
-                  <path d="M30 45 L50 28 L70 45" className="stroke-[#0A2647] dark:stroke-[#e8d8c3]" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M42 43 C42 38, 58 38, 58 44 C58 49, 42 51, 42 57 C42 63, 58 63, 58 58" className="stroke-[#0A2647] dark:stroke-[#e8d8c3]" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                  <defs>
+                    <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#001128" />
+                      <stop offset="100%" stopColor="#0a2647" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="5" y="5" width="90" height="90" rx="20" fill="url(#logo-grad)" stroke="#e8d8c3" strokeWidth="4" strokeOpacity="0.3" />
+                  <text x="50%" y="55%" dominantBaseline="middle" textAnchor="middle" fill="#e8d8c3" fontSize="52" fontWeight="300" letterSpacing="0.1em">S</text>
                 </svg>
               </div>
               {(!sidebarCollapsed || isMobileOpen) && (

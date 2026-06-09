@@ -193,7 +193,7 @@ export default function UsersManagementPage() {
           onClick={fetchUsers}
           className="self-start px-5 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-2xl shadow-sm hover:bg-slate-50 active:bg-slate-100 transition-all flex items-center gap-2 cursor-pointer"
         >
-          🔄 ดึงข้อมูลล่าสุด
+          🔄 Refresh
         </button>
       </div>
 

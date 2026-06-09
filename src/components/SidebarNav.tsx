@@ -199,13 +199,13 @@ export default function SidebarNav({ collapsed = false }: SidebarNavProps) {
       )}
 
       {/* เมนูเปลี่ยนธีม (Light/Dark Mode) */}
-      <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/10">
+      {/* <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/10">
         {!collapsed && (
           <p className="px-4 text-[10px] font-bold text-slate-400 dark:text-[#e8d8c3]/50 uppercase tracking-widest mb-2">
             โหมดการแสดงผล
           </p>
-        )}
-        <button
+        )} */}
+        {/* <button
           onClick={handleToggle}
           className={`w-full flex items-center ${collapsed ? "justify-center" : "gap-3"} px-4 py-2.5 rounded-xl text-sm transition-all duration-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white cursor-pointer`}
           title={isDark ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด"}
@@ -221,9 +221,9 @@ export default function SidebarNav({ collapsed = false }: SidebarNavProps) {
               </svg>
             )}
           </span>
-          {!collapsed && <span className="font-medium">{isDark ? "โหมดสว่าง (Light Mode)" : "โหมดมืด (Dark Mode)"}</span>}
-        </button>
-      </div>
+          {!collapsed && <span className="font-medium">{isDark ? "โหมดสว่าง " : "โหมดมืด "}</span>}
+        </button> */}
+      {/* </div> */}
     </nav>
   );
 }

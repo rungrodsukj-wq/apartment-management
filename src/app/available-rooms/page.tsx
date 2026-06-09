@@ -522,66 +522,66 @@ export default function AvailableRoomsPage() {
                                 สรุปห้องว่าง (หักคิวจองล่วงหน้าแล้ว)
                             </h2>
 
-                            <div className="bg-white rounded-[2rem] shadow-lg border border-slate-200 overflow-hidden mb-10">
+                            <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden mb-10">
                                 <div className="overflow-x-auto">
-                                    <table className="min-w-full text-left text-sm text-slate-700 border-collapse border border-slate-200">
-                                        <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase tracking-wider">
+                                    <table className="min-w-full text-left text-sm text-slate-700 dark:text-slate-300 border-collapse border border-slate-200 dark:border-slate-800">
+                                        <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-wider">
                                             <tr>
-                                                <th rowSpan={3} className="p-4 bg-gradient-to-br from-slate-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center align-middle rounded-tl-[1.5rem]">
+                                                <th rowSpan={3} className="p-4 bg-gradient-to-br from-slate-100 to-white dark:from-slate-800 dark:to-slate-900 text-slate-800 dark:text-slate-100 font-bold border-r border-slate-200 dark:border-slate-800 text-center align-middle rounded-tl-[1.5rem]">
                                                     TYPE ROOM
                                                 </th>
-                                                <th rowSpan={3} className="p-4 bg-gradient-to-br from-amber-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center align-middle max-w-[150px]">
+                                                <th rowSpan={3} className="p-4 bg-gradient-to-br from-amber-100 to-white dark:from-amber-950/40 dark:to-slate-900 text-slate-800 dark:text-amber-200 font-bold border-r border-slate-200 dark:border-slate-800 text-center align-middle max-w-[150px]">
                                                     โควต้าจองไม่ระบุห้อง<br />(Waitlists ทั้งหมด)
                                                 </th>
-                                                <th colSpan={2} className="p-3 bg-gradient-to-br from-sky-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center">
+                                                <th colSpan={2} className="p-3 bg-gradient-to-br from-sky-100 to-white dark:from-sky-950/40 dark:to-slate-900 text-slate-800 dark:text-sky-200 font-bold border-r border-slate-200 dark:border-slate-800 text-center">
                                                     ครัวหน้า
                                                 </th>
-                                                <th colSpan={2} className="p-3 bg-gradient-to-br from-rose-100 to-white text-slate-800 font-bold border-r border-slate-200 text-center">
+                                                <th colSpan={2} className="p-3 bg-gradient-to-br from-rose-100 to-white dark:from-rose-950/40 dark:to-slate-900 text-slate-800 dark:text-rose-200 font-bold border-r border-slate-200 dark:border-slate-800 text-center">
                                                     ครัวหลัง
                                                 </th>
-                                                <th rowSpan={3} className="p-4 bg-gradient-to-br from-purple-100 to-white text-slate-800 font-bold text-center align-middle rounded-tr-[1.5rem] border-slate-200">
+                                                <th rowSpan={3} className="p-4 bg-gradient-to-br from-purple-100 to-white dark:from-purple-950/40 dark:to-slate-900 text-slate-800 dark:text-purple-200 font-bold text-center align-middle rounded-tr-[1.5rem] border-slate-200 dark:border-slate-800">
                                                     ไม่ระบุ<br />ครัว/ทิศ
                                                 </th>
                                             </tr>
                                             <tr>
-                                                <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold border-r border-slate-200 text-center">
+                                                <th colSpan={2} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold border-r border-slate-200 dark:border-slate-800 text-center">
                                                     View
                                                 </th>
-                                                <th colSpan={2} className="p-2 bg-slate-100 text-slate-600 text-xs font-bold border-r border-slate-200 text-center">
+                                                <th colSpan={2} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold border-r border-slate-200 dark:border-slate-800 text-center">
                                                     View
                                                 </th>
                                             </tr>
                                             <tr>
-                                                <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
+                                                <th className="p-3 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-[10px] font-bold border-r border-slate-200 dark:border-slate-800 text-center max-w-[160px]">
                                                     SALAYA ONE RESIDENCES<br />(ตะวันตก)
                                                 </th>
-                                                <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
+                                                <th className="p-3 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-[10px] font-bold border-r border-slate-200 dark:border-slate-800 text-center max-w-[160px]">
                                                     ซอยตั้งสิน<br />(ตะวันออก)
                                                 </th>
-                                                <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
+                                                <th className="p-3 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-[10px] font-bold border-r border-slate-200 dark:border-slate-800 text-center max-w-[160px]">
                                                     SALAYA ONE RESIDENCES<br />(ตะวันตก)
                                                 </th>
-                                                <th className="p-3 bg-slate-50 text-slate-700 text-[10px] font-bold border-r border-slate-200 text-center max-w-[160px]">
+                                                <th className="p-3 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-[10px] font-bold border-r border-slate-200 dark:border-slate-800 text-center max-w-[160px]">
                                                     ซอยตั้งสิน<br />(ตะวันออก)
                                                 </th>
                                             </tr>
                                         </thead>
-                                        <tbody className="bg-white">
+                                        <tbody className="bg-white dark:bg-slate-950">
                                             {matrixData.map((row) => {
                                                 const renderCell = (cell: any) => {
                                                     const isNegative = cell.net < 0;
                                                     const isZero = cell.net === 0;
-                                                    const valueClass = isNegative ? 'text-red-500' : isZero ? 'text-slate-400' : 'text-[#4F81FF]';
+                                                    const valueClass = isNegative ? 'text-red-500' : isZero ? 'text-slate-400 dark:text-slate-600' : 'text-[#4F81FF] dark:text-blue-400';
                                                     return (
-                                                        <td className="p-4 text-center align-top border border-slate-200">
+                                                        <td className="p-4 text-center align-top border border-slate-200 dark:border-slate-800">
                                                             <div className={`text-base font-black ${valueClass}`}>
-                                                                {cell.net} <span className="text-xs font-normal text-slate-500">ห้อง</span>
+                                                                {cell.net} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">ห้อง</span>
                                                             </div>
-                                                            <div className="text-[10px] text-slate-400 mt-1">
+                                                            <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                                                                 (ว่าง {cell.available} / ทั้งหมด {cell.total})
                                                             </div>
                                                             {cell.waitlist > 0 && (
-                                                                <div className="mt-2 inline-flex items-center justify-center rounded-full bg-amber-100 px-2 py-1 text-[9px] font-bold text-amber-700">
+                                                                <div className="mt-2 inline-flex items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/50 px-2 py-1 text-[9px] font-bold text-amber-700 dark:text-amber-300">
                                                                     -{cell.waitlist} waitlist
                                                                 </div>
                                                             )}
@@ -590,13 +590,15 @@ export default function AvailableRoomsPage() {
                                                 };
 
                                                 return (
-                                                    <tr key={row.key} className="hover:bg-slate-50/50 transition-colors">
-                                                        <td className="p-4 font-bold text-slate-800 border border-slate-200 bg-slate-50/80 rounded-l-3xl">{row.display}</td>
-                                                        <td className="p-4 border border-slate-200 text-center bg-slate-50/80">
-                                                            <div className={`text-base font-black ${row.netQuota < 0 ? 'text-red-500' : row.netQuota === 0 ? 'text-slate-400' : 'text-emerald-600'}`}>
-                                                                {row.netQuota} <span className="text-xs font-normal text-slate-500">ห้อง</span>
+                                                    <tr key={row.key} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors">
+                                                        <td className="p-4 font-bold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 rounded-l-3xl">
+                                                            {row.display}
+                                                        </td>
+                                                        <td className="p-4 border border-slate-200 dark:border-slate-800 text-center bg-slate-50/80 dark:bg-slate-900/80">
+                                                            <div className={`text-base font-black ${row.netQuota < 0 ? 'text-red-500' : row.netQuota === 0 ? 'text-slate-400 dark:text-slate-600' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                                {row.netQuota} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">ห้อง</span>
                                                             </div>
-                                                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                                            <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                                                                 (ว่าง {row.totalAvailable} / หักจองไม่ระบุห้อง {row.waitlistCount})
                                                             </div>
                                                         </td>
@@ -604,25 +606,25 @@ export default function AvailableRoomsPage() {
                                                         {renderCell(row.frontEast)}
                                                         {renderCell(row.backWest)}
                                                         {renderCell(row.backEast)}
-                                                    <td className="p-4 text-center align-top border border-slate-200 rounded-r-3xl bg-slate-50/30">
-                                                        {row.unspecified.waitlist > 0 ? (
-                                                            <div className="flex flex-col items-center justify-center h-full">
-                                                                <div className="bg-purple-100 border border-purple-200 px-3 py-2 rounded-xl w-full">
-                                                                    <div className="text-sm font-black text-purple-700">
-                                                                        {row.unspecified.waitlist} <span className="text-xs font-normal text-purple-600">คิว</span>
+                                                        <td className="p-4 text-center align-top border border-slate-200 dark:border-slate-800 rounded-r-3xl bg-slate-50/30 dark:bg-slate-900/10">
+                                                            {row.unspecified.waitlist > 0 ? (
+                                                                <div className="flex flex-col items-center justify-center h-full">
+                                                                    <div className="bg-purple-100 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/50 px-3 py-2 rounded-xl w-full">
+                                                                        <div className="text-sm font-black text-purple-700 dark:text-purple-300">
+                                                                            {row.unspecified.waitlist} <span className="text-xs font-normal text-purple-600 dark:text-purple-400">คิว</span>
+                                                                        </div>
+                                                                        <div className="text-[10px] text-purple-600 dark:text-purple-400 mt-1 font-bold">
+                                                                            รอแอดมินจับคู่ห้องให้
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="text-[10px] text-purple-600 mt-1 font-bold">
-                                                                        รอแอดมินจับคู่ห้องให้
+                                                                    <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
+                                                                        (นำไปหักลบในยอดรวมแล้ว)
                                                                     </div>
                                                                 </div>
-                                                                <div className="text-[10px] text-slate-400 mt-2">
-                                                                    (นำไปหักลบในยอดรวมแล้ว)
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-slate-300 font-medium mt-2">-</div>
-                                                        )}
-                                                    </td>
+                                                            ) : (
+                                                                <div className="text-slate-300 dark:text-slate-700 font-medium mt-2">-</div>
+                                                            )}
+                                                        </td>
                                                     </tr>
                                                 );
                                             })}

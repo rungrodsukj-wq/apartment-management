@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #ffffff;
@@ -96,7 +97,7 @@ html.dark,
 .dark .text-slate-900,
 .dark .text-slate-700,
 .dark .text-slate-600 {
-  color: #ffffff !important;
+  color: #ffffff;
 }
 .dark .text-\[\#0A2647\] {
   color: #e8d8c3 !important;
@@ -152,8 +153,8 @@ html.dark,
   background-color: rgba(255, 255, 255, 0.02) !important;
 }
 .dark th {
-  background-color: rgba(255, 255, 255, 0.03) !important;
-  color: #e8d8c3 !important;
+  background-color: rgba(255, 255, 255, 0.03);
+  color: #e8d8c3;
 }
 
 /* Status badges adjustment */

@@ -10,8 +10,7 @@ import Image from "next/image";
 
 interface ClientLayoutWrapperProps {
   children: React.ReactNode;
-  geistSans?: string;
-  geistMono?: string;
+  k2dFont?: string;
 }
 
 const roleLabels: Record<string, string> = {
@@ -36,13 +35,36 @@ export function getHeaderInfo(pathname: string) {
 
 export default function ClientLayoutWrapper({ 
   children, 
-  geistSans, 
-  geistMono 
+  k2dFont 
 }: ClientLayoutWrapperProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const quickActionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const storedTheme = localStorage.getItem("theme");
+    if (storedTheme === "dark" || (!storedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+      setTheme("dark");
+      document.documentElement.classList.add("dark");
+    } else {
+      setTheme("light");
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    if (theme === "light") {
+      setTheme("dark");
+      localStorage.setItem("theme", "dark");
+      document.documentElement.classList.add("dark");
+    } else {
+      setTheme("light");
+      localStorage.setItem("theme", "light");
+      document.documentElement.classList.remove("dark");
+    }
+  };
   
   const pathname = usePathname();
   const router = useRouter();
@@ -178,15 +200,12 @@ export default function ClientLayoutWrapper({
           {/* Logo & Close Button */}
           <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100 mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-15 h-20 relative">
-                <Image
-                  src="/logo/salaya-one-logo.png"
-                  alt="Salaya One"
-                  fill
-                  sizes="60px"
-                  className="object-contain"
-                  priority
-                />
+              <div className="w-12 h-12 flex items-center justify-center shrink-0">
+                <svg className="w-10 h-10" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <polygon points="50,5 90,28 90,72 50,95 10,72 10,28" className="stroke-[#0A2647] dark:stroke-[#e8d8c3]" strokeWidth="6" strokeLinejoin="round" />
+                  <path d="M30 45 L50 28 L70 45" className="stroke-[#0A2647] dark:stroke-[#e8d8c3]" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M42 43 C42 38, 58 38, 58 44 C58 49, 42 51, 42 57 C42 63, 58 63, 58 58" className="stroke-[#0A2647] dark:stroke-[#e8d8c3]" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </div>
               {(!sidebarCollapsed || isMobileOpen) && (
                 <div className="flex flex-col">
@@ -340,6 +359,24 @@ export default function ClientLayoutWrapper({
                 )}
               </div>
 
+              {/* Theme Toggle Button */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="p-2 text-white hover:bg-white/10 rounded-xl transition-colors outline-none cursor-pointer"
+                title={theme === "light" ? "เปิดโหมดมืด" : "เปิดโหมดสว่าง"}
+              >
+                {theme === "light" ? (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21M4.22 4.22l1.58 1.58m12.42 12.42l1.58 1.58M3 12h2.25m13.5 0H21M4.22 19.78l1.58-1.58M17.78 4.22l1.58 1.58M12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" />
+                  </svg>
+                )}
+              </button>
+
               <div className="w-8 h-8 rounded-lg bg-slate-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
                 {avatarChar}
               </div>
@@ -394,6 +431,23 @@ export default function ClientLayoutWrapper({
                 </div>
               )}
             </div>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="w-9 h-9 flex items-center justify-center bg-slate-50 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 text-slate-500 dark:text-[#e8d8c3] border border-slate-200/60 dark:border-white/10 rounded-full transition-colors cursor-pointer"
+              title={theme === "light" ? "เปิดโหมดมืด" : "เปิดโหมดสว่าง"}
+            >
+              {theme === "light" ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21M4.22 4.22l1.58 1.58m12.42 12.42l1.58 1.58M3 12h2.25m13.5 0H21M4.22 19.78l1.58-1.58M17.78 4.22l1.58 1.58M12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" />
+                </svg>
+              )}
+            </button>
 
             {/* Divider */}
             <div className="h-6 w-px bg-slate-200"></div>

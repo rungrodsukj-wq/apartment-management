@@ -5,25 +5,17 @@
   --foreground: #171717;
 }
 
-/* Merged theme variables into :root — removed unknown "@theme" at-rule */
 :root {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-k2d);
+  --font-mono: var(--font-k2d);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-k2d), Arial, Helvetica, sans-serif !important;
 }
 
 /* Utility: hide scrollbar but keep functionality */
@@ -34,3 +26,167 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;             /* Chrome / Safari / Opera */
 }
+
+/* ==========================================================================
+   DARK MODE OVERRIDES (Login/Register Inspired Style)
+   ========================================================================== */
+html.dark,
+.dark {
+  --background: #031222;
+  --foreground: #ffffff;
+}
+
+.dark body {
+  background-color: #031222 !important;
+  color: #ffffff !important;
+}
+
+/* Layout Backgrounds */
+.dark div.bg-\[\#F4F6F8\],
+.dark main.bg-\[\#F4F6F8\],
+.dark .bg-slate-50,
+.dark .bg-slate-100 {
+  background-color: #031222 !important;
+}
+
+/* Sidebar & Headers */
+.dark aside {
+  background-color: #001128 !important;
+  border-color: rgba(232, 216, 195, 0.15) !important;
+  color: #e8d8c3 !important;
+}
+.dark aside .bg-slate-50 {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.dark aside .text-slate-800,
+.dark aside .text-slate-700 {
+  color: #e8d8c3 !important;
+}
+.dark aside .text-slate-400 {
+  color: rgba(232, 216, 195, 0.5) !important;
+}
+.dark header {
+  background-color: #001128 !important;
+  border-color: rgba(232, 216, 195, 0.15) !important;
+  color: #ffffff !important;
+}
+.dark header .bg-\[\#0A2647\] {
+  background-color: #001128 !important;
+}
+
+/* Cards & Content Blocks */
+.dark .bg-white {
+  background-color: #0a2647 !important;
+  border-color: rgba(232, 216, 195, 0.15) !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
+}
+.dark .border,
+.dark .border-slate-50,
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-200\/60,
+.dark .border-slate-200\/80 {
+  border-color: rgba(232, 216, 195, 0.15) !important;
+}
+
+/* Typography Overrides */
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+.dark .text-slate-800,
+.dark .text-slate-900,
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  color: #ffffff !important;
+}
+.dark .text-\[\#0A2647\] {
+  color: #e8d8c3 !important;
+}
+.dark .text-slate-500,
+.dark .text-slate-400,
+.dark .text-slate-400\/80 {
+  color: rgba(232, 216, 195, 0.7) !important;
+}
+
+/* Charts & SVGs */
+.dark svg.bg-slate-50\/80 {
+  background-color: #001128 !important;
+}
+.dark svg text {
+  fill: rgba(232, 216, 195, 0.7) !important;
+}
+.dark svg line {
+  stroke: rgba(232, 216, 195, 0.15) !important;
+}
+
+/* Inputs, Selects & Buttons */
+.dark input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(232, 216, 195, 0.3) !important;
+  color: #ffffff !important;
+}
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #e8d8c3 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(232, 216, 195, 0.2) !important;
+}
+.dark select option {
+  background-color: #0a2647 !important;
+  color: #ffffff !important;
+}
+
+/* Quick Action Menu */
+.dark .shadow-\[0_24px_64px_rgba\(15\,23\,42\,0\.12\)\] {
+  background-color: #0a2647 !important;
+  border-color: rgba(232, 216, 195, 0.2) !important;
+}
+.dark .hover\:bg-slate-50:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Table Rows & Headers */
+.dark tr:hover {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+.dark th {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  color: #e8d8c3 !important;
+}
+
+/* Status badges adjustment */
+.dark .bg-emerald-500 {
+  background-color: #10b981 !important;
+  color: #ffffff !important;
+}
+.dark .bg-sky-50 {
+  background-color: rgba(14, 165, 233, 0.1) !important;
+  color: #38bdf8 !important;
+}
+.dark .bg-indigo-50 {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+  color: #818cf8 !important;
+}
+.dark .bg-rose-100 {
+  background-color: rgba(244, 63, 94, 0.1) !important;
+  color: #fb7185 !important;
+}
+
+/* Custom golden accent theme button */
+.dark .bg-\[\#4F81FF\] {
+  background: linear-gradient(135deg, #e8d8c3 0%, #d4b895 100%) !important;
+  color: #001128 !important;
+  border: none !important;
+}
+.dark .bg-\[\#4F81FF\]:hover {
+  background: linear-gradient(135deg, #d4b895 0%, #e8d8c3 100%) !important;
+}
+.dark .text-sky-500 {
+  color: #e8d8c3 !important;
+}
+.dark .text-indigo-500 {
+  color: #d4b895 !important;
+}
+

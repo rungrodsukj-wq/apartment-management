@@ -110,6 +110,28 @@ interface SidebarNavProps {
 export default function SidebarNav({ collapsed = false }: SidebarNavProps) {
   const pathname = usePathname();
   const { profile } = useAuth();
+  const [isDark, setIsDark] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsDark(document.documentElement.classList.contains('dark'));
+    
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const handleToggle = () => {
+    const nextDark = !isDark;
+    if (nextDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   const showUserManagement = canManageUsers(profile?.role);
 
@@ -121,8 +143,8 @@ export default function SidebarNav({ collapsed = false }: SidebarNavProps) {
         href={item.href}
         className={`flex items-center ${collapsed ? "justify-center" : "gap-3"} px-4 py-2.5 rounded-xl text-sm transition-all duration-200
           ${isActive
-            ? "bg-[#1e2538] text-white font-semibold shadow-sm"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            ? "bg-[#1e2538] text-white font-semibold shadow-sm dark:bg-[#e8d8c3]/15 dark:text-[#e8d8c3]"
+            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
           }`}
         title={item.name}
       >
@@ -137,14 +159,13 @@ export default function SidebarNav({ collapsed = false }: SidebarNavProps) {
   return (
     <nav className={`flex-1 ${collapsed ? "p-2" : "p-4"} space-y-4 overflow-y-auto`}>
       {menuSections.map((section, sIdx) => {
-        // กรองเมนูตามสิทธิ์การเข้าใช้งาน
         const filteredItems = section.items.filter(item => canAccessPage(profile, item.key));
         if (filteredItems.length === 0) return null;
 
         return (
           <div key={sIdx} className="space-y-1">
             {!collapsed && (
-              <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+              <p className="px-4 text-[10px] font-bold text-slate-400 dark:text-[#e8d8c3]/50 uppercase tracking-widest mb-2">
                 {section.title}
               </p>
             )}
@@ -155,11 +176,10 @@ export default function SidebarNav({ collapsed = false }: SidebarNavProps) {
         );
       })}
 
-      {/* เมนูจัดการผู้ใช้สำหรับ Owner / Admin เท่านั้น */}
       {showUserManagement && (
         <div className="space-y-1 pt-2">
           {!collapsed && (
-            <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+            <p className="px-4 text-[10px] font-bold text-slate-400 dark:text-[#e8d8c3]/50 uppercase tracking-widest mb-2">
               ระบบ
             </p>
           )}
@@ -177,6 +197,33 @@ export default function SidebarNav({ collapsed = false }: SidebarNavProps) {
           </div>
         </div>
       )}
+
+      {/* เมนูเปลี่ยนธีม (Light/Dark Mode) */}
+      <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-white/10">
+        {!collapsed && (
+          <p className="px-4 text-[10px] font-bold text-slate-400 dark:text-[#e8d8c3]/50 uppercase tracking-widest mb-2">
+            โหมดการแสดงผล
+          </p>
+        )}
+        <button
+          onClick={handleToggle}
+          className={`w-full flex items-center ${collapsed ? "justify-center" : "gap-3"} px-4 py-2.5 rounded-xl text-sm transition-all duration-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white cursor-pointer`}
+          title={isDark ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด"}
+        >
+          <span className="flex items-center justify-center opacity-80">
+            {isDark ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m0 13.5V21M4.22 4.22l1.58 1.58m12.42 12.42l1.58 1.58M3 12h2.25m13.5 0H21M4.22 19.78l1.58-1.58M17.78 4.22l1.58 1.58M12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+              </svg>
+            )}
+          </span>
+          {!collapsed && <span className="font-medium">{isDark ? "โหมดสว่าง (Light Mode)" : "โหมดมืด (Dark Mode)"}</span>}
+        </button>
+      </div>
     </nav>
   );
 }

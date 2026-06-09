@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { canAccessPage } from "../lib/permissions";
 import SidebarNav from "../components/SidebarNav";
 import Image from "next/image";
+import IdleTimeoutHandler from "../components/IdleTimeoutHandler";
 
 interface ClientLayoutWrapperProps {
   children: React.ReactNode;
@@ -156,6 +157,7 @@ export default function ClientLayoutWrapper({
 
   return (
     <div className="flex flex-row h-screen bg-[#F4F6F8] text-slate-800 overflow-hidden font-sans w-full">
+      <IdleTimeoutHandler />
       
       {/* Mobile Drawer Backdrop */}
       {isMobileOpen && (

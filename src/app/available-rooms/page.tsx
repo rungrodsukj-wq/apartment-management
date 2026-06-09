@@ -13,6 +13,7 @@ export default function AvailableRoomsPage() {
     const [intentions, setIntentions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+    const [showAvailableModal, setShowAvailableModal] = useState(false);
 
     // Default to next month
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -202,6 +203,10 @@ export default function AvailableRoomsPage() {
 
     }, [waitlists, contracts, intentions, roomsL, lockedRoomIds, selectedYear, selectedMonth]);
 
+    const availableRoomsList = useMemo(() => {
+        return roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
+    }, [roomsL, contracts, intentions, checkStart, checkEnd, lockedRoomIds]);
+
     const matrixData = useMemo(() => {
         const rowTypes = [
             { key: 'One Bedroom', display: 'ONE BEDROOM' },
@@ -210,7 +215,7 @@ export default function AvailableRoomsPage() {
             { key: 'Triple Bedroom', display: 'TRIPLE BEDROOM' }
         ];
 
-        const availableRooms = roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
+        const availableRooms = availableRoomsList;
 
         return rowTypes.map(rt => {
             const rOfType = roomsL.filter(r => r.room_type === rt.key);
@@ -358,7 +363,13 @@ export default function AvailableRoomsPage() {
 
                             {/* KPI Widgets */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col relative overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAvailableModal(true)}
+                                    className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col relative overflow-hidden text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                                    aria-expanded={showAvailableModal}
+                                    title="ดูรายการห้องว่างทั้งหมด"
+                                >
                                     <div className="absolute top-0 right-0 p-6 opacity-10">
                                         <svg className="w-16 h-16 text-[#4F81FF]" fill="currentColor" viewBox="0 0 20 20"><path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z"></path><path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd"></path></svg>
                                     </div>
@@ -367,7 +378,7 @@ export default function AvailableRoomsPage() {
                                         <span className="text-4xl font-black text-[#4F81FF]">{totalAvailablePhysical}</span>
                                         <span className="text-sm font-medium text-slate-400">ห้อง</span>
                                     </div>
-                                </div>
+                                </button>
 
                                 <button
                                     type="button"
@@ -399,6 +410,57 @@ export default function AvailableRoomsPage() {
                                     </div>
                                 </div>
                             </div>
+
+                            {showAvailableModal && (
+                                <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                                    <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[80vh] overflow-auto shadow-2xl">
+                                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                                            <h2 className="text-lg font-bold text-gray-900">รายการห้องว่างทั้งหมด (Physical)</h2>
+                                            <button onClick={() => setShowAvailableModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+                                        </div>
+
+                                        <div className="p-4">
+                                            <div className="mb-3 text-sm text-slate-500">รอบบิล: {monthsTH[selectedMonth - 1]} {selectedYear} — แสดง {availableRoomsList.length} ห้อง</div>
+                                            <div className="overflow-x-auto">
+                                                <table className="min-w-full text-left text-sm text-slate-700 border-collapse">
+                                                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                                                        <tr>
+                                                            <th className="p-3 border-b border-slate-200">#</th>
+                                                            <th className="p-3 border-b border-slate-200">ห้อง</th>
+                                                            <th className="p-3 border-b border-slate-200">ประเภท</th>
+                                                            <th className="p-3 border-b border-slate-200">ครัว</th>
+                                                            <th className="p-3 border-b border-slate-200">วิว</th>
+                                                            <th className="p-3 border-b border-slate-200">อาคาร</th>
+                                                            <th className="p-3 border-b border-slate-200">เมนู</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {availableRoomsList.map((r, idx) => (
+                                                            <tr key={r.id} className="hover:bg-slate-50">
+                                                                <td className="p-3 border-b border-slate-100 align-top">{idx + 1}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">
+                                                                    <div className="font-bold">ห้อง {r.room_number}</div>
+                                                                    <div className="text-xs text-slate-400">ID: {r.id}</div>
+                                                                </td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{r.room_type || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{r.kitchen_type || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{r.view_direction || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">{r.building || '-'}</td>
+                                                                <td className="p-3 border-b border-slate-100 align-top">
+                                                                    <a href={`/bookings`} className="text-sm font-bold text-blue-600 hover:underline">ดูรายละเอียด</a>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        {availableRoomsList.length === 0 && (
+                                                            <tr><td colSpan={7} className="p-6 text-center text-slate-400">ไม่มีห้องว่างในรอบนี้</td></tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {showWaitlistModal && (
                                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">

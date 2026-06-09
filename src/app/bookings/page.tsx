@@ -486,7 +486,7 @@ export default function BookingsPage() {
                 ...editForm,
                 move_start_date: newDate,
                 move_end_date: editForm.contract_end_date || editForm.move_end_date,
-                main_end_date: dayBefore,
+                main_end_date: editForm.contract_end_date && new Date(dayBefore) > new Date(editForm.contract_end_date) ? editForm.contract_end_date : dayBefore,
             });
         } else {
             setEditForm({ ...editForm, move_start_date: '' });
@@ -495,17 +495,69 @@ export default function BookingsPage() {
 
     const handleTempEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newDate = e.target.value;
+        if (!editForm) return;
         if (newDate) {
+            // Clamp temp_end_date to contract_end_date if present
+            let clamped = newDate;
+            if (editForm.contract_end_date && new Date(newDate) > new Date(editForm.contract_end_date)) {
+                clamped = editForm.contract_end_date;
+            }
             setEditForm({
                 ...editForm,
-                temp_end_date: newDate,
+                temp_end_date: clamped,
                 main_start_date: (!editForm.main_start_date || editForm.main_start_date === editForm.temp_end_date)
-                    ? newDate
+                    ? clamped
                     : editForm.main_start_date,
             });
         } else {
             setEditForm({ ...editForm, temp_end_date: '' });
         }
+    };
+
+    const handleEditTempStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newDate = e.target.value;
+        if (!editForm) return;
+        if (!newDate) {
+            setEditForm({ ...editForm, temp_start_date: '' });
+            return;
+        }
+
+        // main_end_date should be the day before temp_start_date
+        const d = new Date(newDate);
+        d.setDate(d.getDate() - 1);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        let dayBefore = `${year}-${month}-${day}`;
+
+        // Ensure main_end_date does not exceed contract_end_date
+        if (editForm.contract_end_date && new Date(dayBefore) > new Date(editForm.contract_end_date)) {
+            dayBefore = editForm.contract_end_date;
+        }
+
+        // Set temp_end_date to contract_end_date (or keep empty string if not available)
+        const tempEnd = editForm.contract_end_date || '';
+
+        setEditForm({
+            ...editForm,
+            temp_start_date: newDate,
+            temp_end_date: tempEnd,
+            main_end_date: dayBefore,
+        });
+    };
+
+    const handleEditMainEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newDate = e.target.value;
+        if (!editForm) return;
+        if (!newDate) {
+            setEditForm({ ...editForm, main_end_date: '' });
+            return;
+        }
+        let clamped = newDate;
+        if (editForm.contract_end_date && new Date(newDate) > new Date(editForm.contract_end_date)) {
+            clamped = editForm.contract_end_date;
+        }
+        setEditForm({ ...editForm, main_end_date: clamped });
     };
 
     const handleCreateTempEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -607,6 +659,47 @@ export default function BookingsPage() {
         if (editForm.actual_check_in_date && editForm.contract_start_date && new Date(editForm.actual_check_in_date) > new Date(editForm.contract_start_date)) {
             alert('❌ วันเข้าพักก่อนเริ่มสัญญาต้องไม่เกินวันเริ่มสัญญา');
             return;
+        }
+
+        // Ensure main_end_date and temp_end_date do not exceed contract_end_date
+        if (editForm.contract_end_date && editForm.main_end_date && new Date(editForm.main_end_date) > new Date(editForm.contract_end_date)) {
+            alert('❌ วันสิ้นสุดของห้องหลักต้องไม่เกินวันสิ้นสุดสัญญา');
+            return;
+        }
+        if (editForm.has_temp_room && editForm.contract_end_date && editForm.temp_end_date && new Date(editForm.temp_end_date) > new Date(editForm.contract_end_date)) {
+            alert('❌ วันที่ย้ายออกของห้องชั่วคราวต้องไม่เกินวันสิ้นสุดสัญญา');
+            return;
+        }
+
+        // Re-check availability to avoid race conditions / inconsistent selections
+        try {
+            // main room
+            if (editForm.main_room_id) {
+                const mainStart = editForm.main_start_date || editForm.contract_start_date;
+                const mainEnd = editForm.main_end_date || editForm.contract_end_date;
+                if (!isRoomAvailable(contracts, intentions, editForm.main_room_id, mainStart, mainEnd, editForm.id)) {
+                    alert('❌ ห้องหลักที่เลือกไม่ว่างในช่วงที่ระบุ');
+                    return;
+                }
+            }
+
+            // temp room
+            if (editForm.has_temp_room && editForm.temp_room_id) {
+                if (!isRoomAvailable(contracts, intentions, editForm.temp_room_id, editForm.temp_start_date, editForm.temp_end_date, editForm.id)) {
+                    alert('❌ ห้องชั่วคราวที่เลือกไม่ว่างในช่วงที่ระบุ');
+                    return;
+                }
+            }
+
+            // move-to room
+            if (editForm.move_to_room_id) {
+                if (!isRoomAvailable(contracts, intentions, editForm.move_to_room_id, editForm.move_start_date, editForm.move_end_date, editForm.id)) {
+                    alert('❌ ห้องย้ายที่เลือกไม่ว่างในช่วงที่ระบุ');
+                    return;
+                }
+            }
+        } catch (e) {
+            console.warn('Availability re-check failed', e);
         }
 
         const updatePayload = {
@@ -1726,7 +1819,7 @@ export default function BookingsPage() {
                                             <button type="button" onClick={() => setEditForm({ ...editForm, has_temp_room: false, temp_room_id: null, temp_start_date: null, temp_end_date: null })} className="text-xs font-bold text-red-500">ลบออก</button>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
-                                            <input type="date" className="p-2 text-xs bg-white border border-amber-200 rounded-lg" value={editForm.temp_start_date || ''} onChange={(e) => setEditForm({ ...editForm, temp_start_date: e.target.value })} />
+                                            <input type="date" className="p-2 text-xs bg-white border border-amber-200 rounded-lg" value={editForm.temp_start_date || ''} onChange={handleEditTempStartDateChange} />
                                             <input type="date" className="p-2 text-xs bg-white border border-amber-200 rounded-lg" value={editForm.temp_end_date || ''} onChange={handleTempEndDateChange} />
                                         </div>
                                     </div>
@@ -1743,7 +1836,7 @@ export default function BookingsPage() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_start_date || ''} onChange={(e) => setEditForm({ ...editForm, main_start_date: e.target.value })} />
-                                    <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_end_date || ''} onChange={(e) => setEditForm({ ...editForm, main_end_date: e.target.value })} />
+                                    <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_end_date || ''} onChange={handleEditMainEndDateChange} />
                                 </div>
                             </div>
 
@@ -1751,12 +1844,12 @@ export default function BookingsPage() {
                             <div className="pt-4 border-t border-slate-100">
                                 <p className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-3">ย้ายห้อง (ถ้ามี)</p>
                                 <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4">
-                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-3 gap-3">
                                         <div>
                                             <label className={labelCls}>วันที่ย้ายเข้าห้องใหม่</label>
                                             <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg w-full"
                                                 value={editForm.move_start_date || ''}
-                                                onChange={(e) => setEditForm({ ...editForm, move_start_date: e.target.value })} />
+                                                onChange={handleMoveStartDateChange} />
                                         </div>
                                         <div>
                                             <label className={labelCls}>ถึงวันที่</label>
@@ -1804,7 +1897,7 @@ export default function BookingsPage() {
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
                             {editRoomPicker === 'temp' && renderRoomButtonGrid(
-                                rooms.filter(r => r.id !== editForm.main_room_id && applyRoomFilters(r)),
+                                rooms.filter(r => r.id !== editForm.main_room_id && isRoomAvailable(contracts, intentions, r.id, editForm.temp_start_date, editForm.temp_end_date, editForm.id) && applyRoomFilters(r)),
                                 editForm.temp_room_id,
                                 (roomId) => { setEditForm({ ...editForm, temp_room_id: roomId }); setEditRoomPicker(null); },
                                 { searchStart: editForm.temp_start_date, searchEnd: editForm.temp_end_date }

@@ -59,7 +59,6 @@ export default function DashboardPage() {
   // Renewal intention for modal detail
   const [modalRenewalIntent, setModalRenewalIntent] = useState<string | null>(null);
 
-
   // State สำหรับตัวกรอง
   const [filterBuilding, setFilterBuilding] = useState('');
   const [filterFloor, setFilterFloor] = useState('');
@@ -89,6 +88,9 @@ export default function DashboardPage() {
   const [selectedYearStart, setSelectedYearStart] = useState(new Date().getFullYear());
   const [selectedMonthEnd, setSelectedMonthEnd] = useState(new Date().getMonth() + 1);
   const [selectedYearEnd, setSelectedYearEnd] = useState(new Date().getFullYear());
+
+  // --- Virtual Scroll State ---
+  const [scrollTop, setScrollTop] = useState(0);
 
   const handleStartYearChange = (year: number) => {
     setStartYear(year);
@@ -131,9 +133,11 @@ export default function DashboardPage() {
     const el = scrollContainerRef.current;
     if (!el) return;
     const handleWheel = (e: WheelEvent) => {
-      if (e.shiftKey) {
+      // 🌟 แก้ไข: แปลงเฉพาะ vertical scroll (deltaY) เป็นแนวนอนเมื่อกด Shift เท่านั้น
+      // ปล่อย deltaX ทำงานตามปกติเพื่อรองรับความสมูทของ Trackpad MacBook หรือ Touchscreen
+      if (e.shiftKey && e.deltaY !== 0) {
         e.preventDefault();
-        el.scrollLeft += (e.deltaX || e.deltaY);
+        el.scrollLeft += e.deltaY;
       }
     };
     el.addEventListener('wheel', handleWheel, { passive: false });
@@ -433,11 +437,9 @@ export default function DashboardPage() {
   const displayedRooms = useMemo(() => {
     let baseRooms = filteredRooms;
 
-    // Apply renewal filter first if present
     if (filterRenewal) {
-      const desired = filterRenewal; // e.g. 'renew', 'not_renew', etc.
+      const desired = filterRenewal; 
       baseRooms = baseRooms.filter(room => {
-        // Find contracts for this room that overlap the current chartRange
         const contractsForRoom = allContracts.filter(c => {
           const isAssigned = c.main_room_id === room.id || c.temp_room_id === room.id || c.move_to_room_id === room.id;
           if (!isAssigned) return false;
@@ -471,10 +473,8 @@ export default function DashboardPage() {
           return false;
         });
 
-        // If no relevant contracts overlapping the chart range, exclude the room when filtering by renewal
         if (contractsForRoom.length === 0) return false;
 
-        // If any contract matches the desired renewal intent, include the room
         for (const c of contractsForRoom) {
           const intent = renewalIntentsMap[c.id] ?? null;
           if (desired === 'renew' && intent === 'renew') return true;
@@ -514,9 +514,21 @@ export default function DashboardPage() {
     return baseRooms;
   }, [filteredRooms, filterGap, allContracts, chartRange, filterRenewal, renewalIntentsMap]);
 
+
+  // 🌟 Logic การทำ Windowing / Virtual Scroll เรนเดอร์เฉพาะแถวที่ปรากฏบนหน้าจอ
+  const rowHeight = 48; // อ้างอิงจาก h-12 = 48px
+  const overscan = 10; // สำรองบรรทัดไว้เรนเดอร์ล่วงหน้ากันกระตุก
+  const containerViewportHeight = typeof window !== 'undefined' ? window.innerHeight : 1000; 
+  const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+  const endIndex = Math.min(displayedRooms.length - 1, Math.floor((scrollTop + containerViewportHeight) / rowHeight) + overscan);
+  
+  // ตัดข้อมูลเฉพาะห้องพักที่ต้องเรนเดอร์
+  const visibleRooms = displayedRooms.slice(startIndex, endIndex + 1);
+
+
   return (
     <div className="flex-1 p-8 md:p-10 max-w-[1600px] mx-auto w-full space-y-8">
-      {/* Header & Filters Section */}
+      {/* Header & Filters Section (ยังคงเดิมทั้งหมด) */}
       <section className="flex flex-col xl:flex-row xl:justify-between xl:items-end gap-6">
         <div className="bg-white p-2.5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] flex flex-wrap items-end gap-3">
           <div className="px-2">
@@ -654,7 +666,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Stats Cards Section */}
+      {/* Stats Cards Section (ยังคงเดิมทั้งหมด) */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="bg-emerald-500 rounded-3xl p-6 shadow-lg shadow-emerald-500/20 text-white relative overflow-hidden">
           <div className="relative z-10">
@@ -706,7 +718,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Monthly Occupancy Rate Section */}
+      {/* Monthly Occupancy Rate Section (ยังคงเดิมทั้งหมด) */}
       <section className="bg-white border border-slate-100 rounded-[2rem] shadow-[0_8px_30px_-4px_rgba(0,0,0,0.04)] p-6">
         <h2 className="font-bold text-[#0A2647] text-lg mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <span className="flex items-center gap-2">
@@ -842,7 +854,7 @@ export default function DashboardPage() {
             <option value="not_asked">ยังไม่ได้สอบถาม</option>
             <option value="pending">รอตอบกลับ</option>
           </select>
-          <span className="text-xs text-slate-400 font-medium ml-auto">พบ {displayedRooms ? displayedRooms.length : filteredRooms.length} ห้อง</span>
+          <span className="text-xs text-slate-400 font-medium ml-auto">พบ {displayedRooms.length} ห้อง</span>
         </div>
 
         {/* Toolbar (Zoom & Legend) */}
@@ -877,15 +889,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Chart Body */}
+        {/* Chart Body 🌟 เพิ่ม onScroll เพื่อเก็บ state เตรียมทำ Windowing */}
         <div
           ref={scrollContainerRef}
-          className="overflow-auto max-h-[65vh] relative select-none custom-scrollbar bg-[#F8FAFC]"
+          className="overflow-auto max-h-[100vh] relative select-none custom-scrollbar bg-[#F8FAFC]"
           style={{ cursor: 'grab' }}
           onMouseDown={handleMouseDown}
           onMouseLeave={handleMouseLeaveOrUp}
           onMouseUp={handleMouseLeaveOrUp}
           onMouseMove={handleMouseMove}
+          onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
         >
           <div style={{ width: `${110 + totalDays * dayWidth}px` }} className="flex relative min-w-full">
 
@@ -894,8 +907,11 @@ export default function DashboardPage() {
               <div className={`sticky top-0 z-40 border-b border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase tracking-widest ${showDayDetails ? 'h-[48px]' : 'h-[32px]'}`}>
                 เลขห้อง
               </div>
-              <div className="divide-y divide-slate-100 bg-white">
-                {displayedRooms.map(room => (
+              
+              {/* 🌟 ประยุกต์ใช้ Virtual Scroll ปรับความสูงรวมและดันบรรทัดที่ไม่แสดงออก */}
+              <div className="divide-y divide-slate-100 bg-white relative" style={{ height: displayedRooms.length * rowHeight }}>
+                {startIndex > 0 && <div style={{ height: startIndex * rowHeight }} />}
+                {visibleRooms.map(room => (
                   <div key={room.id} className="h-12 flex items-center justify-center font-bold text-sm text-[#0A2647] hover:bg-blue-50/50 transition-colors bg-white">
                     {room.room_number}
                   </div>
@@ -931,9 +947,10 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Rooms Rows */}
-              <div className="divide-y divide-slate-100/60 relative">
-                {displayedRooms.map(room => {
+              {/* Rooms Rows 🌟 ใช้ Virtual Scroll ในฝั่ง Timeline เช่นกัน */}
+              <div className="divide-y divide-slate-100/60 relative" style={{ height: displayedRooms.length * rowHeight }}>
+                {startIndex > 0 && <div style={{ height: startIndex * rowHeight }} />}
+                {visibleRooms.map(room => {
                   const roomBlocks = getBlocksForRoom(room.id);
                   return (
                     <div key={room.id} className="h-12 relative group w-full hover:bg-white/50 overflow-hidden transition-colors">
@@ -947,20 +964,20 @@ export default function DashboardPage() {
                         if (block.end < startDate || block.start > endDate) return null;
 
                         return (
-                          /* 🌟 ย้ายคอมเมนต์แจ้งเตือนมาอยู่ตำแหน่งที่ถูกต้องนอกแท็กเปิดเรียบร้อยแล้ว */
+                          /* 🌟 เพิ่ม overflow-hidden ที่ปุ่ม และแก้ไข truncate */
                           <button
                             key={idx}
                             type="button"
                             onClick={() => setSelectedBlockForDetail(block)}
                             style={{ left: `${leftPx}px`, width: `${widthPx}px` }}
-                            className={`absolute top-2 bottom-2 rounded-md shadow-md text-xs text-white flex items-center px-3 cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:brightness-110 hover:z-30 hover:shadow-lg border border-white/30
+                            className={`absolute top-2 bottom-2 overflow-hidden rounded-md shadow-md text-xs text-white flex items-center px-2 cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:brightness-110 hover:z-30 hover:shadow-lg border border-white/30
                             ${block.type === 'TEMP' ? 'bg-gradient-to-r from-orange-400 to-orange-500' : 
                               block.type === 'MOVE' ? 'bg-gradient-to-r from-purple-500 to-purple-600' : 
                               'bg-gradient-to-r from-blue-500 to-blue-600'}
                           `}
                             title={`คลิกเพื่อดูรายละเอียดคุณ ${block.name} ${block.isCancelled ? '(ยกเลิก)' : ''} | เข้า: ${block.start.toLocaleDateString('th-TH')} | ออก: ${block.end.toLocaleDateString('th-TH')}`}
                           >
-                            {widthPx > 35 && <span className="truncate drop-shadow-sm">{block.name}</span>}
+                            {widthPx > 35 && <span className="truncate w-full text-left drop-shadow-sm pointer-events-none">{block.name}</span>}
                           </button>
                         );
                       })}
@@ -986,7 +1003,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* ─── Tenant & Contract Details Modal ─── */}
+      {/* ─── Tenant & Contract Details Modal ─── (ยังคงเดิมทั้งหมด) */}
       {selectedBlockForDetail && (() => {
         const c = selectedBlockForDetail.contract;
 

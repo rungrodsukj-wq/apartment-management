@@ -45,8 +45,7 @@ export default function BookingsPage() {
     const [editRoomPicker, setEditRoomPicker] = useState<'temp' | 'main' | 'move' | null>(null);
     const [selectedRoomForDetail, setSelectedRoomForDetail] = useState<any | null>(null);
 
-
-    // ── NEW: Create booking state ──
+    // ── Create booking state ──
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [createForm, setCreateForm] = useState<any>({
         tenant_name: '',
@@ -190,7 +189,6 @@ export default function BookingsPage() {
         const room = rooms.find(r => r.id === roomId);
         if (!room) return 'ไม่ทราบ';
         return `${room.room_number}`;
-        // return `${room.room_number} ${room.room_type ? `(${room.room_type})` : ''}`;
     };
 
     const getonlyRoomNumber = (roomId: string) => {
@@ -321,14 +319,15 @@ export default function BookingsPage() {
                             key={room.id}
                             type="button"
                             onClick={() => onSelect(room.id)}
-                            className={`text-left rounded-3xl p-5 min-h-[150px] border transition-all ${isSelected ? 'border-[#4F81FF] bg-blue-50 shadow-lg shadow-blue-100' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                            className={`text-left rounded-3xl p-5 min-h-[150px] border transition-all ${isSelected ? 'border-[#4F81FF] bg-blue-50/70 shadow-lg shadow-blue-100/50 ring-2 ring-[#4F81FF]/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-sm'}`}
                         >
-                            <p className="text-base font-semibold text-slate-900">ห้อง {room.room_number}</p>
+                            <p className="text-base font-bold text-slate-900">ห้อง {room.room_number}</p>
                             <div className="mt-3 text-sm text-slate-600 leading-6 space-y-1">
                                 <p>{room.room_type || '-'} | ครัว{room.kitchen_type || '-'} | วิว{room.view_direction || '-'}</p>
                                 <p>{room.building ? `ตึก ${room.building}` : 'ตึก -'} · {room.floor != null ? `ชั้น ${room.floor}` : 'ชั้น -'}</p>
                                 {freeWindow && (
-                                    <p className="text-xs text-slate-500">
+                                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                                        <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                         ว่าง: {formatWindowDate(freeWindow.start) ?? 'ตั้งแต่ต้น'} — {formatWindowDate(freeWindow.end) ?? 'ไม่มีกำหนด'}
                                     </p>
                                 )}
@@ -423,7 +422,6 @@ export default function BookingsPage() {
     };
 
     const handleRenewContract = (oldContract: any) => {
-        // 1. คำนวณวันเหมือนเดิม
         const today = (() => {
             const d = new Date();
             const year = d.getFullYear();
@@ -438,16 +436,13 @@ export default function BookingsPage() {
         const newStartDateStr = newStartDate.toISOString().split('T')[0];
 
         const newEndDateStr = addDays(addYears(newStartDateStr, 1), -1);
-
         const newStatus = isOldContractExpired ? 'active' : 'upcoming';
 
-        // 2. โยนข้อมูลใส่ createForm เพื่อเตรียมแสดงผลบน Modal
         setCreateForm({
             tenant_name: oldContract.tenant_name,
             actual_check_in_date: newStartDateStr,
             contract_start_date: newStartDateStr,
             contract_end_date: newEndDateStr,
-            // If the contract has a pending move, prefer the destination room
             main_room_id: oldContract.move_to_room_id || oldContract.main_room_id,
             main_start_date: newStartDateStr,
             main_end_date: newEndDateStr,
@@ -456,11 +451,9 @@ export default function BookingsPage() {
             temp_start_date: '',
             temp_end_date: '',
             status: newStatus,
-            parent_contract_id: oldContract.id // เก็บรหัสสัญญาเก่าไว้เพื่อเอาไปบันทึก
+            parent_contract_id: oldContract.id
         });
         setIsShortTermContract(false);
-
-        // 3. เปิด Modal สร้างการจอง
         setIsCreateModalOpen(true);
     };
 
@@ -472,7 +465,6 @@ export default function BookingsPage() {
                 const contractToRenew = contracts.find((c: any) => c.id === renewContractId);
                 if (contractToRenew) {
                     handleRenewContract(contractToRenew);
-                    // Clear the query parameter from the URL
                     const url = new URL(window.location.href);
                     url.searchParams.delete('renewContractId');
                     window.history.replaceState(null, '', url.pathname + url.search);
@@ -531,7 +523,6 @@ export default function BookingsPage() {
         }
     };
 
-    // Move currently-selected main room into the temporary slot (for cases where user picked it by mistake)
     const moveCreateMainToTemp = () => {
         if (!createForm.main_room_id) return;
         setCreateForm({
@@ -546,7 +537,6 @@ export default function BookingsPage() {
         });
     };
 
-    // Move currently-selected main room into the temp slot in edit form
     const moveEditMainToTemp = () => {
         if (!editForm || !editForm.main_room_id) return;
         setEditForm({
@@ -561,7 +551,6 @@ export default function BookingsPage() {
         });
     };
 
-    // Move temp -> main for create modal
     const moveCreateTempToMain = () => {
         if (!createForm.temp_room_id) return;
         setCreateForm({
@@ -576,7 +565,6 @@ export default function BookingsPage() {
         });
     };
 
-    // Move temp -> main for edit modal
     const moveEditTempToMain = () => {
         if (!editForm || !editForm.temp_room_id) return;
         setEditForm({
@@ -652,7 +640,6 @@ export default function BookingsPage() {
         }
     };
 
-    // ── NEW: Handle create contract submit ──
     const handleCreateContract = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -719,12 +706,8 @@ export default function BookingsPage() {
             main_start_date: normalizeDate(effectiveMainStart),
             main_end_date: normalizeDate(effectiveMainEnd),
             monthly_rent: createForm.monthly_rent ? Number(createForm.monthly_rent) : null,
-
-            // --- จุดที่แก้ไข 2 บรรทัดนี้ ---
             status: createForm.status || 'active',
             parent_contract_id: createForm.parent_contract_id || null,
-            // -------------------------
-
             temp_room_id: createForm.has_temp_room ? (createForm.temp_room_id || null) : null,
             temp_start_date: createForm.has_temp_room ? normalizeDate(createForm.temp_start_date) : null,
             temp_end_date: createForm.has_temp_room ? normalizeDate(createForm.temp_end_date) : null,
@@ -770,11 +753,9 @@ export default function BookingsPage() {
                 temp_end_date: '',
                 status: 'active',
                 monthly_rent: '',
-                parent_contract_id: null, // เพิ่มตรงนี้
+                parent_contract_id: null,
             });
             fetchData();
-            // หากการสร้างสัญญานี้มาจาก flow การต่อสัญญา (มี parent_contract_id)
-            // ให้บันทึกความตั้งใจเป็น 'renew' สำหรับสัญญาเดิม
             if (payload.parent_contract_id) {
                 try {
                     const parentId = payload.parent_contract_id;
@@ -793,7 +774,6 @@ export default function BookingsPage() {
                         if (!insErr && newIntId) await logAudit(profile, 'renewal_intentions', 'create', newIntId, 'เพิ่มความตั้งใจต่อสัญญาเป็น renew (หลังสร้างสัญญาใหม่)', rec);
                     }
 
-                    // รีเฟรช intentions ในหน้านี้ด้วย
                     const { data: iData } = await supabase.from('renewal_intentions').select('*');
                     if (iData) setIntentions(iData);
                 } catch (e) {
@@ -802,8 +782,6 @@ export default function BookingsPage() {
             }
         }
     };
-
-    // availability helpers moved to src/lib/availability.ts
 
     const formatDateTH = (dateStr: string) => {
         if (!dateStr || dateStr === '2000-01-01' || dateStr === '2099-12-31') return null;
@@ -815,15 +793,15 @@ export default function BookingsPage() {
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'active':
-                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">ACTIVE</span>;
+                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 tracking-wider">ACTIVE</span>;
             case 'completed':
-                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-50 text-slate-500 border border-slate-200/60">COMPLETED</span>;
+                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-50 text-slate-500 border border-slate-200/60 tracking-wider">COMPLETED</span>;
             case 'upcoming':
-                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/60">UPCOMING</span>;
+                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/60 tracking-wider">UPCOMING</span>;
             case 'cancelled':
-                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-red-50 text-red-600 border border-red-200/60">CANCELLED</span>;
+                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-red-50 text-red-600 border border-red-200/60 tracking-wider">CANCELLED</span>;
             default:
-                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">{status.toUpperCase()}</span>;
+                return <span className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60 tracking-wider">{status.toUpperCase()}</span>;
         }
     };
 
@@ -832,11 +810,26 @@ export default function BookingsPage() {
         if (!intentionObj) return null;
 
         const config: any = {
-            not_asked: { label: 'ยังไม่สอบถาม', color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-300', icon: '❔' },
-            pending: { label: 'รอตอบกลับ', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', icon: '⏳' },
-            renew: { label: 'ต่อสัญญาห้องเดิม', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300', icon: '✅' },
-            renew_no_room: { label: 'ต่อสัญญาไม่ระบุห้อง', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', icon: '🔄' },
-            not_renew: { label: 'ไม่ต่อสัญญา', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-300', icon: '🚪' },
+            not_asked: { 
+                label: 'ยังไม่สอบถาม', color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-300', 
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 
+            },
+            pending: { 
+                label: 'รอตอบกลับ', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', 
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 
+            },
+            renew: { 
+                label: 'ต่อสัญญาห้องเดิม', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300', 
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 
+            },
+            renew_no_room: { 
+                label: 'ต่อสัญญาไม่ระบุห้อง', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', 
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> 
+            },
+            not_renew: { 
+                label: 'ไม่ต่อสัญญา', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-300', 
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg> 
+            },
         };
 
         const cfg = config[intentionObj.intention];
@@ -849,74 +842,15 @@ export default function BookingsPage() {
         );
     };
 
-    const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 focus:border-[#4F81FF] focus:bg-white outline-none transition-all";
+    const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/30 focus:border-[#4F81FF] focus:bg-white outline-none transition-all duration-200 font-medium";
     const labelCls = "block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2";
     const isRenewalMode = Boolean(createForm.parent_contract_id);
     const renewalRoom = rooms.find((r: any) => r.id === createForm.main_room_id);
 
-    // ── Shared room selector for create modal ──
-    const renderCreateRoomSelector = () => {
-        const start = createForm.main_start_date || createForm.contract_start_date;
-        const end = createForm.main_end_date || createForm.contract_end_date;
-
-        if (!start || !end) {
-            return (
-                <select className={`${inputCls} cursor-pointer`} value="" disabled>
-                    <option value="">⚠️ ใส่วันที่ก่อนเพื่อดูห้องว่าง</option>
-                </select>
-            );
-        }
-
-        const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
-        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, start, end));
-        const perfectMatchRooms = availableRooms.filter(r => {
-            const isMatch = (prefVal: any, roomVal: any) => {
-                if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
-                return prefVal === roomVal;
-            };
-            return isMatch(customerPref.room_type, r.room_type)
-                && isMatch(customerPref.kitchen_type, r.kitchen_type)
-                && isMatch(customerPref.view_preference, r.view_direction);
-        });
-        const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
-
-        return (
-            <select
-                className={`${inputCls} cursor-pointer`}
-                required
-                value={createForm.main_room_id}
-                onChange={(e) => setCreateForm({ ...createForm, main_room_id: e.target.value })}
-            >
-                <option value="">-- เลือกห้อง --</option>
-                {perfectMatchRooms.length > 0 && (
-                    <optgroup label="⭐️ ตรงสเปกลูกค้า">
-                        {perfectMatchRooms.map(r => (
-                            <option key={r.id} value={r.id}>
-                                ห้อง {r.room_number} ({r.room_type || '-'} | วิว{r.view_direction || '-'} | ครัว{r.kitchen_type || '-'})
-                            </option>
-                        ))}
-                    </optgroup>
-                )}
-                {otherRooms.length > 0 && (
-                    <optgroup label="🏢 ห้องว่างอื่นๆ">
-                        {otherRooms.map(r => (
-                            <option key={r.id} value={r.id}>
-                                ห้อง {r.room_number} ({r.room_type || '-'} | วิว{r.view_direction || '-'} | ครัว{r.kitchen_type || '-'})
-                            </option>
-                        ))}
-                    </optgroup>
-                )}
-                {availableRooms.length === 0 && (
-                    <option value="" disabled>❌ ไม่มีห้องว่างในช่วงนี้</option>
-                )}
-            </select>
-        );
-    };
-
     const renderCreateTempRoomSelector = () => {
         if (!createForm.temp_start_date || !createForm.temp_end_date) {
             return (
-                <div className="rounded-2xl bg-white border border-slate-200 p-6 text-slate-600 text-sm">
+                <div className="rounded-2xl bg-white border border-slate-200 p-6 text-slate-600 text-sm font-medium">
                     กรุณาระบุวันที่เริ่มเข้าพักและวันที่ย้ายออกของห้องชั่วคราว
                 </div>
             );
@@ -939,8 +873,9 @@ export default function BookingsPage() {
 
         if (availableRooms.length === 0) {
             return (
-                <div className="flex items-center gap-3 bg-red-50 border border-red-200/60 rounded-2xl px-4 py-4 text-sm text-red-600 font-medium">
-                    <span className="text-xl">❌</span> ไม่มีห้องชั่วคราวว่างในช่วงนี้
+                <div className="flex items-center gap-3 bg-red-50 border border-red-200/60 rounded-2xl px-4 py-4 text-sm text-red-600 font-bold">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    ไม่มีห้องชั่วคราวว่างในช่วงนี้
                 </div>
             );
         }
@@ -956,31 +891,35 @@ export default function BookingsPage() {
                     onClick={() => setCreateForm({ ...createForm, temp_room_id: createForm.temp_room_id === room.id ? '' : room.id })}
                     className={`relative text-left rounded-2xl p-4 border transition-all w-full ${isSelected
                         ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20'
-                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50'
                         }`}
                 >
-                    {isMatchRoom && <span className="absolute top-2.5 right-2.5 text-[10px]">⭐</span>}
+                    {isMatchRoom && (
+                        <span className="absolute top-2.5 right-2.5 text-amber-500">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                        </span>
+                    )}
                     <p className={`text-base font-bold mb-2 ${isSelected ? 'text-[#4F81FF]' : 'text-slate-800'}`}>
                         ห้อง {room.room_number}
                     </p>
                     <div className="flex flex-wrap gap-1.5 mb-2">
                         {room.room_type && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
                                 {room.room_type}
                             </span>
                         )}
                         {room.view_direction && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
                                 วิว{room.view_direction}
                             </span>
                         )}
                         {room.kitchen_type && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
                                 ครัว{room.kitchen_type}
                             </span>
                         )}
                     </div>
-                    <div className={`flex items-center gap-1 text-[10px] font-medium ${isSelected ? 'text-blue-500' : 'text-emerald-600'}`}>
+                    <div className={`flex items-center gap-1 text-[10px] font-bold ${isSelected ? 'text-blue-500' : 'text-emerald-600'}`}>
                         <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
@@ -992,11 +931,11 @@ export default function BookingsPage() {
 
         return (
             <div className="space-y-4">
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>ห้องชั่วคราวว่าง <span className="font-bold text-slate-700">{availableRooms.length}</span> ห้อง</span>
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                    <span>ห้องชั่วคราวว่าง <span className="text-slate-700 font-extrabold">{availableRooms.length}</span> ห้อง</span>
                     {perfectMatchRooms.length > 0 && (
-                        <span className="bg-amber-50 text-amber-700 border border-amber-200/60 px-3 py-1 rounded-full font-semibold text-[11px]">
-                            ⭐ ตรงสเปก {perfectMatchRooms.length} ห้อง
+                        <span className="bg-amber-50 text-amber-700 border border-amber-200/60 px-3 py-1 rounded-full text-[11px] flex items-center gap-1">
+                            ตรงสเปก {perfectMatchRooms.length} ห้อง
                         </span>
                     )}
                 </div>
@@ -1009,7 +948,7 @@ export default function BookingsPage() {
                 )}
                 {otherRooms.length > 0 && (
                     <div>
-                        <p className="text-[11px] font-bold text-slate-500 mb-2">🏢 ห้องว่างอื่นๆ</p>
+                        <p className="text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wide">🏢 ห้องว่างอื่นๆ</p>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                             {otherRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={false} />)}
                         </div>
@@ -1019,10 +958,12 @@ export default function BookingsPage() {
                     const room = rooms.find(r => r.id === createForm.temp_room_id);
                     return room ? (
                         <div className="flex items-center gap-3 bg-blue-50 border border-blue-200/60 rounded-2xl px-4 py-3">
-                            <div className="w-8 h-8 bg-[#4F81FF] rounded-xl flex items-center justify-center text-white text-sm shrink-0">🔑</div>
+                            <div className="w-8 h-8 bg-[#4F81FF] rounded-xl flex items-center justify-center text-white text-sm shrink-0">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                            </div>
                             <div>
                                 <p className="text-sm font-bold text-blue-800">ห้อง {room.room_number} — เลือกแล้ว</p>
-                                <p className="text-xs text-blue-600">
+                                <p className="text-xs text-blue-600 font-medium">
                                     {[room.room_type, room.view_direction ? `วิว${room.view_direction}` : null, room.kitchen_type ? `ครัว${room.kitchen_type}` : null].filter(Boolean).join(' · ')}
                                 </p>
                             </div>
@@ -1034,58 +975,76 @@ export default function BookingsPage() {
     };
 
     return (
-        <div className="min-h-full flex flex-col bg-transparent">
-            <div className="flex-1 p-8 md:p-10">
+        <div className="min-h-full flex flex-col bg-slate-50/50">
+            {/* ฝังฟอนต์ K2D ลงในสไตล์ชีทท้องถิ่นเพื่อรับประกันความสวยงาม */}
+            <style jsx global>{`
+                @import url('https://fonts.googleapis.com/css2?family=K2D:wght@300;400;500;600;700;800&display=swap');
+                div, button, input, select, h1, h2, h3, h4, p, span, label {
+                    font-family: 'K2D', sans-serif !important;
+                }
+            `}</style>
 
+            <div className="flex-1 p-8 md:p-10 max-w-7xl w-full mx-auto">
                 {/* Header */}
-                <div className="flex justify-between items-end mb-8">
-
-                    {/* ── NEW: Create booking button ── */}
+                <div className="flex justify-between items-center mb-8 pb-4 border-b border-slate-200/60">
+                    <div>
+                        <h1 className="text-2xl font-extrabold text-[#0A2647] tracking-tight">ระบบจัดการการจองห้องพัก</h1>
+                        <p className="text-sm text-slate-500 font-medium mt-1">บริหารจัดการสัญญาเช่า สัญญาหลัก และการจัดสรรห้องพักชั่วคราว</p>
+                    </div>
                     {isEditable && (
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="flex items-center gap-2 px-5 py-3 bg-[#4F81FF] hover:bg-[#3D6CE5] text-white rounded-2xl text-sm font-bold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-95"
+                            className="flex items-center gap-2 px-6 py-3.5 bg-[#4F81FF] hover:bg-[#3D6CE5] text-white rounded-2xl text-sm font-bold shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-[0.98]"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                            <svg className="w-4 h-4 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                             </svg>
-                            สร้างการจอง
+                            สร้างการจองใหม่
                         </button>
                     )}
                 </div>
 
-                {/* Stats */}
+                {/* Stats Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl">📋</div>
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex items-center gap-5 transition-transform hover:scale-[1.01]">
+                        <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shadow-inner">
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </div>
                         <div>
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">สัญญาที่กรองแล้ว</p>
-                            <p className="text-2xl font-bold text-[#0A2647]">{filteredContracts.length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">สัญญาที่กรองแล้ว</p>
+                            <p className="text-2xl font-extrabold text-[#0A2647]">{filteredContracts.length} <span className="text-sm font-bold text-slate-400">รายการ</span></p>
                         </div>
                     </div>
-                    <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl">✅</div>
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex items-center gap-5 transition-transform hover:scale-[1.01]">
+                        <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
                         <div>
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">สัญญา Active</p>
-                            <p className="text-2xl font-bold text-[#0A2647]">{filteredContracts.filter(c => c.status === 'active').length} <span className="text-sm font-medium text-slate-500">รายการ</span></p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">สัญญา Active</p>
+                            <p className="text-2xl font-extrabold text-[#0A2647]">{filteredContracts.filter(c => c.status === 'active').length} <span className="text-sm font-bold text-slate-400">รายการ</span></p>
                         </div>
                     </div>
-                    <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex items-center gap-5">
-                        <div className="w-14 h-14 bg-red-100 text-red-500 rounded-2xl flex items-center justify-center text-2xl">⏳</div>
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex items-center gap-5 transition-transform hover:scale-[1.01]">
+                        <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shadow-inner">
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
                         <div>
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">ต้องดำเนินการ</p>
-                            <p className="text-2xl font-bold text-[#0A2647]">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">ต้องดำเนินการ</p>
+                            <p className="text-2xl font-extrabold text-[#0A2647]">
                                 {filteredContracts.filter(c => !c.main_room_id && c.status !== 'cancelled').length}{' '}
-                                <span className="text-sm font-medium text-slate-500">รายการ</span>
+                                <span className="text-sm font-bold text-slate-400">รายการ</span>
                             </p>
                         </div>
                     </div>
                 </div>
 
-                <h2 className="text-lg font-bold text-[#0A2647] mb-4">รายการสัญญา</h2>
-
-                <div className="bg-white rounded-3xl p-5 mb-6 border border-slate-100 shadow-sm">
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                {/* Filters Section */}
+                <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                        <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                        <h2 className="text-sm font-bold text-[#0A2647] uppercase tracking-wider">ตัวกรองข้อมูลสัญญา</h2>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                         <div>
                             <label className={labelCls}>ตึก</label>
                             <select
@@ -1126,13 +1085,13 @@ export default function BookingsPage() {
                             </select>
                         </div>
                         <div>
-                            <label className={labelCls}>ทิศ</label>
+                            <label className={labelCls}>ทิศ (View)</label>
                             <select
                                 className={inputCls}
                                 value={listFilters.view}
                                 onChange={(e) => setListFilters({ ...listFilters, view: e.target.value })}
                             >
-                                <option value="">ทุกทิศ (View)</option>
+                                <option value="">ทุกทิศ</option>
                                 {viewOptions.map((value) => (
                                     <option key={value} value={value}>{value}</option>
                                 ))}
@@ -1143,7 +1102,7 @@ export default function BookingsPage() {
                             <input
                                 type="text"
                                 className={inputCls}
-                                placeholder="ค้นหา ชื่อผู้เช่า หรือ ห้อง"
+                                placeholder="ชื่อผู้เช่า หรือ เลขห้อง..."
                                 value={listFilters.search}
                                 onChange={(e) => setListFilters({ ...listFilters, search: e.target.value })}
                             />
@@ -1151,6 +1110,7 @@ export default function BookingsPage() {
                     </div>
                 </div>
 
+                {/* Main List */}
                 {loading ? (
                     <div className="flex justify-center p-20">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-4 border-[#4F81FF]"></div>
@@ -1183,75 +1143,72 @@ export default function BookingsPage() {
                             return (
                                 <div
                                     key={contract.id}
-                                    className={`bg-white rounded-2xl p-4 lg:p-5 flex flex-col lg:flex-row gap-4 lg:gap-6 shadow-sm hover:shadow-md border border-slate-100 transition-all duration-200 group ${contract.status === 'cancelled' ? 'opacity-60 grayscale-[20%]' : ''}`}
+                                    className={`bg-white rounded-2xl p-5 flex flex-col lg:flex-row gap-5 shadow-sm hover:shadow-md border border-slate-100 transition-all duration-200 ${contract.status === 'cancelled' ? 'opacity-60 grayscale-[10%]' : ''}`}
                                 >
-                                    {/* 1. ไอคอนเลขห้อง (ปรับขนาดให้สมดุลกับความสูงเนื้อหา) */}
+                                    {/* Room Number Box */}
                                     <button
                                         type="button"
                                         onClick={() => currentRoomId && handleRoomClick(currentRoomId)}
                                         disabled={!currentRoomId}
-                                        className={`w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-lg shadow-sm transition-all ${currentRoomId ? 'hover:bg-slate-100 hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
-                                        title={currentRoomId ? "ดูรายละเอียดห้อง" : undefined}
+                                        className={`w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 text-slate-800 flex items-center justify-center shrink-0 font-extrabold text-xl shadow-inner transition-all ${currentRoomId ? 'hover:bg-slate-100 hover:scale-105 cursor-pointer' : 'cursor-default'}`}
                                     >
                                         {currentRoomId ? getonlyRoomNumber(currentRoomId) : '-'}
                                     </button>
 
-                                    {/* 2. เนื้อหาหลัก (ใช้ min-w-0 เพื่อป้องกันปัญหา Flex overflow ล้นจอ) */}
-                                    <div className="flex-1 min-w-0 flex flex-col md:flex-row gap-4 md:gap-6 items-start md:items-center">
-
-                                        {/* ข้อมูลผู้เช่า */}
-                                        <div className="md:w-1/3 shrink-0 flex flex-col justify-center">
-                                            <h3 className="text-base font-bold text-slate-800 truncate" title={contract.tenant_name}>
+                                    {/* Middle Content Wrapper */}
+                                    <div className="flex-1 min-w-0 flex flex-col md:flex-row gap-5 items-start md:items-center">
+                                        {/* Tenant Info */}
+                                        <div className="md:w-1/3 shrink-0">
+                                            <h3 className="text-base font-bold text-slate-900 truncate" title={contract.tenant_name}>
                                                 {contract.tenant_name}
                                             </h3>
-
-                                            {/* --- ส่วนที่เพิ่มใหม่: วันที่สัญญา --- */}
-                                            <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                            <div className="text-xs font-semibold text-slate-500 mt-1 flex items-center gap-1.5">
+                                                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                                 <span>{contract.contract_start_date ? formatDateTH(contract.contract_start_date) : '-'}</span>
-                                                <span className="mx-1">-</span>
+                                                <span className="text-slate-300">•</span>
                                                 <span>{contract.contract_end_date ? formatDateTH(contract.contract_end_date) : '-'}</span>
                                             </div>
-                                            {/* ----------------------------- */}
-
-                                            <div className="mt-2 flex items-center flex-wrap gap-2">
+                                            <div className="mt-2.5 flex items-center flex-wrap gap-2">
                                                 {getStatusBadge(displayStatus)}
                                                 {getIntentionBadge(contract.id)}
                                             </div>
                                         </div>
 
-                                        {/* ข้อมูลห้องและการแจ้งเตือน */}
+                                        {/* Room Assignments Grid */}
                                         <div className="md:w-2/3 min-w-0 flex flex-col gap-3">
-                                            {/* ป้ายเตือนต่างๆ */}
+                                            {/* Action Alerts */}
                                             {(needsTempRoom || missingMainRoom) && (
                                                 <div className="flex flex-wrap gap-2">
                                                     {needsTempRoom && (
-                                                        <span className="bg-red-50 text-red-600 border border-red-200/60 text-xs px-3 py-1.5 rounded-lg font-medium animate-pulse flex items-center gap-1.5">
-                                                            🚨 ต้องระบุห้องชั่วคราว
+                                                        <span className="bg-red-50 text-red-600 border border-red-100 text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 animate-pulse">
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                                            ต้องระบุห้องชั่วคราว
                                                         </span>
                                                     )}
                                                     {missingMainRoom && (
-                                                        <span className="bg-amber-50 text-amber-700 border border-amber-200/60 text-xs px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5">
-                                                            ⚠️ ยังไม่ระบุห้องหลัก
+                                                        <span className="bg-amber-50 text-amber-700 border border-amber-100 text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1">
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                                            ยังไม่ระบุห้องหลัก
                                                         </span>
                                                     )}
                                                 </div>
                                             )}
 
-                                            {/* การ์ดห้องพัก (Scroll แนวนอนแบบไม่เห็น Scrollbar) */}
                                             <div className="flex flex-row flex-nowrap gap-3 text-sm overflow-x-auto pb-1 min-w-0 scrollbar-hide">
                                                 {contract.temp_room_id && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRoomClick(contract.temp_room_id)}
-                                                        className="shrink-0 w-[150px] rounded-xl border border-amber-200/70 bg-amber-50 p-3 min-h-[90px] flex flex-col justify-between text-left hover:bg-amber-100/50 hover:border-amber-300 hover:shadow-sm hover:scale-[1.02] active:scale-95 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-amber-400/50"
-                                                        title="คลิกเพื่อดูรายละเอียดห้องชั่วคราว"
+                                                        className="shrink-0 w-[160px] rounded-xl border border-amber-200 bg-amber-50/50 p-3 flex flex-col justify-between text-left hover:bg-amber-100/50 transition-all"
                                                     >
                                                         <div>
-                                                            <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 mb-0.5">ห้องพักชั่วคราว</div>
-                                                            <div className="font-bold text-slate-900">{getRoomNumber(contract.temp_room_id)}</div>
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-0.5 flex items-center gap-1">
+                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                                ห้องชั่วคราว
+                                                            </div>
+                                                            <div className="font-extrabold text-slate-900">{getRoomNumber(contract.temp_room_id)}</div>
                                                         </div>
-                                                        <div className="text-[11px] text-slate-600 mt-2 truncate">
+                                                        <div className="text-[11px] font-semibold text-slate-500 mt-2 truncate">
                                                             {formatDateTH(contract.temp_start_date) || '-'} - {formatDateTH(contract.temp_end_date) || '-'}
                                                         </div>
                                                     </button>
@@ -1261,26 +1218,24 @@ export default function BookingsPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRoomClick(contract.main_room_id)}
-                                                        className="shrink-0 w-[150px] rounded-xl border border-slate-200 bg-slate-50 p-3 min-h-[90px] flex flex-col justify-between text-left hover:bg-slate-100/80 hover:border-slate-300 hover:shadow-sm hover:scale-[1.02] active:scale-95 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-slate-300"
-                                                        title="คลิกเพื่อดูรายละเอียดห้องหลัก"
+                                                        className="shrink-0 w-[160px] rounded-xl border border-slate-200 bg-slate-50/70 p-3 flex flex-col justify-between text-left hover:bg-slate-100 transition-all"
                                                     >
                                                         <div>
-                                                            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">ห้องพักหลัก</div>
-                                                            <div className="font-bold text-slate-900 truncate">
-                                                                {getRoomNumber(contract.main_room_id)}
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5 flex items-center gap-1">
+                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                                                                ห้องพักหลัก
                                                             </div>
+                                                            <div className="font-extrabold text-slate-900 truncate">{getRoomNumber(contract.main_room_id)}</div>
                                                         </div>
-                                                        <div className="text-[11px] text-slate-600 mt-2 truncate">
+                                                        <div className="text-[11px] font-semibold text-slate-500 mt-2 truncate">
                                                             {formatDateTH(contract.main_start_date) || '-'} - {formatDateTH(contract.main_end_date) || '-'}
                                                         </div>
                                                     </button>
                                                 ) : (
-                                                    <div className="shrink-0 w-[150px] rounded-xl border border-slate-200 bg-slate-50 p-3 min-h-[90px] flex flex-col justify-between opacity-60">
+                                                    <div className="shrink-0 w-[160px] rounded-xl border border-dashed border-slate-200 bg-slate-50/30 p-3 flex flex-col justify-between opacity-60">
                                                         <div>
-                                                            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">ห้องพักหลัก</div>
-                                                            <div className="font-bold text-slate-400 truncate">
-                                                                ยังไม่ระบุห้อง
-                                                            </div>
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">ห้องพักหลัก</div>
+                                                            <div className="font-bold text-slate-400 truncate">ยังไม่ระบุห้อง</div>
                                                         </div>
                                                         <div className="text-[11px] text-slate-400 mt-2 truncate">
                                                             {formatDateTH(contract.main_start_date) || '-'} - {formatDateTH(contract.main_end_date) || '-'}
@@ -1292,14 +1247,16 @@ export default function BookingsPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRoomClick(contract.move_to_room_id)}
-                                                        className="shrink-0 w-[150px] rounded-xl border border-sky-200 bg-sky-50 p-3 min-h-[90px] flex flex-col justify-between text-left hover:bg-sky-100/50 hover:border-sky-300 hover:shadow-sm hover:scale-[1.02] active:scale-95 transition-all cursor-pointer outline-none focus:ring-2 focus:ring-sky-300"
-                                                        title="คลิกเพื่อดูรายละเอียดห้องที่ย้ายไป"
+                                                        className="shrink-0 w-[160px] rounded-xl border border-sky-200 bg-sky-50/50 p-3 flex flex-col justify-between text-left hover:bg-sky-100/50 transition-all"
                                                     >
                                                         <div>
-                                                            <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-700 mb-0.5">ย้ายห้องไปที่</div>
-                                                            <div className="font-bold text-slate-900">{getRoomNumber(contract.move_to_room_id)}</div>
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-sky-700 mb-0.5 flex items-center gap-1">
+                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                                                ย้ายห้องไปที่
+                                                            </div>
+                                                            <div className="font-extrabold text-slate-900">{getRoomNumber(contract.move_to_room_id)}</div>
                                                         </div>
-                                                        <div className="text-[11px] text-slate-600 mt-2 truncate">
+                                                        <div className="text-[11px] font-semibold text-slate-500 mt-2 truncate">
                                                             {formatDateTH(contract.move_start_date) || '-'} - {formatDateTH(contract.move_end_date) || '-'}
                                                         </div>
                                                     </button>
@@ -1308,35 +1265,26 @@ export default function BookingsPage() {
                                         </div>
                                     </div>
 
-                                    {/* 3. ปุ่ม Action (จัดเรียงชิดขวา และปรับความสูงให้เท่ากันที่พิกัด 38px/40px) */}
+                                    {/* Actions */}
                                     {isEditable && (
-                                        <div className="flex flex-wrap items-center justify-end gap-2 lg:pl-6 lg:border-l border-slate-100 pt-4 lg:pt-0 border-t lg:border-t-0 mt-2 lg:mt-0 shrink-0">
+                                        <div className="flex flex-wrap items-center justify-end gap-2 lg:pl-5 lg:border-l border-slate-100 pt-4 lg:pt-0 mt-2 lg:mt-0 shrink-0">
                                             <button
                                                 onClick={() => handleEditClick(contract)}
-                                                className="h-[38px] w-[38px] rounded-xl border border-transparent flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                                                className="h-[40px] w-[40px] rounded-xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all"
                                                 title="แก้ไขข้อมูล"
                                             >
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                             </button>
 
                                             {contract.status !== 'cancelled' && (
-                                                <>
-                                                    {/* <button
-                                                        onClick={() => handleRenewContract(contract)}
-                                                        className="h-[38px] bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 px-4 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5"
-                                                    >
-                                                        ต่อสัญญา
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                                    </button> */}
-                                                    <button
-                                                        onClick={() => openCancelModal(contract)}
-                                                        className="h-[38px] bg-red-50 hover:bg-red-500 text-red-600 hover:text-white border border-red-200 hover:border-red-500 px-4 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5"
-                                                        title="ยกเลิกสัญญา"
-                                                    >
-                                                        ยกเลิกสัญญา
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                    </button>
-                                                </>
+                                                <button
+                                                    onClick={() => openCancelModal(contract)}
+                                                    className="h-[40px] bg-red-50 hover:bg-red-500 text-red-600 hover:text-white border border-red-100 hover:border-red-500 px-4 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-red-500/5"
+                                                    title="ยกเลิกสัญญา"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                                    ยกเลิกสัญญา
+                                                </button>
                                             )}
                                         </div>
                                     )}
@@ -1345,11 +1293,13 @@ export default function BookingsPage() {
                         })}
 
                         {/* Empty State */}
-                        {contracts.length === 0 && (
-                            <div className="text-center py-16 text-slate-400 bg-white/50 rounded-3xl border border-slate-200 border-dashed flex flex-col items-center">
-                                <div className="text-5xl mb-4 opacity-50 grayscale">📭</div>
-                                <p className="font-semibold text-lg text-slate-600">ยังไม่มีสัญญาเช่า</p>
-                                <p className="text-sm mt-1 text-slate-500">สัญญาจะปรากฏที่นี่หลังจากจัดสรรห้องเรียบร้อยแล้ว</p>
+                        {filteredContracts.length === 0 && (
+                            <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 border-dashed flex flex-col items-center justify-center p-6">
+                                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mb-4 shadow-inner">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+                                </div>
+                                <p className="font-bold text-lg text-slate-700">ไม่พบข้อมูลสัญญาเช่า</p>
+                                <p className="text-sm text-slate-400 font-medium mt-1 max-w-sm">ไม่พบรายการที่ตรงกับเงื่อนไขการกรอง หรือยังไม่มีสัญญาระบบในขณะนี้</p>
                             </div>
                         )}
                     </div>
@@ -1358,35 +1308,33 @@ export default function BookingsPage() {
 
             {/* ─── Create Booking Modal ─── */}
             {isCreateModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2rem] w-full max-w-8xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-
+                <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-opacity">
+                    <div className="bg-white rounded-[2rem] w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
                         {/* Modal header */}
-                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center shrink-0">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center shrink-0 bg-slate-50/50">
                             <div>
-                                <h2 className="text-xl font-bold text-[#0A2647]">สร้างการจองใหม่</h2>
-                                <p className="text-sm text-slate-500 mt-0.5">ระบุข้อมูลผู้เช่าและห้องพัก</p>
+                                <h2 className="text-xl font-extrabold text-[#0A2647] tracking-tight">สร้างการจองใหม่</h2>
+                                <p className="text-sm text-slate-500 font-medium mt-0.5">ระบุรายละเอียดสัญญา ข้อมูลผู้เข้าพัก และจัดสรรสถานะห้องพัก</p>
                             </div>
                             <button
                                 onClick={() => {
                                     setIsCreateModalOpen(false);
                                     setIsShortTermContract(false);
                                 }}
-                                className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                                className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200/80 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-inner"
                             >
-                                ✕
+                                <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
 
                         {/* Modal body */}
                         <div className="p-8 overflow-y-auto flex-1">
-                            <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
+                            <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
                                 <form id="create-contract-form" onSubmit={handleCreateContract} className="space-y-6">
-
-                                    {/* Section 1: ชื่อ + วันที่ */}
+                                    {/* Section 1 */}
                                     <div>
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                            <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[10px]">1</span>
+                                        <p className="text-xs font-bold text-[#4F81FF] uppercase tracking-wider mb-4 flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center text-[10px] border border-blue-200">1</span>
                                             ข้อมูลผู้เช่า & ระยะเวลาสัญญา
                                         </p>
                                         <div className="mb-4">
@@ -1394,7 +1342,7 @@ export default function BookingsPage() {
                                             <input
                                                 type="text"
                                                 className={inputCls}
-                                                placeholder="กรอกชื่อผู้เช่า..."
+                                                placeholder="กรอกชื่อ-นามสกุลผู้เช่า..."
                                                 value={createForm.tenant_name}
                                                 onChange={(e) => setCreateForm({ ...createForm, tenant_name: e.target.value })}
                                                 required
@@ -1402,15 +1350,16 @@ export default function BookingsPage() {
                                             {createForm.tenant_name && (() => {
                                                 const pref = waitlists.find(w => w.name === createForm.tenant_name);
                                                 return pref ? (
-                                                    <p className="mt-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 inline-flex items-center gap-1.5">
-                                                        📋 ความต้องการ: <span className="font-semibold text-slate-700">{pref.room_type} | ครัว{pref.kitchen_type} | วิว{pref.view_preference}</span>
+                                                    <p className="mt-2 text-[11px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 inline-flex items-center gap-1.5">
+                                                        <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                        ความต้องการ: <span className="text-slate-800 font-bold">{pref.room_type} | ครัว{pref.kitchen_type} | วิว{pref.view_preference}</span>
                                                     </p>
                                                 ) : null;
                                             })()}
                                         </div>
-                                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label className={labelCls}>วันเริ่มต้นสัญญา <span className="text-red-400">*</span></label>
+                                                <label className={labelCls}>วันเริ่มต้นสัญญา <span className="text-red-500">*</span></label>
                                                 <input
                                                     type="date"
                                                     className={inputCls}
@@ -1428,7 +1377,7 @@ export default function BookingsPage() {
                                                     onChange={(e) => setCreateForm({ ...createForm, actual_check_in_date: e.target.value })}
                                                 />
                                             </div>
-                                            <div className="lg:col-span-2">
+                                            <div className="md:col-span-2">
                                                 <label className={labelCls}>วันสิ้นสุดสัญญา{isShortTermContract ? '' : ' (1 ปี)'}</label>
                                                 <input
                                                     type="date"
@@ -1443,55 +1392,43 @@ export default function BookingsPage() {
                                                     required
                                                 />
                                                 {createForm.parent_contract_id && (
-                                                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                                                    <div className="mt-3 flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                                                         <button
                                                             type="button"
                                                             onClick={() => setIsShortTermContract(prev => !prev)}
-                                                            className={`px-4 py-2 rounded-2xl text-sm font-semibold transition ${isShortTermContract ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${isShortTermContract ? 'bg-[#4F81FF] text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                                                         >
                                                             สัญญาระยะสั้น
                                                         </button>
-                                                        <p className="text-xs text-slate-500">
-                                                            {isShortTermContract
-                                                                ? 'สามารถแก้วันสิ้นสุดสัญญาได้เองแล้ว'
-                                                                : 'กดเพื่อเปิดการแก้วันที่สิ้นสุดสัญญาสำหรับการต่อสัญญา'}
+                                                        <p className="text-xs text-slate-500 font-medium">
+                                                            {isShortTermContract ? 'เปิดสิทธิ์แก้ไขวันสิ้นสุดสัญญาอิสระแล้ว' : 'เปิดปุ่มนี้เพื่อปลดล็อกวันสิ้นสุดสัญญา'}
                                                         </p>
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
-                                            <div className="md:col-span-2">
-                                                <label className={labelCls}>ราคาเช่าต่อเดือน</label>
-                                                <input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    className={inputCls}
-                                                    value={
-                                                        createForm.monthly_rent
-                                                            ? Number(createForm.monthly_rent).toLocaleString("en-US")
-                                                            : ""
-                                                    }
-                                                    onChange={(e) => {
-                                                        const value = e.target.value.replace(/,/g, "").replace(/\D/g, "");
-
-                                                        setCreateForm({
-                                                            ...createForm,
-                                                            monthly_rent: value ? Number(value) : 0,
-                                                        });
-                                                    }}
-                                                    placeholder="เช่น 17,000"
-                                                    required
-                                                />
-                                            </div>
+                                        <div className="mt-4">
+                                            <label className={labelCls}>ราคาเช่าต่อเดือน (บาท)</label>
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                className={inputCls}
+                                                value={createForm.monthly_rent ? Number(createForm.monthly_rent).toLocaleString("en-US") : ""}
+                                                onChange={(e) => {
+                                                    const value = e.target.value.replace(/,/g, "").replace(/\D/g, "");
+                                                    setCreateForm({ ...createForm, monthly_rent: value ? Number(value) : 0 });
+                                                }}
+                                                placeholder="เช่น 17,000"
+                                                required
+                                            />
                                         </div>
                                     </div>
 
-                                    {/* Section 3: Temp room (optional) */}
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                            <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center text-[10px]">3</span>
-                                            ห้องพักชั่วคราว (ถ้ามี)
+                                    {/* Section 2: Temp Room */}
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-md bg-amber-50 flex items-center justify-center text-[10px] border border-amber-200">2</span>
+                                            ห้องพักชั่วคราว (Optional)
                                         </p>
 
                                         {!createForm.has_temp_room ? (
@@ -1503,269 +1440,214 @@ export default function BookingsPage() {
                                                     temp_start_date: createForm.actual_check_in_date || createForm.contract_start_date || '',
                                                     temp_end_date: createForm.main_start_date || '',
                                                 })}
-                                                className="w-full flex items-center justify-center gap-2 py-4 bg-amber-50 border-2 border-dashed border-amber-200 text-amber-600 rounded-2xl text-sm font-semibold hover:bg-amber-100 hover:border-amber-300 transition-all"
+                                                className="w-full flex items-center justify-center gap-2 py-4 bg-amber-50/40 border-2 border-dashed border-amber-200 text-amber-700 rounded-2xl text-sm font-bold hover:bg-amber-50 hover:border-amber-300 transition-all shadow-sm"
                                             >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                                                เพิ่มห้องพักชั่วคราว (กรณีเข้าพักก่อนห้องหลักพร้อม)
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                                                ระบุห้องพักชั่วคราว (กรณีเข้าอยู่ก่อนห้องหลักพร้อมใช้งาน)
                                             </button>
                                         ) : (
-                                            <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-5 relative">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setCreateForm({ ...createForm, has_temp_room: false, temp_room_id: '', temp_start_date: '', temp_end_date: '' })}
-                                                    className="absolute top-4 right-4 text-xs px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-xl font-semibold hover:bg-red-50 transition-colors"
-                                                >
-                                                    ยกเลิก
-                                                </button>
-                                                {createForm.temp_room_id && (
+                                            <div className="bg-amber-50/40 border border-amber-200/70 rounded-2xl p-5 relative">
+                                                <div className="absolute top-4 right-4 flex gap-2">
+                                                    {createForm.temp_room_id && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={moveCreateTempToMain}
+                                                            className="text-xs px-2.5 py-1.5 bg-white text-emerald-700 border border-emerald-200 rounded-xl font-bold hover:bg-emerald-50 shadow-sm"
+                                                        >
+                                                            ตั้งเป็นห้องหลัก
+                                                        </button>
+                                                    )}
                                                     <button
                                                         type="button"
-                                                        onClick={moveCreateTempToMain}
-                                                        className="absolute top-4 right-20 text-xs px-3 py-1.5 bg-white text-emerald-700 border border-emerald-200 rounded-xl font-semibold hover:bg-emerald-50 transition-colors"
+                                                        onClick={() => setCreateForm({ ...createForm, has_temp_room: false, temp_room_id: '', temp_start_date: '', temp_end_date: '' })}
+                                                        className="text-xs px-2.5 py-1.5 bg-white text-red-500 border border-red-200 rounded-xl font-bold hover:bg-red-50 shadow-sm"
                                                     >
-                                                        ตั้งเป็นห้องหลัก
+                                                        ยกเลิก
                                                     </button>
-                                                )}
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
                                                     <div>
-                                                        <label className={labelCls}>เริ่มเข้าพัก</label>
+                                                        <label className={labelCls}>เริ่มเข้าพักห้องชั่วคราว</label>
                                                         <input
                                                             type="date"
-                                                            className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
+                                                            className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm font-medium outline-none focus:ring-2 focus:ring-amber-400/20"
                                                             value={createForm.temp_start_date}
                                                             onChange={(e) => setCreateForm({ ...createForm, temp_start_date: e.target.value })}
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className={labelCls}>ย้ายออก (ไปห้องหลัก)</label>
+                                                        <label className={labelCls}>ย้ายออกไปห้องหลัก</label>
                                                         <input
                                                             type="date"
-                                                            className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
+                                                            className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm font-medium outline-none focus:ring-2 focus:ring-amber-400/20"
                                                             value={createForm.temp_end_date}
                                                             onChange={handleCreateTempEndDateChange}
                                                         />
                                                     </div>
-                                                    <div className="hidden md:block" />
                                                 </div>
-                                                <div className="space-y-4 mt-5">
-                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                                        <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center text-[10px]">4</span>
-                                                        เลือกห้องพักชั่วคราว
-                                                    </p>
+                                                <div className="space-y-4 mt-5 pt-4 border-t border-amber-200/40">
+                                                    <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider">เลือกห้องพักชั่วคราวที่ว่าง</label>
                                                     {renderCreateTempRoomSelector()}
                                                 </div>
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Warn if a temp room is selected but no main room chosen yet */}
-                                    {createForm.has_temp_room && createForm.temp_room_id && !createForm.main_room_id && (
-                                        <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-                                            ⚠️ คุณเลือกห้องชั่วคราวแล้ว แต่ยังไม่ได้เลือกห้องหลัก — โปรดเลือกห้องหลักก่อนยืนยันการจอง
-                                        </div>
-                                    )}
                                 </form>
 
-                                <div className="space-y-6 bg-slate-50 border border-slate-200 rounded-[2rem] p-6 overflow-hidden">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">เลือกห้องพักหลัก</p>
-                                            <p className="text-sm text-slate-500">ดูห้องว่างในช่วงสัญญาได้ที่นี่</p>
-                                        </div>
-                                        {!isRenewalMode && createForm.main_room_id && (
-                                            <button
-                                                type="button"
-                                                onClick={moveCreateMainToTemp}
-                                                className="text-xs px-3 py-1.5 bg-white text-amber-700 border border-amber-200 rounded-xl font-semibold hover:bg-amber-50 transition-colors"
-                                            >
-                                                ย้ายห้องที่เลือกเป็นชั่วคราว
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {isRenewalMode ? (
-                                        <div className="rounded-2xl border border-blue-200/60 bg-blue-50 p-6">
-                                            <p className="text-sm font-semibold text-slate-700">ห้องเก่าที่ต่อสัญญา</p>
-                                            {renewalRoom ? (
-                                                <>
-                                                    <p className="mt-3 text-3xl font-bold text-blue-900">ห้อง {renewalRoom.room_number}</p>
-                                                    <p className="mt-2 text-sm text-blue-600">
-                                                        {[renewalRoom.room_type, renewalRoom.view_direction ? `วิว${renewalRoom.view_direction}` : null, renewalRoom.kitchen_type ? `ครัว${renewalRoom.kitchen_type}` : null]
-                                                            .filter(Boolean)
-                                                            .join(' · ')}
-                                                    </p>
-                                                    <p className="mt-4 text-sm text-slate-600">ห้องนี้ถูกล็อกไว้สำหรับการต่อสัญญาใหม่ ไม่ต้องเลือกห้องเพิ่มเติม</p>
-                                                </>
-                                            ) : (
-                                                <p className="mt-3 text-sm text-slate-600">ไม่พบข้อมูลห้องเดิม โปรดตรวจสอบข้อมูลสัญญา</p>
+                                {/* Right Pane: Main Room Picker Display */}
+                                <div className="space-y-5 bg-slate-50 border border-slate-200 rounded-[2rem] p-6 flex flex-col justify-between overflow-hidden">
+                                    <div>
+                                        <div className="flex items-center justify-between gap-4 pb-3 border-b border-slate-200">
+                                            <div>
+                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">เลือกห้องพักหลัก (Main Room)</p>
+                                                <p className="text-xs text-slate-500 font-medium">ห้องที่ผูกกับสัญญาหลักตามระยะเวลาจริง</p>
+                                            </div>
+                                            {!isRenewalMode && createForm.main_room_id && (
+                                                <button
+                                                    type="button"
+                                                    onClick={moveCreateMainToTemp}
+                                                    className="text-xs px-2.5 py-1.5 bg-white text-amber-700 border border-amber-200 rounded-xl font-bold hover:bg-amber-50 shadow-sm"
+                                                >
+                                                    เปลี่ยนเป็นห้องชั่วคราว
+                                                </button>
                                             )}
                                         </div>
-                                    ) : createForm.contract_start_date && createForm.contract_end_date ? (
-                                        (() => {
-                                            const start = createForm.main_start_date || createForm.contract_start_date;
-                                            const end = createForm.main_end_date || createForm.contract_end_date;
-                                            const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
-                                            const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
-                                            const isMatch = (prefVal: any, roomVal: any) => {
-                                                if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
-                                                return prefVal === roomVal;
-                                            };
-                                            const perfectMatchRooms = availableRooms.filter(r =>
-                                                isMatch(customerPref.room_type, r.room_type) &&
-                                                isMatch(customerPref.kitchen_type, r.kitchen_type) &&
-                                                isMatch(customerPref.view_preference, r.view_direction)
-                                            );
-                                            const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
 
-                                            if (availableRooms.length === 0) {
-                                                return (
-                                                    <div className="flex items-center gap-3 bg-red-50 border border-red-200/60 rounded-2xl px-4 py-4 text-sm text-red-600 font-medium">
-                                                        <span className="text-xl">❌</span> ไม่มีห้องว่างในช่วงเวลานี้
-                                                    </div>
-                                                );
-                                            }
-
-                                            const RoomCard = ({ room, isMatchRoom }: { room: any; isMatchRoom: boolean }) => {
-                                                const isSelected = createForm.main_room_id === room.id;
-                                                const fw = getRoomFreeWindow(contracts, room.id, start, end);
-                                                const fmtDate = (d: string) => formatDateTH(d);
-
-                                                return (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setCreateForm({ ...createForm, main_room_id: createForm.main_room_id === room.id ? '' : room.id })}
-                                                        className={`relative text-left rounded-2xl p-4 border transition-all w-full ${isSelected
-                                                            ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20'
-                                                            : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50'
-                                                            }`}
-                                                    >
-                                                        {isMatchRoom && <span className="absolute top-2.5 right-2.5 text-[10px]">⭐</span>}
-                                                        <p className={`text-base font-bold mb-2 ${isSelected ? 'text-[#4F81FF]' : 'text-slate-800'}`}>
-                                                            ห้อง {room.room_number}
-                                                        </p>
-                                                        <div className="flex flex-wrap gap-1.5 mb-2">
-                                                            {room.room_type && (
-                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
-                                                                    {room.room_type}
-                                                                </span>
-                                                            )}
-                                                            {room.view_direction && (
-                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
-                                                                    วิว{room.view_direction}
-                                                                </span>
-                                                            )}
-                                                            {room.kitchen_type && (
-                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isSelected ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600 border border-slate-200/60'}`}>
-                                                                    ครัว{room.kitchen_type}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className={`flex items-center gap-1 text-[10px] font-medium ${isSelected ? 'text-blue-500' : 'text-emerald-600'}`}>
-                                                            <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                            </svg>
-                                                            ว่าง: {fmtDate(fw.start) ?? 'ตั้งแต่ต้น'} — {fmtDate(fw.end) ?? 'ไม่มีกำหนด'}
-                                                        </div>
-                                                    </button>
-                                                );
-                                            };
-
-                                            return (
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center justify-between text-xs text-slate-500">
-                                                        <span>ห้องว่าง <span className="font-bold text-slate-700">{availableRooms.length}</span> ห้อง</span>
-                                                        {perfectMatchRooms.length > 0 && (
-                                                            <span className="bg-amber-50 text-amber-700 border border-amber-200/60 px-3 py-1 rounded-full font-semibold text-[11px]">
-                                                                ⭐{perfectMatchRooms.length} ห้อง
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {perfectMatchRooms.length > 0 && (
-                                                        <div>
-                                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                                                                {perfectMatchRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={true} />)}
-                                                            </div>
-                                                        </div>
+                                        <div className="mt-4">
+                                            {isRenewalMode ? (
+                                                <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5">
+                                                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">ห้องเดิมที่ใช้ต่อสัญญา</p>
+                                                    {renewalRoom ? (
+                                                        <>
+                                                            <p className="mt-2 text-2xl font-extrabold text-blue-900">ห้อง {renewalRoom.room_number}</p>
+                                                            <p className="text-xs text-blue-600 font-semibold mt-1">
+                                                                {[renewalRoom.room_type, renewalRoom.view_direction ? `วิว${renewalRoom.view_direction}` : null, renewalRoom.kitchen_type ? `ครัว${renewalRoom.kitchen_type}` : null].filter(Boolean).join(' · ')}
+                                                            </p>
+                                                        </>
+                                                    ) : (
+                                                        <p className="mt-2 text-sm text-slate-500">ไม่พบข้อมูลห้องเดิม</p>
                                                     )}
-                                                    {otherRooms.length > 0 && (
-                                                        <div>
-                                                            <p className="text-[11px] font-bold text-slate-500 mb-2">🏢 ห้องว่างอื่นๆ</p>
-                                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                                                                {otherRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={false} />)}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {createForm.main_room_id && (() => {
-                                                        const room = rooms.find(r => r.id === createForm.main_room_id);
-                                                        return room ? (
-                                                            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200/60 rounded-2xl px-4 py-3">
-                                                                <div className="w-8 h-8 bg-[#4F81FF] rounded-xl flex items-center justify-center text-white text-sm shrink-0">🔑</div>
-                                                                <div>
-                                                                    <p className="text-sm font-bold text-blue-800">ห้อง {room.room_number} — เลือกแล้ว</p>
-                                                                    <p className="text-xs text-blue-600">
-                                                                        {[room.room_type, room.view_direction ? `วิว${room.view_direction}` : null, room.kitchen_type ? `ครัว${room.kitchen_type}` : null].filter(Boolean).join(' · ')}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        ) : null;
-                                                    })()}
                                                 </div>
-                                            );
-                                        })()
-                                    ) : (
-                                        <div className="rounded-2xl bg-white border border-slate-200 p-6 text-slate-600 text-sm">
-                                            กรุณาเลือกวันเริ่มต้นและวันสิ้นสุดสัญญาเพื่อดูรายการห้องว่าง
+                                            ) : createForm.contract_start_date && createForm.contract_end_date ? (
+                                                (() => {
+                                                    const start = createForm.main_start_date || createForm.contract_start_date;
+                                                    const end = createForm.main_end_date || createForm.contract_end_date;
+                                                    const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
+                                                    const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
+                                                    const isMatch = (prefVal: any, roomVal: any) => (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') ? true : prefVal === roomVal;
+                                                    const perfectMatchRooms = availableRooms.filter(r => isMatch(customerPref.room_type, r.room_type) && isMatch(customerPref.kitchen_type, r.kitchen_type) && isMatch(customerPref.view_preference, r.view_direction));
+                                                    const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
+
+                                                    if (availableRooms.length === 0) {
+                                                        return (
+                                                            <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl p-4 text-xs text-red-600 font-bold">
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                                ไม่มีห้องว่างในระบบในช่วงเวลาที่เลือก
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    const RoomCard = ({ room, isMatchRoom }: { room: any; isMatchRoom: boolean }) => {
+                                                        const isSelected = createForm.main_room_id === room.id;
+                                                        const fw = getRoomFreeWindow(contracts, room.id, start, end);
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setCreateForm({ ...createForm, main_room_id: createForm.main_room_id === room.id ? '' : room.id })}
+                                                                className={`relative text-left rounded-xl p-3 border text-xs font-medium transition-all ${isSelected ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                                                            >
+                                                                <p className="font-bold text-sm text-slate-900">ห้อง {room.room_number}</p>
+                                                                <p className="text-slate-500 font-semibold mt-1 truncate">{room.room_type || '-'}</p>
+                                                                {isMatchRoom && <span className="absolute top-2 right-2 text-amber-500 text-[10px]">★</span>}
+                                                            </button>
+                                                        );
+                                                    };
+
+                                                    return (
+                                                        <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-1">
+                                                            {perfectMatchRooms.length > 0 && (
+                                                                <div>
+                                                                    <p className="text-[11px] font-bold text-amber-700 mb-1.5 flex items-center gap-1">⭐ ตรงสเปกแนะนำ</p>
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        {perfectMatchRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={true} />)}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {otherRooms.length > 0 && (
+                                                                <div>
+                                                                    <p className="text-[11px] font-bold text-slate-400 mb-1.5 uppercase tracking-wide">ห้องว่างทั่วไป</p>
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        {otherRooms.map(r => <RoomCard key={r.id} room={r} isMatchRoom={false} />)}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()
+                                            ) : (
+                                                <div className="text-center py-8 text-slate-400 font-medium text-xs bg-white border border-slate-200 rounded-xl border-dashed">
+                                                    กรุณาระบุวันเริ่มสัญญาเพื่อระบบจะคำนวณห้องว่าง
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
+
+                                    {/* Action Footers inside right pane */}
+                                    {createForm.main_room_id && (() => {
+                                        const r = rooms.find(room => room.id === createForm.main_room_id);
+                                        return r ? (
+                                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-2">
+                                                <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                                <p className="text-xs font-bold text-emerald-800">จัดสรรเสร็จสิ้น: ห้องหลัก {r.room_number}</p>
+                                            </div>
+                                        ) : null;
+                                    })()}
                                 </div>
                             </div>
                         </div>
 
                         {/* Modal footer */}
-                        <div className="px-8 py-5 border-t border-slate-100 flex gap-4 shrink-0">
+                        <div className="px-8 py-5 border-t border-slate-100 flex gap-4 shrink-0 bg-slate-50">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setIsCreateModalOpen(false);
                                     setIsShortTermContract(false);
                                 }}
-                                className="flex-1 px-6 py-3.5 text-sm font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all"
+                                className="flex-1 px-6 py-3.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all"
                             >
-                                ยกเลิก
+                                ย้อนกลับ
                             </button>
                             <button
                                 type="submit"
                                 form="create-contract-form"
-                                className="flex-1 px-6 py-3.5 text-sm font-bold text-white bg-[#4F81FF] rounded-2xl hover:bg-[#3D6CE5] shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+                                className="flex-1 px-6 py-3.5 text-sm font-bold text-white bg-[#4F81FF] rounded-2xl hover:bg-[#3D6CE5] shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-1.5"
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                                </svg>
-                                ยืนยันการจอง
+                                <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                บันทึกการสร้างจอง
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* ─── Cancel Contract Modal ─── */}
             {isCancelModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2rem] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center shrink-0">
+                    <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl flex flex-col border border-slate-100">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
-                                <h2 className="text-xl font-bold text-[#0A2647]">ยกเลิกสัญญา</h2>
-                                <p className="text-sm text-slate-500 mt-0.5">เลือกวันที่ย้ายออกจริงโดยใช้ปฏิทิน</p>
+                                <h2 className="text-lg font-extrabold text-[#0A2647]">ยืนยันยกเลิกสัญญา</h2>
+                                <p className="text-xs text-slate-500 font-medium mt-0.5">ระบุวันที่ผู้เช่าย้ายออกจริงออกจากห้องพัก</p>
                             </div>
-                            <button
-                                onClick={() => setIsCancelModalOpen(false)}
-                                className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-                            >
-                                ✕
-                            </button>
+                            <button onClick={() => setIsCancelModalOpen(false)} className="text-slate-400 hover:text-slate-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
                         </div>
-                        <div className="p-8 space-y-6">
+                        <div className="p-8 space-y-4">
+                            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl">
+                                <p className="text-xs font-bold text-red-800">คุณกำลังยกเลิกสัญญาของ:</p>
+                                <p className="text-sm font-extrabold text-slate-900 mt-0.5">{cancelTenantName}</p>
+                            </div>
                             <div>
-                                <p className="text-sm font-semibold text-slate-600 mb-2">สัญญาของ: {cancelTenantName || '-'}</p>
                                 <label className={labelCls}>วันที่ย้ายออกจริง</label>
                                 <input
                                     type="date"
@@ -1773,715 +1655,134 @@ export default function BookingsPage() {
                                     value={cancelEndDate}
                                     onChange={(e) => setCancelEndDate(e.target.value)}
                                 />
-                                {/* <p className="mt-2 text-sm text-slate-500">{cancelEndDate ? new Date(cancelEndDate).toLocaleDateString('th-TH') : '-'}</p> */}
                             </div>
                         </div>
-                        <div className="px-8 py-5 border-t border-slate-100 flex gap-4 shrink-0">
+                        <div className="px-8 py-5 border-t border-slate-100 flex gap-3 bg-slate-50">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setIsCancelModalOpen(false);
-                                    setCancelContractId(null);
-                                    setCancelTenantName('');
-                                }}
-                                className="flex-1 px-6 py-3.5 text-sm font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all"
+                                onClick={() => setIsCancelModalOpen(false)}
+                                className="flex-1 px-4 py-3 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
                             >
-                                ย้อนกลับ
+                                ปิดหน้าต่าง
                             </button>
                             <button
                                 type="button"
                                 onClick={handleCancelContract}
-                                className="flex-1 px-6 py-3.5 text-sm font-bold text-white bg-red-600 rounded-2xl hover:bg-red-700 shadow-lg shadow-red-500/20 transition-all"
+                                className="flex-1 px-4 py-3 text-xs font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-md shadow-red-600/10"
                             >
-                                ยืนยันยกเลิก
+                                ยืนยันยกเลิกสัญญา
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ─── Edit Modal (unchanged) ─── */}
+            {/* ─── Edit Modal ─── */}
             {isEditModalOpen && editForm && (
                 <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2rem] w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center shrink-0">
+                    <div className="bg-white rounded-[2rem] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] border border-slate-100">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
-                                <h2 className="text-xl font-bold text-[#0A2647]">แก้ไขสัญญาเช่า</h2>
-                                {(() => {
-                                    const pref = waitlists.find(w => w.name === editForm.tenant_name) || {};
-                                    return (
-                                        <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                                            <p className="text-sm text-slate-500">
-                                                ผู้เช่า: <span className="text-[#4F81FF] font-bold">{editForm.tenant_name}</span>
-                                            </p>
-                                            {pref.room_type && (
-                                                <span className="text-[11px] font-semibold bg-slate-50 text-slate-600 px-3 py-1 rounded-lg border border-slate-200/60">
-                                                    {pref.room_type} | ครัว{pref.kitchen_type} | วิว{pref.view_preference}
-                                                </span>
-                                            )}
-                                        </div>
-                                    );
-                                })()}
+                                <h2 className="text-lg font-extrabold text-[#0A2647]">แก้ไขสัญญาเช่าพัก</h2>
+                                <p className="text-xs text-slate-500 font-semibold mt-0.5">ผู้เช่า: <span className="text-[#4F81FF]">{editForm.tenant_name}</span></p>
                             </div>
-                            <div className="flex items-center gap-3">
-                                {getStatusBadge(editForm.status)}
-                                <button
-                                    onClick={() => setIsEditModalOpen(false)}
-                                    className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-                                >
-                                    ✕
-                                </button>
-                            </div>
+                            <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
                         </div>
 
                         <form id="edit-contract-form" onSubmit={handleSaveEdit} className="p-8 space-y-6 overflow-y-auto flex-1">
                             <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    ระยะเวลาสัญญา & วันเข้าพัก
-                                </p>
-                                <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
-                                    <div>
-                                        <label className={labelCls}>วันเข้าพักก่อนเริ่มสัญญา</label>
-                                        <input type="date" className={inputCls}
-                                            value={editForm.actual_check_in_date || ''}
-                                            onChange={(e) => setEditForm({ ...editForm, actual_check_in_date: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className={labelCls}>วันเริ่มสัญญา</label>
-                                        <input type="date" className={inputCls}
-                                            value={editForm.contract_start_date || ''}
-                                            disabled
-                                            onChange={(e) => setEditForm({ ...editForm, contract_start_date: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className={labelCls}>วันสิ้นสุดสัญญา</label>
-                                        <input type="date" className={inputCls}
-                                            value={editForm.contract_end_date || ''}
-                                            disabled
-                                            onChange={(e) => setEditForm({ ...editForm, contract_end_date: e.target.value })} />
-                                    </div>
+                                <label className={labelCls}>วันเข้าพักก่อนเริ่มสัญญาจริง</label>
+                                <input type="date" className={inputCls} value={editForm.actual_check_in_date || ''} onChange={(e) => setEditForm({ ...editForm, actual_check_in_date: e.target.value })} />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className={labelCls}>วันเริ่มสัญญา (Read Only)</label>
+                                    <input type="date" className={`${inputCls} bg-slate-100 cursor-not-allowed`} value={editForm.contract_start_date || ''} disabled />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>วันสิ้นสุดสัญญา (Read Only)</label>
+                                    <input type="date" className={`${inputCls} bg-slate-100 cursor-not-allowed`} value={editForm.contract_end_date || ''} disabled />
                                 </div>
                             </div>
 
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center text-[10px]">1</span>
-                                    ห้องพักชั่วคราว (ถ้ามี)
-                                </p>
+                            {/* Temp Room section inside Edit */}
+                            <div className="pt-4 border-t border-slate-100">
+                                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-3">การจัดสรรห้องพักชั่วคราว</p>
                                 {!editForm.has_temp_room ? (
                                     <button
                                         type="button"
                                         onClick={() => setEditForm({ ...editForm, has_temp_room: true, temp_start_date: editForm.actual_check_in_date || '', temp_end_date: editForm.main_start_date || '' })}
-                                        className="w-full flex items-center justify-center gap-2 py-4 bg-amber-50 border-2 border-dashed border-amber-200 text-amber-600 rounded-2xl text-sm font-semibold hover:bg-amber-100 hover:border-amber-300 transition-all"
+                                        className="w-full py-3 bg-amber-50 text-amber-800 font-bold text-xs border border-dashed border-amber-300 rounded-xl hover:bg-amber-100/70"
                                     >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                                        เพิ่มห้องพักชั่วคราว (กรณีเข้าพักก่อนห้องหลักพร้อม)
+                                        + เพิ่มการใช้งานห้องชั่วคราว
                                     </button>
                                 ) : (
-                                    <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-5 relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditForm({ ...editForm, has_temp_room: false, temp_room_id: null, temp_start_date: null, temp_end_date: null })}
-                                            className="absolute top-4 right-4 text-xs px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-xl font-semibold hover:bg-red-50 transition-colors"
-                                        >
-                                            ยกเลิก
-                                        </button>
-                                        {editForm.temp_room_id && (
-                                            <button
-                                                type="button"
-                                                onClick={moveEditTempToMain}
-                                                className="absolute top-4 right-20 text-xs px-3 py-1.5 bg-white text-emerald-700 border border-emerald-200 rounded-xl font-semibold hover:bg-emerald-50 transition-colors"
-                                            >
-                                                ตั้งเป็นห้องหลัก
+                                    <div className="bg-amber-50/40 border border-amber-200 rounded-xl p-4 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <button type="button" onClick={() => setEditRoomPicker('temp')} className="px-3 py-1.5 bg-white border border-amber-300 text-xs font-bold rounded-xl text-slate-800">
+                                                {editForm.temp_room_id ? `ห้องที่เลือก: ${getRoomNumber(editForm.temp_room_id)}` : 'คลิกเพื่อเลือกห้องชั่วคราว'}
                                             </button>
-                                        )}
-                                        <div className="grid grid-cols-1 gap-4">
-                                            <div className="space-y-3">
-                                                <label className={labelCls}>เลือกห้อง</label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setEditRoomPicker('temp')}
-                                                    className="w-full inline-flex items-center justify-between rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:border-amber-300 hover:bg-amber-50 transition-all"
-                                                >
-                                                    <span>{editForm.temp_room_id ? `ห้อง ${getRoomNumber(editForm.temp_room_id)}` : 'เลือกห้อง'}</span>
-                                                    <span className="text-amber-500">เลือก</span>
-                                                </button>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                <div>
-                                                    <label className={labelCls}>เริ่มเข้าพัก</label>
-                                                    <input type="date" className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-amber-400/50 outline-none transition-all"
-                                                        value={editForm.temp_start_date || ''}
-                                                        onChange={(e) => setEditForm({ ...editForm, temp_start_date: e.target.value })} />
-                                                </div>
-                                                <div>
-                                                    <label className={labelCls}>ย้ายออก (ไปห้องหลัก)</label>
-                                                    <input type="date" className="w-full bg-white border border-amber-200 rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-amber-400/50 outline-none transition-all"
-                                                        value={editForm.temp_end_date || ''}
-                                                        onChange={handleTempEndDateChange} />
-                                                </div>
-                                            </div>
+                                            <button type="button" onClick={() => setEditForm({ ...editForm, has_temp_room: false, temp_room_id: null, temp_start_date: null, temp_end_date: null })} className="text-xs font-bold text-red-500">ลบออก</button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input type="date" className="p-2 text-xs bg-white border border-amber-200 rounded-lg" value={editForm.temp_start_date || ''} onChange={(e) => setEditForm({ ...editForm, temp_start_date: e.target.value })} />
+                                            <input type="date" className="p-2 text-xs bg-white border border-amber-200 rounded-lg" value={editForm.temp_end_date || ''} onChange={handleTempEndDateChange} />
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center text-[10px]">2</span>
-                                    ห้องพักหลัก (Main Room)
-                                </p>
-                                <div className="flex items-center justify-end mb-3">
-                                    {editForm.main_room_id && (
-                                        <button
-                                            type="button"
-                                            onClick={moveEditMainToTemp}
-                                            className="text-xs px-3 py-1.5 bg-white text-amber-700 border border-amber-200 rounded-xl font-semibold hover:bg-amber-50 transition-colors"
-                                        >
-                                            ย้ายห้องหลักนี้เป็นชั่วคราว
-                                        </button>
-                                    )}
+                            {/* Main Room selector inside Edit */}
+                            <div className="pt-4 border-t border-slate-100">
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className={labelCls}>ห้องพักหลัก (Main Room)</label>
+                                    <button type="button" onClick={() => setEditRoomPicker('main')} className="px-3 py-1 bg-white border border-slate-200 text-xs font-bold rounded-lg hover:bg-slate-50">
+                                        {editForm.main_room_id ? `ห้องหลัก: ${getRoomNumber(editForm.main_room_id)}` : 'จัดสรรห้องหลักใหม่'}
+                                    </button>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                    <div className="flex gap-4">
-                                        <div className="flex-1">
-                                            <label className={labelCls}>วันที่เริ่มอยู่</label>
-                                            <input type="date" className={inputCls}
-                                                value={editForm.main_start_date || ''}
-                                                onChange={(e) => setEditForm({ ...editForm, main_start_date: e.target.value })} />
-                                        </div>
-                                        <div className="flex-1">
-                                            <label className={labelCls}>วันที่ย้ายออก</label>
-                                            <input type="date" className={inputCls}
-                                                value={editForm.main_end_date || ''}
-                                                onChange={(e) => setEditForm({ ...editForm, main_end_date: e.target.value })} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className={labelCls}>เลือกห้องพัก</label>
-                                        {!editForm.main_start_date || !editForm.main_end_date ? (
-                                            <p className="py-4 px-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-500 text-sm">
-                                                ⚠️ ใส่วันที่ก่อนเพื่อดูห้องว่าง
-                                            </p>
-                                        ) : (() => {
-                                            const customerPref = waitlists.find(w => w.name === editForm.tenant_name) || {};
-                                            const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id));
-                                            const perfectMatchRooms = availableRooms.filter(r => {
-                                                const isMatch = (prefVal: any, roomVal: any) => {
-                                                    if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
-                                                    return prefVal === roomVal;
-                                                };
-                                                return isMatch(customerPref.room_type, r.room_type)
-                                                    && isMatch(customerPref.kitchen_type, r.kitchen_type)
-                                                    && isMatch(customerPref.view_preference, r.view_direction);
-                                            });
-                                            const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
-                                            return (
-                                                <div className="space-y-3">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setEditRoomPicker('main')}
-                                                        className="w-full inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 transition-all"
-                                                    >
-                                                        <span>{editForm.main_room_id ? `ห้อง ${getRoomNumber(editForm.main_room_id)}` : 'เลือกห้อง'}</span>
-                                                        <span>เลือก</span>
-                                                    </button>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-md bg-purple-100 text-purple-600 flex items-center justify-center text-[10px]">3</span>
-                                    ย้ายห้อง (ถ้ามี)
-                                </p>
-                                <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                                        <div>
-                                            <label className={labelCls}>วันที่ย้ายเข้าห้องใหม่</label>
-                                            <input type="date" className={inputCls}
-                                                value={editForm.move_start_date || ''}
-                                                onChange={handleMoveStartDateChange} />
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>ถึงวันที่</label>
-                                            <input type="date" className={inputCls}
-                                                value={editForm.move_end_date || ''}
-                                                onChange={(e) => setEditForm({ ...editForm, move_end_date: e.target.value })} />
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>เลือกห้องใหม่</label>
-                                            {(!editForm.move_start_date || !editForm.move_end_date) ? (
-                                                <p className="py-4 px-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-500 text-sm">
-                                                    ⚠️ ใส่วันที่ก่อนเพื่อดูห้องว่าง
-                                                </p>
-                                            ) : (
-                                                <div className="space-y-3">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setEditRoomPicker('move')}
-                                                        className="w-full inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 transition-all"
-                                                    >
-                                                        <span>{editForm.move_to_room_id ? `ห้อง ${getRoomNumber(editForm.move_to_room_id)}` : 'เลือกห้องใหม่'}</span>
-                                                        <span>เลือก</span>
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_start_date || ''} onChange={(e) => setEditForm({ ...editForm, main_start_date: e.target.value })} />
+                                    <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_end_date || ''} onChange={(e) => setEditForm({ ...editForm, main_end_date: e.target.value })} />
                                 </div>
                             </div>
                         </form>
 
-                        <div className="px-8 py-5 border-t border-slate-100 flex gap-4 shrink-0">
-                            <button
-                                type="button"
-                                onClick={() => setIsEditModalOpen(false)}
-                                className="flex-1 px-6 py-3.5 text-sm font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all"
-                            >
-                                ยกเลิก
-                            </button>
-                            <button
-                                type="submit"
-                                form="edit-contract-form"
-                                className="flex-1 px-6 py-3.5 text-sm font-bold text-white bg-[#4F81FF] rounded-2xl hover:bg-[#3D6CE5] shadow-lg shadow-blue-500/30 transition-all"
-                            >
-                                บันทึกการเปลี่ยนแปลง
-                            </button>
+                        <div className="px-8 py-5 border-t border-slate-100 flex gap-3 bg-slate-50">
+                            <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50">ยกเลิก</button>
+                            <button type="submit" form="edit-contract-form" className="flex-1 py-3 bg-[#4F81FF] text-white rounded-xl text-xs font-bold hover:bg-[#3D6CE5]">บันทึกการเปลี่ยนแปลง</button>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* ─── Edit Room Picker Inner Sub-Modal ─── */}
             {editRoomPicker && editForm && (
-                <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-60 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
-                        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between gap-4">
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-900">
-                                    {editRoomPicker === 'temp' ? 'เลือกห้องพักชั่วคราว' : editRoomPicker === 'main' ? 'เลือกห้องพักหลัก' : 'เลือกห้องย้ายใหม่'}
-                                </h3>
-                                <p className="text-sm text-slate-500 mt-1">
-                                    {editRoomPicker === 'temp'
-                                        ? 'เลือกห้องชั่วคราวที่ไม่ใช่ห้องหลัก'
-                                        : editRoomPicker === 'main'
-                                            ? 'เลือกห้องหลักตามวันที่กำหนด'
-                                            : 'เลือกห้องใหม่สำหรับช่วงย้ายห้อง'}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setEditRoomPicker(null)}
-                                className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600"
-                            >
-                                ✕
-                            </button>
+                <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col border border-slate-100">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <p className="font-bold text-sm text-[#0A2647]">เลือกรายการห้องพักที่ว่างเข้าระบบ</p>
+                            <button onClick={() => setEditRoomPicker(null)} className="text-slate-400 hover:text-slate-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
                         </div>
-                        <div className="p-8 overflow-y-auto flex-1 space-y-5">
-                            {editRoomPicker === 'temp' && (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                                        <div>
-                                            <label className={labelCls}>ตึก</label>
-                                            <select
-                                                className={inputCls}
-                                                value={roomFilters.building}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, building: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกตึก --</option>
-                                                {buildingOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>ชั้น</label>
-                                            <select
-                                                className={inputCls}
-                                                value={roomFilters.floor}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, floor: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกชั้น --</option>
-                                                {floorOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>ประเภทห้อง</label>
-                                            <select
-                                                className={inputCls}
-                                                value={roomFilters.room_type}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกประเภทห้อง --</option>
-                                                {roomTypeOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>ประเภทครัว</label>
-                                            <select
-                                                className={inputCls}
-                                                value={roomFilters.kitchen}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
-                                            >
-                                                <option value="">-- ทุกประเภทครัว --</option>
-                                                {kitchenOptions.map((value) => (
-                                                    <option key={value} value={value}>{value}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>ค้นหา</label>
-                                            <input
-                                                type="text"
-                                                className={inputCls}
-                                                placeholder="ค้นหาเลขห้อง หรือ ประเภท"
-                                                value={roomFilters.search}
-                                                onChange={(e) => setRoomFilters({ ...roomFilters, search: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                    {renderRoomButtonGrid(
-                                        rooms.filter(r => r.id !== editForm.main_room_id && applyRoomFilters(r)),
-                                        editForm.temp_room_id,
-                                        (roomId) => {
-                                            setEditForm({ ...editForm, temp_room_id: roomId });
-                                            setEditRoomPicker(null);
-                                        },
-                                        { searchStart: editForm.temp_start_date, searchEnd: editForm.temp_end_date }
-                                    )}
-                                </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {editRoomPicker === 'temp' && renderRoomButtonGrid(
+                                rooms.filter(r => r.id !== editForm.main_room_id && applyRoomFilters(r)),
+                                editForm.temp_room_id,
+                                (roomId) => { setEditForm({ ...editForm, temp_room_id: roomId }); setEditRoomPicker(null); },
+                                { searchStart: editForm.temp_start_date, searchEnd: editForm.temp_end_date }
                             )}
-
-                            {editRoomPicker === 'main' && (
-                                <div className="space-y-4">
-                                    {(!editForm.main_start_date || !editForm.main_end_date) ? (
-                                        <p className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-                                            ⚠️ กรุณาระบุวันที่เริ่มและวันที่ย้ายออกของห้องหลักก่อน
-                                        </p>
-                                    ) : (() => {
-                                        const customerPref = waitlists.find(w => w.name === editForm.tenant_name) || {};
-                                        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id) && applyRoomFilters(r));
-                                        const isMatch = (prefVal: any, roomVal: any) => {
-                                            if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
-                                            return prefVal === roomVal;
-                                        };
-                                        const perfectMatchRooms = availableRooms.filter(r =>
-                                            isMatch(customerPref.room_type, r.room_type) &&
-                                            isMatch(customerPref.kitchen_type, r.kitchen_type) &&
-                                            isMatch(customerPref.view_preference, r.view_direction)
-                                        );
-                                        const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
-                                        return (
-                                            <>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                                                    <div>
-                                                        <label className={labelCls}>ตึก</label>
-                                                        <select
-                                                            className={inputCls}
-                                                            value={roomFilters.building}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, building: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกตึก --</option>
-                                                            {buildingOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>ชั้น</label>
-                                                        <select
-                                                            className={inputCls}
-                                                            value={roomFilters.floor}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, floor: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกชั้น --</option>
-                                                            {floorOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>ประเภทห้อง</label>
-                                                        <select
-                                                            className={inputCls}
-                                                            value={roomFilters.room_type}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกประเภทห้อง --</option>
-                                                            {roomTypeOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>ประเภทครัว</label>
-                                                        <select
-                                                            className={inputCls}
-                                                            value={roomFilters.kitchen}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกประเภทครัว --</option>
-                                                            {kitchenOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>ค้นหา</label>
-                                                        <input
-                                                            type="text"
-                                                            className={inputCls}
-                                                            placeholder="ค้นหาเลขห้อง หรือ ประเภท"
-                                                            value={roomFilters.search}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, search: e.target.value })}
-                                                        />
-                                                    </div>
-                                                </div>
-                                                {perfectMatchRooms.length > 0 && (
-                                                    <div className="space-y-3">
-                                                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">⭐️ ตรงสเปกลูกค้า</p>
-                                                        {renderRoomButtonGrid(perfectMatchRooms, editForm.main_room_id, (roomId) => {
-                                                            setEditForm({ ...editForm, main_room_id: roomId });
-                                                            setEditRoomPicker(null);
-                                                        }, { searchStart: editForm.main_start_date, searchEnd: editForm.main_end_date })}
-                                                    </div>
-                                                )}
-                                                {otherRooms.length > 0 && (
-                                                    <div className="space-y-3">
-                                                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">🏢 ห้องว่างอื่นๆ</p>
-                                                        {renderRoomButtonGrid(otherRooms, editForm.main_room_id, (roomId) => {
-                                                            setEditForm({ ...editForm, main_room_id: roomId });
-                                                            setEditRoomPicker(null);
-                                                        }, { searchStart: editForm.main_start_date, searchEnd: editForm.main_end_date })}
-                                                    </div>
-                                                )}
-                                                {availableRooms.length === 0 && (
-                                                    <p className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-                                                        ❌ ไม่มีห้องว่างในช่วงนี้
-                                                    </p>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
-                                </div>
+                            {editRoomPicker === 'main' && renderRoomButtonGrid(
+                                rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id) && applyRoomFilters(r)),
+                                editForm.main_room_id,
+                                (roomId) => { setEditForm({ ...editForm, main_room_id: roomId }); setEditRoomPicker(null); },
+                                { searchStart: editForm.main_start_date, searchEnd: editForm.main_end_date }
                             )}
-
-                            {editRoomPicker === 'move' && (
-                                <div className="space-y-4">
-                                    {(!editForm.move_start_date || !editForm.move_end_date) ? (
-                                        <p className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-                                            ⚠️ กรุณาระบุวันที่ย้ายก่อนเพื่อดูห้องว่าง
-                                        </p>
-                                    ) : (() => {
-                                        const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.move_start_date, editForm.move_end_date, editForm.id) && applyRoomFilters(r));
-                                        return availableRooms.length > 0 ? (
-                                            <>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                                                    <div>
-                                                        <label className={labelCls}>ตึก</label>
-                                                        <select
-                                                            className={inputCls}
-                                                            value={roomFilters.building}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, building: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกตึก --</option>
-                                                            {buildingOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>ชั้น</label>
-                                                        <select
-                                                            className={inputCls}
-                                                            value={roomFilters.floor}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, floor: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกชั้น --</option>
-                                                            {floorOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>ประเภทห้อง</label>
-                                                        <select
-                                                            className={inputCls}
-                                                            value={roomFilters.room_type}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกประเภทห้อง --</option>
-                                                            {roomTypeOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>ประเภทครัว</label>
-                                                        <select
-                                                            className={inputCls}
-                                                            value={roomFilters.kitchen}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
-                                                        >
-                                                            <option value="">-- ทุกประเภทครัว --</option>
-                                                            {kitchenOptions.map((value) => (
-                                                                <option key={value} value={value}>{value}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>ค้นหา</label>
-                                                        <input
-                                                            type="text"
-                                                            className={inputCls}
-                                                            placeholder="ค้นหาเลขห้อง หรือ ประเภท"
-                                                            value={roomFilters.search}
-                                                            onChange={(e) => setRoomFilters({ ...roomFilters, search: e.target.value })}
-                                                        />
-                                                    </div>
-                                                </div>
-                                                {renderRoomButtonGrid(availableRooms, editForm.move_to_room_id, (roomId) => {
-                                                    setEditForm({ ...editForm, move_to_room_id: roomId });
-                                                    setEditRoomPicker(null);
-                                                }, { searchStart: editForm.move_start_date, searchEnd: editForm.move_end_date })}
-                                            </>
-                                        ) : (
-                                            <p className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-                                                ❌ ไม่มีห้องว่างในช่วงนี้
-                                            </p>
-                                        );
-                                    })()}
-                                </div>
+                            {editRoomPicker === 'move' && renderRoomButtonGrid(
+                                rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.move_start_date, editForm.move_end_date, editForm.id) && applyRoomFilters(r)),
+                                editForm.move_to_room_id,
+                                (roomId) => { setEditForm({ ...editForm, move_to_room_id: roomId }); setEditRoomPicker(null); },
+                                { searchStart: editForm.move_start_date, searchEnd: editForm.move_end_date }
                             )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ─── Room Details Modal ─── */}
-            {selectedRoomForDetail && (
-                <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-                    <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                        {/* Modal Header */}
-                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center shrink-0">
-                            <div>
-                                <h2 className="text-xl font-bold text-[#0A2647]">ข้อมูลห้องพัก</h2>
-                                <p className="text-sm text-slate-500 mt-0.5">รายละเอียดและสิ่งอำนวยความสะดวก</p>
-                            </div>
-                            <button
-                                onClick={() => setSelectedRoomForDetail(null)}
-                                className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        {/* Modal Body */}
-                        <div className="p-8 space-y-6 overflow-y-auto">
-                            {/* Main Header visual */}
-                            <div className="flex items-center gap-5 bg-slate-50 border border-slate-100 rounded-3xl p-5">
-                                <div className="w-16 h-16 bg-[#4F81FF] text-white rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg shadow-blue-500/20">
-                                    🚪
-                                </div>
-                                <div>
-                                    <h3 className="text-2xl font-bold text-[#0A2647]">ห้อง {selectedRoomForDetail.room_number}</h3>
-                                    <p className="text-sm text-slate-500 font-medium">
-                                        ตึก {selectedRoomForDetail.building || '-'} · ชั้น {selectedRoomForDetail.floor != null ? selectedRoomForDetail.floor : '-'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Features List */}
-                            <div className="space-y-4">
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">คุณลักษณะของห้อง</p>
-
-                                <div className="grid grid-cols-1 gap-3.5">
-                                    {/* ประเภทห้อง */}
-                                    <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-lg">🛏️</span>
-                                            <span className="text-sm font-semibold text-slate-500">ประเภทห้อง</span>
-                                        </div>
-                                        <span className="text-sm font-bold text-slate-800 bg-white border border-slate-200/60 px-3 py-1 rounded-xl">
-                                            {selectedRoomForDetail.room_type || 'ไม่ระบุ'}
-                                        </span>
-                                    </div>
-
-                                    {/* ประเภทครัว */}
-                                    <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-lg">🍳</span>
-                                            <span className="text-sm font-semibold text-slate-500">ประเภทครัว</span>
-                                        </div>
-                                        <span className="text-sm font-bold text-slate-800 bg-white border border-slate-200/60 px-3 py-1 rounded-xl">
-                                            {selectedRoomForDetail.kitchen_type || 'ไม่ระบุ'}
-                                        </span>
-                                    </div>
-
-                                    {/* ทิศ / วิว */}
-                                    <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-lg">🌅</span>
-                                            <span className="text-sm font-semibold text-slate-500">ทิศ / วิว</span>
-                                        </div>
-                                        <span className="text-sm font-bold text-slate-800 bg-white border border-slate-200/60 px-3 py-1 rounded-xl">
-                                            {selectedRoomForDetail.view_direction || 'ไม่ระบุ'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Occupancy Status Section */}
-                            <div className="pt-4 border-t border-slate-100 space-y-3">
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">สถานะการใช้งานปัจจุบัน</p>
-                                {(() => {
-                                    const activeContract = contracts.find(
-                                        c => c.status === 'active' && getCurrentRoomId(c) === selectedRoomForDetail.id
-                                    );
-
-                                    if (activeContract) {
-                                        return (
-                                            <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-4 space-y-3">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-                                                    <span className="text-sm font-bold text-amber-800">มีผู้เข้าพักในขณะนี้</span>
-                                                </div>
-                                                <div className="text-xs text-amber-700 space-y-1">
-                                                    <p className="font-semibold">ผู้เช่า: <span className="text-slate-900 font-bold">{activeContract.tenant_name}</span></p>
-                                                    <p>
-                                                        ระยะเวลาสัญญา: {formatDateTH(activeContract.contract_start_date) || '-'} - {formatDateTH(activeContract.contract_end_date) || '-'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    } else {
-                                        return (
-                                            <div className="bg-emerald-50 border border-emerald-200/60 rounded-2xl p-4 flex items-center gap-3">
-                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                                                <span className="text-sm font-bold text-emerald-800">ว่าง (ไม่มีผู้พักอาศัยในปัจจุบัน)</span>
-                                            </div>
-                                        );
-                                    }
-                                })()}
-                            </div>
-                        </div>
-
-                        {/* Modal Footer */}
-                        <div className="px-8 py-5 border-t border-slate-100 bg-slate-50 flex gap-3 shrink-0">
-                            <button
-                                type="button"
-                                onClick={() => setSelectedRoomForDetail(null)}
-                                className="w-full px-6 py-3.5 text-sm font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all text-center"
-                            >
-                                ปิดหน้าต่าง
-                            </button>
                         </div>
                     </div>
                 </div>

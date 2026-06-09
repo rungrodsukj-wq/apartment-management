@@ -447,7 +447,8 @@ export default function BookingsPage() {
             actual_check_in_date: newStartDateStr,
             contract_start_date: newStartDateStr,
             contract_end_date: newEndDateStr,
-            main_room_id: oldContract.main_room_id, // เซ็ตค่าเริ่มต้นเป็นห้องเดิมไว้ก่อน
+            // If the contract has a pending move, prefer the destination room
+            main_room_id: oldContract.move_to_room_id || oldContract.main_room_id,
             main_start_date: newStartDateStr,
             main_end_date: newEndDateStr,
             has_temp_room: false,

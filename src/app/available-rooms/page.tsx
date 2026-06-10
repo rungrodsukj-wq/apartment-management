@@ -103,7 +103,7 @@ export default function AvailableRoomsPage() {
         return locked;
     }, [intentions, contracts, checkStart]);
 
-    const overlappingWaitlists = useMemo(() => {
+    const overlappingData = useMemo(() => {
         // ฟังก์ชันช่วยจัดกลุ่มคิวจองให้ตรงกับ 5 ช่องในตารางเป๊ะๆ
         const getBucket = (k: string | null | undefined, v: string | null | undefined) => {
             if (k === 'ครัวหน้า' && v === 'ทิศตะวันตก') return 'frontWest';
@@ -199,9 +199,16 @@ export default function AvailableRoomsPage() {
             return d.getFullYear() === selectedYear && (d.getMonth() + 1) === selectedMonth;
         });
 
-        return [...carriedOverWaitlists, ...targetWaitlists];
+        return {
+            combined: [...carriedOverWaitlists, ...targetWaitlists],
+            carriedOver: carriedOverWaitlists
+        };
 
     }, [waitlists, contracts, intentions, roomsL, lockedRoomIds, selectedYear, selectedMonth]);
+
+    const overlappingWaitlists = overlappingData.combined;
+    const carriedOverCount = overlappingData.carriedOver.length;
+    const carriedOverIdSet = new Set(overlappingData.carriedOver.map((w: any) => w.id));
 
     const availableRoomsList = useMemo(() => {
         return roomsL.filter(r => isRoomAvailable(contracts, intentions, r.id, checkStart, checkEnd) && !lockedRoomIds.has(r.id));
@@ -275,6 +282,7 @@ export default function AvailableRoomsPage() {
 
     const totalAvailablePhysical = matrixData.reduce((acc, row) => acc + row.totalAvailable, 0);
     const totalWaitlists = matrixData.reduce((acc, row) => acc + row.waitlistCount, 0);
+    const newWaitlistsCount = Math.max(0, totalWaitlists - (carriedOverCount || 0));
     const totalNetQuota = matrixData.reduce((acc, row) => acc + row.netQuota, 0);
 
     return (
@@ -289,7 +297,7 @@ export default function AvailableRoomsPage() {
                 <div className="flex-1 p-8 md:p-10">
 
                     {/* Date Picker Card */}
-                    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 mb-8 max-w-2xl">
+                    {/* <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 mb-8 max-w-2xl">
                         <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
                             <svg className="w-5 h-5 text-[#4F81FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             เลือกรอบบิลเดือนที่ลูกค้าต้องการเข้าพัก
@@ -323,7 +331,7 @@ export default function AvailableRoomsPage() {
                         <p className="text-xs text-slate-400 mt-4 bg-slate-50 p-3 rounded-lg border border-slate-100 inline-block">
                             <span className="font-semibold text-slate-600">ระยะเวลาคำนวณ 1 ปี:</span> {formatDateTH(checkStart)} - {formatDateTH(checkEnd)}
                         </p>
-                    </div>
+                    </div> */}
 
                     {loading ? (
                         <div className="flex justify-center p-20"><div className="animate-spin rounded-full h-10 w-10 border-b-4 border-[#4F81FF]"></div></div>
@@ -391,9 +399,16 @@ export default function AvailableRoomsPage() {
                                         <svg className="w-16 h-16 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd"></path></svg>
                                     </div>
                                     <span className="text-sm font-bold text-slate-500 mb-2 relative z-10">คิวจองล่วงหน้า (Waitlists)</span>
-                                    <div className="relative z-10 flex items-baseline gap-2">
-                                        <span className="text-4xl font-black text-amber-500">{totalWaitlists}</span>
-                                        <span className="text-sm font-medium text-slate-400">คิว</span>
+                                    <div className="relative z-10 flex items-baseline gap-3">
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-4xl font-black text-amber-500">{newWaitlistsCount}</span>
+                                            <span className="text-sm font-medium text-slate-400">คิว</span>
+                                        </div>
+                                        {carriedOverCount > 0 && (
+                                            <div className="text-sm font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-xl">
+                                                + ทบ {carriedOverCount} คิว
+                                            </div>
+                                        )}
                                     </div>
                                 </button>
 
@@ -471,7 +486,14 @@ export default function AvailableRoomsPage() {
                                         </div>
 
                                         <div className="p-4">
-                                            <div className="mb-3 text-sm text-slate-500">รอบบิล: {monthsTH[selectedMonth - 1]} {selectedYear} — แสดง {overlappingWaitlists.length} คิว</div>
+                                            <div className="mb-3 text-sm text-slate-500">
+                                                รอบบิล: {monthsTH[selectedMonth - 1]} {selectedYear} — แสดง {overlappingWaitlists.length} คิว
+                                                {carriedOverCount > 0 && (
+                                                    <span className="ml-2 text-xs inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">
+                                                        ทบจากเดือนก่อน {carriedOverCount} คิว
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="overflow-x-auto">
                                                 <table className="min-w-full text-left text-sm text-slate-700 border-collapse">
                                                     <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
@@ -494,6 +516,9 @@ export default function AvailableRoomsPage() {
                                                                 <td className="p-3 border-b border-slate-100 align-top">
                                                                     <div className="font-bold">{w.name || '-'}</div>
                                                                     <div className="text-xs text-slate-400">ID: {w.id}</div>
+                                                                    {carriedOverIdSet.has(w.id) && (
+                                                                        <div className="text-xs text-amber-600 font-bold mt-1">ทบจากเดือนก่อน</div>
+                                                                    )}
                                                                 </td>
                                                                 <td className="p-3 border-b border-slate-100 align-top">{w.room_type || '-'}</td>
                                                                 <td className="p-3 border-b border-slate-100 align-top">{w.kitchen_type || '-'}</td>
@@ -516,6 +541,42 @@ export default function AvailableRoomsPage() {
                                     </div>
                                 </div>
                             )}
+                            {/* Date Picker Card */}
+                            <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 mb-8 max-w-2xl">
+                                <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-[#4F81FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    เลือกรอบบิลเดือนที่ลูกค้าต้องการเข้าพัก
+                                </h2>
+                                <div className="flex flex-col sm:flex-row gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-slate-500 mb-2">เดือน</label>
+                                        <select
+                                            className="w-full bg-slate-50 border border-black rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 outline-none transition-all cursor-pointer font-medium"
+                                            value={selectedMonth}
+                                            onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                        >
+                                            {monthsTH.map((m, i) => (
+                                                <option key={i} value={i + 1}>{m}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-slate-500 mb-2">ปี (ค.ศ.)</label>
+                                        <select
+                                            className="w-full bg-slate-50 border border-black rounded-xl p-3.5 text-sm text-slate-800 focus:ring-2 focus:ring-[#4F81FF]/50 outline-none transition-all cursor-pointer font-medium"
+                                            value={selectedYear}
+                                            onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                        >
+                                            {years.map((y) => (
+                                                <option key={y} value={y}>{y}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-400 mt-4 bg-slate-50 p-3 rounded-lg border border-slate-100 inline-block">
+                                    <span className="font-semibold text-slate-600">ระยะเวลาคำนวณ 1 ปี:</span> {formatDateTH(checkStart)} - {formatDateTH(checkEnd)}
+                                </p>
+                            </div>
 
                             <h2 className="text-lg font-bold text-[#0A2647] mb-4 flex items-center gap-2">
                                 <svg className="w-5 h-5 text-[#4F81FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>

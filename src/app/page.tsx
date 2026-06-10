@@ -735,16 +735,6 @@ export default function DashboardPage() {
 
       {/* Renewal / Waitlist Cards */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="text-sm font-bold text-rose-500">Waitlist</div>
-            </div>
-            <a href="/waitlists" className="bg-rose-100 text-rose-600 px-3 py-1 rounded-lg text-xs font-bold hover:bg-rose-500 hover:text-white transition-colors">จัดการคิว ➔</a>
-          </div>
-          <div className="text-3xl font-extrabold text-rose-600 mt-4">{loading ? '-' : waitlistCount} <span className="text-sm font-medium opacity-70">คิว</span></div>
-        </div>
-
         <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-amber-50 flex flex-col justify-between">
           <div>
             <div className="text-sm font-bold text-amber-600">ลูกบ้านยังไม่แจ้งความประสงค์</div>
@@ -765,6 +755,15 @@ export default function DashboardPage() {
             <div className="text-sm font-bold text-red-600">ไม่ต่อสัญญา</div>
           </div>
           <div className="text-3xl font-extrabold text-red-600 mt-4">{loading ? '-' : renewalMetrics.notRenewCount} <span className="text-sm font-medium opacity-70">คน</span></div>
+        </div>
+        <div className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-50 flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-sm font-bold text-rose-500">จองไม่ระบุห้อง</div>
+            </div>
+            <a href="/waitlists" className="bg-rose-100 text-rose-600 px-3 py-1 rounded-lg text-xs font-bold hover:bg-rose-500 hover:text-white transition-colors">จัดสรรห้อง ➔</a>
+          </div>
+          <div className="text-3xl font-extrabold text-rose-600 mt-4">{loading ? '-' : waitlistCount} <span className="text-sm font-medium opacity-70">คิว</span></div>
         </div>
       </section>
 

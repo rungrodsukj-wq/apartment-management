@@ -769,7 +769,7 @@ export default function BookingsPage() {
 
                             <div className="flex gap-4 pt-4 mt-2 border-t border-slate-100">
                                 <button type="button" onClick={closeModal} className="flex-1 px-6 py-3.5 text-sm font-bold text-slate-600 bg-white border-2 border-slate-200 rounded-2xl hover:bg-slate-50 hover:border-slate-300 transition-all">ยกเลิก</button>
-                                <button type="submit" className="flex-1 px-6 py-3.5 text-sm font-bold text-white bg-[#4F81FF] rounded-2xl hover:bg-[#3D6CE5] shadow-lg shadow-blue-500/30 transition-all">
+                                <button type="submit" className="flex-1 bg-[#4F81FF] hover:bg-[#3D6CE5] text-white px-6 py-3 rounded-2xl font-medium shadow-lg shadow-blue-500/25 flex items-center gap-2 justify-center transition-all active:scale-95">
                                     {editingId ? 'บันทึกการเปลี่ยนแปลง' : 'ยืนยันการเพิ่มคิว'}
                                 </button>
                             </div>

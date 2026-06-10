@@ -240,7 +240,7 @@ export default function RoomsPage() {
                     {userCanEdit && (
                     <button
                         onClick={() => handleOpenModal()}
-                        className="bg-gradient-to-r from-[#4F81FF] to-[#3D6CE5] hover:from-[#3D6CE5] hover:to-[#2A52BE] text-white px-7 py-3.5 rounded-2xl font-bold shadow-lg shadow-blue-500/30 flex items-center gap-2.5 transition-all active:scale-95 whitespace-nowrap"
+                        className="bg-gradient-to-r from-[#4F81FF] to-[#3D6CE5] hover:from-[#3D6CE5] hover:to-[#2A52BE] text-white px-7 py-3.5 rounded-2xl font-bold shadow-lg shadow-blue-500/30 dark:from-[#EADBC8] dark:to-[#DAC0A3] dark:hover:from-[#DAC0A3] dark:hover:to-[#C8AE91] dark:text-[#041C32] dark:shadow-blue-950/40 flex items-center gap-2.5 transition-all active:scale-95 whitespace-nowrap"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                         เพิ่มห้องพักใหม่
@@ -430,7 +430,7 @@ export default function RoomsPage() {
                 {isModalOpen && (
                     <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
                         <div className="bg-white rounded-[2rem] w-full max-w-lg overflow-hidden shadow-2xl transform transition-all border border-slate-100">
-                            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/60">
                                 <h2 className="text-xl font-black text-[#0A2647] flex items-center gap-3">
                                     <span className="w-8 h-8 rounded-full bg-[#4F81FF]/10 text-[#4F81FF] flex items-center justify-center text-base">
                                         {editId ? '✏️' : '✨'}

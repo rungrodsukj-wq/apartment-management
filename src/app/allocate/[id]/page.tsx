@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
-import { getRoomOccupancyIntervals, getRoomAvailability, getNextAvailableDate, getRoomAvailabilityText } from '../../../lib/availability';
+import { getRoomOccupancyIntervals, getRoomAvailability, getNextAvailableDate, getRoomAvailabilityText, isRoomAvailable } from '../../../lib/availability';
 import { useAuth } from '../../../context/AuthContext';
 import { canEdit } from '../../../lib/permissions';
 import { logAudit, describeChanges } from '../../../lib/audit';
@@ -43,6 +43,7 @@ interface Contract {
     move_to_room_id?: string;
     move_start_date?: string;
     move_end_date?: string;
+    status?: string;
     actual_check_in_date?: string;
     contract_start_date?: string;
     contract_end_date?: string;
@@ -134,7 +135,7 @@ export default function AllocateRoomPage() {
 
         const { data: cData } = await supabase
             .from('contracts')
-            .select('main_room_id, main_start_date, main_end_date, temp_room_id, temp_start_date, temp_end_date, move_to_room_id, move_start_date, move_end_date, actual_check_in_date, contract_start_date, contract_end_date')
+            .select('id, main_room_id, main_start_date, main_end_date, temp_room_id, temp_start_date, temp_end_date, move_to_room_id, move_start_date, move_end_date, actual_check_in_date, contract_start_date, contract_end_date')
             .neq('status', 'cancelled');
         if (cData) setAllContracts(cData);
 
@@ -169,10 +170,18 @@ export default function AllocateRoomPage() {
         }
     };
 
+    const formatGap = (from: Date | null, to: Date): string | null => {
+        if (!from) return null;
+        if (from.getTime() === 0) return null;
+        if (from >= to) return null;
+        const totalDays = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+        const months = Math.floor(totalDays / 30);
+        const days = totalDays % 30;
+        if (months > 0) return `${months} เดือน${days ? ` ${days} วัน` : ''}`;
+        return `${totalDays} วัน`;
+    };
+
     const getSearchStartDate = () => {
-        if (assignAs === 'main' && tempContractId && tempEndDate) {
-            return tempEndDate;
-        }
         return waitlist?.start_date ?? '';
     };
 
@@ -294,6 +303,8 @@ export default function AllocateRoomPage() {
 
     const searchStartDate = getSearchStartDate();
 
+    // Debug helper removed — cleaning up UI
+
     // Build locked rooms set: any contract that ends on/after searchStartDate and
     // whose intention is missing or not explicitly a non-locking intent will lock the associated room(s).
     const lockedRoomIds = (() => {
@@ -306,22 +317,42 @@ export default function AllocateRoomPage() {
         intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
 
         for (const c of allContracts) {
-            const roomIds = [c.main_room_id, c.temp_room_id, c.move_to_room_id].filter(Boolean) as string[];
-            if (roomIds.length === 0) continue;
-
-            const endDate = c.contract_end_date || c.main_end_date || c.temp_end_date || c.move_end_date;
-            if (!endDate) continue;
-            if (endDate < searchStartDate) continue;
-
+            if (c.status === 'cancelled') continue;
             const intent = c.id ? byContract[c.id] : undefined;
-            if (!intent || !nonLockIntents.includes(intent.intention)) {
-                roomIds.forEach(rid => locked.add(rid));
+
+            // main room
+            if (c.main_room_id) {
+                const endDate = c.main_end_date || c.contract_end_date;
+                if (endDate && new Date(endDate) >= new Date(searchStartDate)) {
+                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.main_room_id);
+                }
+            }
+
+            // temp room (use its explicit end date)
+            if (c.temp_room_id) {
+                const endDate = c.temp_end_date;
+                if (endDate && new Date(endDate) >= new Date(searchStartDate)) {
+                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.temp_room_id);
+                }
+            }
+
+            // move-to room
+            if (c.move_to_room_id) {
+                const endDate = c.move_end_date || c.contract_end_date;
+                if (endDate && new Date(endDate) >= new Date(searchStartDate)) {
+                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.move_to_room_id);
+                }
             }
         }
 
         for (const intent of intentions) {
             if (intent.room_id) {
-                if (!intent.intention || !nonLockIntents.includes(intent.intention)) locked.add(intent.room_id);
+                if (!intent.intention || !nonLockIntents.includes(intent.intention)) {
+                    // If the room is already available for the requested range, don't mark it locked
+                    if (!isRoomAvailable(allContracts, intentions, intent.room_id, searchStartDate, waitlist.end_date)) {
+                        locked.add(intent.room_id);
+                    }
+                }
             }
         }
 
@@ -388,7 +419,7 @@ export default function AllocateRoomPage() {
                         {waitlist.allocation_note && (
                             <div className="mb-2 text-sm font-semibold text-amber-800 bg-amber-100 px-3 py-1 rounded-lg inline-block">{waitlist.allocation_note}</div>
                         )}
-                        <h1 className="text-2xl font-bold text-gray-900 mb-1">จัดสรรห้องให้คุณ {waitlist.name}</h1>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">จัดสรรห้องให้คุณ {waitlist.name}</h1>
                         <p className="text-sm text-gray-500">เลือกห้องพักที่ตรงกับเงื่อนไขการจองด้านล่าง</p>
                     </div>
                     <div className="flex flex-wrap md:justify-end gap-3 text-sm w-full md:w-auto">
@@ -426,6 +457,7 @@ export default function AllocateRoomPage() {
                         <p className="text-yellow-900 text-sm">{waitlist.special_request}</p>
                     </div>
                 )}
+                {/* Debug panel removed */}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -435,27 +467,34 @@ export default function AllocateRoomPage() {
                             <span>✨</span> ห้องว่างตรงตามกำหนด (Perfect Match)
                         </h2>
                         <div className="space-y-3">
-                            {perfectMatches.length > 0 ? perfectMatches.map(room => (
-                                <div
-                                    key={room.id}
-                                    // 🌟 เลือกให้เป็น Main Room
-                                    onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
-                                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}
-                                >
-                                    <div className="flex justify-between items-center">
-                                        <div className="font-bold text-lg text-gray-900">ห้อง {room.room_number}</div>
-                                        <div className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold">พร้อมเข้าอยู่ตรงวัน</div>
+                            {perfectMatches.length > 0 ? perfectMatches.map(room => {
+                                const { availableFrom, availableUntil } = getRoomAvailability(allContracts, room.id, searchStartDate);
+                                const gap = formatGap(availableFrom, new Date(waitlist.start_date));
+                                return (
+                                    <div
+                                        key={room.id}
+                                        // 🌟 เลือกให้เป็น Main Room
+                                        onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/40 dark:text-white' : 'border-gray-200 bg-white hover:border-blue-300 dark:border-gray-700 dark:bg-neutral-800 dark:hover:border-blue-400 dark:text-gray-300 dark:opacity-60 dark:hover:opacity-100'}`}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="font-bold text-lg text-gray-900 dark:text-white">ห้อง {room.room_number}</div>
+                                            <div className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold">พร้อมเข้าอยู่ตรงวัน</div>
+                                        </div>
+                                        <div className="text-sm text-gray-500 mt-2 flex gap-4">
+                                            <span>🛏️ {room.room_type}</span>
+                                            <span>🍳 {room.kitchen_type}</span>
+                                            <span>🧭 {room.view_direction}</span>
+                                        </div>
+                                        <div className="text-xs font-semibold text-gray-600 mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex items-center gap-1.5 w-full">
+                                            📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
+                                        </div>
+                                        {gap && (
+                                            <div className="text-xs text-amber-700 mt-2 font-medium">ช่องว่าง: {gap}</div>
+                                        )}
                                     </div>
-                                    <div className="text-sm text-gray-500 mt-2 flex gap-4">
-                                        <span>🛏️ {room.room_type}</span>
-                                        <span>🍳 {room.kitchen_type}</span>
-                                        <span>🧭 {room.view_direction}</span>
-                                    </div>
-                                    <div className="text-xs font-semibold text-gray-600 mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex items-center gap-1.5 w-full">
-                                        📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
-                                    </div>
-                                </div>
-                            )) : (
+                                );
+                            }) : (
                                 <div className="p-5 text-center border border-dashed border-gray-300 rounded-xl text-gray-400 text-sm bg-gray-50">
                                     ไม่มีห้องที่ว่างตรงตามสเปคและครอบคลุมเวลาเป๊ะๆ ในขณะนี้
                                 </div>
@@ -476,10 +515,10 @@ export default function AllocateRoomPage() {
                                             key={room.id}
                                             // 🌟 เลือกให้เป็น Temp Room อัตโนมัติ!
                                             onClick={() => { setSelectedRoomId(room.id); setAssignAs('temp'); }}
-                                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-yellow-300'}`}
+                                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/40 dark:text-white' : 'border-gray-200 bg-white hover:border-yellow-300 dark:border-gray-700 dark:bg-neutral-800 dark:hover:border-yellow-300 dark:text-gray-300 dark:opacity-60 dark:hover:opacity-100'}`}
                                         >
                                             <div className="flex justify-between items-center">
-                                                <div className="font-bold text-lg text-gray-900">ห้อง {room.room_number}</div>
+                                                <div className="font-bold text-lg text-gray-900 dark:text-white">ห้อง {room.room_number}</div>
                                                 <div className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-md font-bold">
                                                     อยู่ได้ถึง {availableUntil ? availableUntil.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
                                                 </div>
@@ -509,10 +548,10 @@ export default function AllocateRoomPage() {
                                     key={room.id}
                                     // 🌟 เลือกให้เป็น Main Room
                                     onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
-                                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all opacity-80 hover:opacity-100 ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-blue-300'}`}
+                                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all opacity-80 hover:opacity-100 ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30 dark:text-white' : 'border-gray-200 bg-gray-50 hover:border-blue-300 dark:border-gray-700 dark:bg-neutral-800 dark:hover:border-blue-400 dark:text-gray-300 dark:opacity-60 dark:hover:opacity-100'}`}
                                 >
                                     <div className="flex justify-between items-center">
-                                        <div className="font-bold text-lg text-gray-900">ห้อง {room.room_number}</div>
+                                        <div className="font-bold text-lg text-gray-900 dark:text-white">ห้อง {room.room_number}</div>
                                         <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold">สเปคอื่นที่พร้อมเข้าอยู่</div>
                                     </div>
                                     <div className="text-sm text-gray-500 mt-2 flex gap-4">
@@ -534,22 +573,32 @@ export default function AllocateRoomPage() {
 
                     <div className="pt-4 border-t border-gray-200">
                         <h2 className="text-lg font-bold text-orange-500 mb-3 flex items-center gap-2">
-                            <span>⏳</span> ห้องตรงสเปค แต่ยังติดจอง (Available Later)
+                            <span>⏳</span> ห้องต้องสเปค แต่ห้องอยู่ห้องชั่วคราว
                         </h2>
                         <div className="space-y-3">
                             {availableLaterMatches.length > 0 ? availableLaterMatches.map(room => {
                                 const nextAvailDate = getNextAvailableDate(allContracts, room.id, waitlist.start_date);
+                                const { availableFrom } = getRoomAvailability(allContracts, room.id, searchStartDate);
+                                const tempGap = formatGap(new Date(waitlist.start_date), availableFrom);
+
                                 return (
                                     <div
                                         key={room.id}
                                         // 🌟 เลือกให้เป็น Main Room
                                         onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
-                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-orange-200'}`}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/40 dark:text-white' : 'border-gray-200 bg-white hover:border-orange-200 dark:border-gray-700 dark:bg-neutral-800 dark:hover:border-orange-300 dark:text-gray-300 dark:opacity-60 dark:hover:opacity-100'}`}
                                     >
                                         <div className="flex justify-between items-center">
-                                            <div className="font-bold text-lg text-gray-900">ห้อง {room.room_number}</div>
-                                            <div className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-bold">
-                                                ว่างวันที่ {new Date(nextAvailDate).toLocaleDateString('th-TH')}
+                                            <div className="font-bold text-lg text-gray-900 dark:text-white">ห้อง {room.room_number}</div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-bold">
+                                                    ว่างวันที่ {new Date(nextAvailDate).toLocaleDateString('th-TH')}
+                                                </div>
+                                                {tempGap && (
+                                                    <div className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-bold">
+                                                        ต้องอยู่ห้องชั่วคราว {tempGap}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="text-sm text-gray-500 mt-2 flex gap-4">
@@ -576,7 +625,7 @@ export default function AllocateRoomPage() {
                 {/* แผงควบคุมด้านขวา (ปรับ UI ใหม่ให้เข้าใจง่ายขึ้น) */}
                 <div className="col-span-1">
                     <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-8 max-h-160 overflow-y-auto">
-                        <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3 mb-5 sticky top-0 bg-white z-10">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 pb-3 mb-5 sticky top-0 bg-white z-10">
                             สรุปการจัดสรรห้อง
                         </h3>
 
@@ -605,13 +654,13 @@ export default function AllocateRoomPage() {
                                     <label className="block text-sm font-bold text-gray-800">
                                         📅 วันที่เข้าพักจริง (Actual Check-in)
                                     </label>
-                                    <input
-                                        type="date"
-                                        className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 transition-shadow outline-none"
-                                        value={actualCheckInDate}
-                                        onChange={(e) => setActualCheckInDate(e.target.value)}
-                                        required
-                                    />
+                                        <input
+                                            type="date"
+                                            className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 dark:text-white bg-white dark:bg-neutral-800 focus:ring-2 focus:ring-blue-500 transition-shadow outline-none"
+                                            value={actualCheckInDate}
+                                            onChange={(e) => setActualCheckInDate(e.target.value)}
+                                            required
+                                        />
                                     <p className="text-[11px] text-gray-500">
                                         * กำหนดการตามสัญญาคือ {new Date(waitlist.start_date).toLocaleDateString('th-TH')}
                                     </p>
@@ -640,7 +689,7 @@ export default function AllocateRoomPage() {
                                             />
                                             <span className="flex flex-1">
                                                 <span className="flex flex-col">
-                                                    <span className="block text-sm font-bold text-gray-900 flex items-center gap-2">
+                                                    <span className="block text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                                         🏠 ให้เป็น "ห้องหลัก"
                                                     </span>
                                                     <span className="mt-1 flex items-center text-xs text-gray-500 leading-relaxed">
@@ -751,7 +800,7 @@ export default function AllocateRoomPage() {
                                     </button>
                                     <button
                                         onClick={() => router.push('/')}
-                                        className="w-full text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 py-3 rounded-xl text-sm font-bold transition-colors"
+                                        className="w-full text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 py-3 rounded-xl text-sm font-bold transition-colors dark:hover:text-white"
                                     >
                                         ยกเลิก
                                     </button>
@@ -767,7 +816,7 @@ export default function AllocateRoomPage() {
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
                         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                            <h2 className="text-lg font-bold text-gray-900">แก้ไขการจัดสรรชั่วคราวที่มีอยู่</h2>
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">แก้ไขการจัดสรรชั่วคราวที่มีอยู่</h2>
                             <button onClick={closeTempEditModal} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
                         </div>
 
@@ -779,9 +828,9 @@ export default function AllocateRoomPage() {
 
                             <div>
                                 <label className="block text-sm font-bold text-gray-800 mb-2">📅 วันที่เริ่ม (Temp Start)</label>
-                                <input
+                                    <input
                                     type="date"
-                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 dark:text-white bg-white dark:bg-neutral-800 focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                                     value={tempStartDate}
                                     onChange={(e) => setTempStartDate(e.target.value)}
                                 />
@@ -789,9 +838,9 @@ export default function AllocateRoomPage() {
 
                             <div>
                                 <label className="block text-sm font-bold text-gray-800 mb-2">📅 วันที่สิ้นสุด (Temp End)</label>
-                                <input
+                                    <input
                                     type="date"
-                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 bg-white focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                                    className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 dark:text-white bg-white dark:bg-neutral-800 focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                                     value={tempEndDate}
                                     onChange={(e) => setTempEndDate(e.target.value)}
                                 />

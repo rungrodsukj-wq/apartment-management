@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { isOverlap, isRoomAvailable } from '../../lib/availability';
+import { isOverlap, isRoomAvailable, getRoomAvailability, getRoomAvailabilityText } from '../../lib/availability';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -66,6 +66,17 @@ export default function AvailableRoomsPage() {
         });
     };
 
+    const formatGap = (from: Date | null, to: Date): string | null => {
+        if (!from) return null;
+        if (from.getTime() === 0) return null;
+        if (from >= to) return null;
+        const totalDays = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+        const months = Math.floor(totalDays / 30);
+        const days = totalDays % 30;
+        if (months > 0) return `${months} เดือน${days ? ` ${days} วัน` : ''}`;
+        return `${totalDays} วัน`;
+    };
+
     const roomsL = rooms.filter(r => r.building === 'L');
 
     const checkStart = `${selectedYear}-${pad(selectedMonth)}-01`;
@@ -81,22 +92,39 @@ export default function AvailableRoomsPage() {
         const nonLockIntents = ['not_renew', 'renew_no_room','renew'];
 
         for (const c of contracts) {
-            const roomIds = [c.main_room_id, c.temp_room_id, c.move_to_room_id].filter(Boolean) as string[];
-            if (roomIds.length === 0) continue;
-
-            const endDate = c.contract_end_date || c.main_end_date || c.temp_end_date || c.move_end_date;
-            if (!endDate) continue;
-            if (endDate < checkStart) continue;
-
+            if (c.status === 'cancelled') continue;
             const intent = byContract[c.id];
-            if (!intent || !nonLockIntents.includes(intent.intention)) {
-                roomIds.forEach(rid => locked.add(rid));
+
+            if (c.main_room_id) {
+                const endDate = c.main_end_date || c.contract_end_date;
+                if (endDate && new Date(endDate) >= new Date(checkStart)) {
+                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.main_room_id);
+                }
+            }
+
+            if (c.temp_room_id) {
+                const endDate = c.temp_end_date;
+                if (endDate && new Date(endDate) >= new Date(checkStart)) {
+                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.temp_room_id);
+                }
+            }
+
+            if (c.move_to_room_id) {
+                const endDate = c.move_end_date || c.contract_end_date;
+                if (endDate && new Date(endDate) >= new Date(checkStart)) {
+                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.move_to_room_id);
+                }
             }
         }
 
         for (const intent of intentions) {
             if (intent.room_id) {
-                if (!intent.intention || !nonLockIntents.includes(intent.intention)) locked.add(intent.room_id);
+                if (!intent.intention || !nonLockIntents.includes(intent.intention)) {
+                    // If the room is already available for the requested range, don't mark it locked
+                    if (!isRoomAvailable(contracts, intentions, intent.room_id, checkStart, checkEnd)) {
+                        locked.add(intent.room_id);
+                    }
+                }
             }
         }
 
@@ -430,7 +458,7 @@ export default function AvailableRoomsPage() {
                                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
                                     <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[80vh] overflow-auto shadow-2xl">
                                         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                                            <h2 className="text-lg font-bold text-gray-900">รายการห้องว่างทั้งหมด (Physical)</h2>
+                                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">รายการห้องว่างทั้งหมด (Physical)</h2>
                                             <button onClick={() => setShowAvailableModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
                                         </div>
 
@@ -445,27 +473,41 @@ export default function AvailableRoomsPage() {
                                                             <th className="p-3 border-b border-slate-200">ประเภท</th>
                                                             <th className="p-3 border-b border-slate-200">ครัว</th>
                                                             <th className="p-3 border-b border-slate-200">วิว</th>
-                                                            <th className="p-3 border-b border-slate-200">อาคาร</th>
-                                                            <th className="p-3 border-b border-slate-200">เมนู</th>
+                                                                <th className="p-3 border-b border-slate-200">อาคาร</th>
+                                                                <th className="p-3 border-b border-slate-200">สถานะว่าง</th>
+                                                                <th className="p-3 border-b border-slate-200">เมนู</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {availableRoomsList.map((r, idx) => (
-                                                            <tr key={r.id} className="hover:bg-slate-50">
-                                                                <td className="p-3 border-b border-slate-100 align-top">{idx + 1}</td>
-                                                                <td className="p-3 border-b border-slate-100 align-top">
-                                                                    <div className="font-bold">ห้อง {r.room_number}</div>
-                                                                    <div className="text-xs text-slate-400">ID: {r.id}</div>
-                                                                </td>
-                                                                <td className="p-3 border-b border-slate-100 align-top">{r.room_type || '-'}</td>
-                                                                <td className="p-3 border-b border-slate-100 align-top">{r.kitchen_type || '-'}</td>
-                                                                <td className="p-3 border-b border-slate-100 align-top">{r.view_direction || '-'}</td>
-                                                                <td className="p-3 border-b border-slate-100 align-top">{r.building || '-'}</td>
-                                                                <td className="p-3 border-b border-slate-100 align-top">
-                                                                    <a href={`/bookings`} className="text-sm font-bold text-blue-600 hover:underline">ดูรายละเอียด</a>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
+                                                        {availableRoomsList.map((r, idx) => {
+                                                            const { availableFrom, availableUntil } = getRoomAvailability(contracts, r.id, checkStart);
+                                                            const availText = getRoomAvailabilityText(contracts, r.id, checkStart);
+                                                            const tempGap = formatGap(availableFrom, new Date(checkStart));
+                                                            return (
+                                                                <tr key={r.id} className="hover:bg-slate-50">
+                                                                    <td className="p-3 border-b border-slate-100 align-top">{idx + 1}</td>
+                                                                    <td className="p-3 border-b border-slate-100 align-top">
+                                                                        <div className="font-bold">ห้อง {r.room_number}</div>
+                                                                        <div className="text-xs text-slate-400">ID: {r.id}</div>
+                                                                    </td>
+                                                                    <td className="p-3 border-b border-slate-100 align-top">{r.room_type || '-'}</td>
+                                                                    <td className="p-3 border-b border-slate-100 align-top">{r.kitchen_type || '-'}</td>
+                                                                    <td className="p-3 border-b border-slate-100 align-top">{r.view_direction || '-'}</td>
+                                                                    <td className="p-3 border-b border-slate-100 align-top">{r.building || '-'}</td>
+                                                                    <td className="p-3 border-b border-slate-100 align-top">
+                                                                        <div className="text-xs font-semibold text-gray-600">{availText}</div>
+                                                                        {tempGap && (
+                                                                            <div className="text-xs mt-1 inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">
+                                                                                ต้องอยู่ชั่วคราว {tempGap}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-3 border-b border-slate-100 align-top">
+                                                                        <a href={`/bookings`} className="text-sm font-bold text-blue-600 hover:underline">ดูรายละเอียด</a>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
                                                         {availableRoomsList.length === 0 && (
                                                             <tr><td colSpan={7} className="p-6 text-center text-slate-400">ไม่มีห้องว่างในรอบนี้</td></tr>
                                                         )}
@@ -481,7 +523,7 @@ export default function AvailableRoomsPage() {
                                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
                                     <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[80vh] overflow-auto shadow-2xl">
                                         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                                            <h2 className="text-lg font-bold text-gray-900">รายละเอียดคิวจองล่วงหน้า</h2>
+                                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">รายละเอียดคิวจองล่วงหน้า</h2>
                                             <button onClick={() => setShowWaitlistModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
                                         </div>
 

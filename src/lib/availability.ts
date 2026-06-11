@@ -27,6 +27,7 @@ export const isRoomAvailable = (
 
     // ตัวแปรสำหรับเก็บ "วันที่หมดสัญญาล่าสุด" ที่เกิดก่อนวันเข้าพัก
     let latestEndStr: string | null = null;
+    let latestPeriodType: string | null = null; // 'main' | 'temp' | 'move'
 
     for (const c of contracts) {
         if (currentContractId && c.id === currentContractId) continue;
@@ -37,12 +38,12 @@ export const isRoomAvailable = (
         }
 
         const periods = [
-            c.main_room_id === roomId && c.main_start_date && c.main_end_date ? { start: c.main_start_date, end: c.main_end_date } : null,
-            c.temp_room_id === roomId && c.temp_start_date && c.temp_end_date ? { start: c.temp_start_date, end: c.temp_end_date } : null,
-            c.move_to_room_id === roomId && c.move_start_date && c.move_end_date ? { start: c.move_start_date, end: c.move_end_date } : null,
-        ].filter(Boolean) as { start: string; end: string }[];
+            c.main_room_id === roomId && c.main_start_date && c.main_end_date ? { start: c.main_start_date, end: c.main_end_date, type: 'main' } : null,
+            c.temp_room_id === roomId && c.temp_start_date && c.temp_end_date ? { start: c.temp_start_date, end: c.temp_end_date, type: 'temp' } : null,
+            c.move_to_room_id === roomId && c.move_start_date && c.move_end_date ? { start: c.move_start_date, end: c.move_end_date, type: 'move' } : null,
+        ].filter(Boolean) as { start: string; end: string; type: string }[];
 
-        for (const period of periods) {
+            for (const period of periods) {
             // 1. ถ้ามีสัญญาช่วงเวลาทับซ้อน = ไม่ว่างแน่นอน
             if (isOverlap(checkStart, checkEnd, period.start, period.end)) return false;
 
@@ -50,14 +51,24 @@ export const isRoomAvailable = (
             if (new Date(period.end) < new Date(checkStart)) {
                 if (!latestEndStr || new Date(period.end) > new Date(latestEndStr)) {
                     latestEndStr = period.end;
+                    latestPeriodType = period.type;
                 }
             }
         }
 
-        const contractEnd = c.contract_end_date || c.main_end_date || c.temp_end_date || c.move_end_date;
-        if (contractEnd) {
+        // Determine the relevant end date for this room on this contract
+        let roomRelevantEnd: string | null = null;
+        if (c.main_room_id === roomId) {
+            roomRelevantEnd = c.main_end_date || c.contract_end_date || null;
+        } else if (c.temp_room_id === roomId) {
+            roomRelevantEnd = c.temp_end_date || null;
+        } else if (c.move_to_room_id === roomId) {
+            roomRelevantEnd = c.move_end_date || c.contract_end_date || null;
+        }
+
+        if (roomRelevantEnd) {
             try {
-                if (new Date(contractEnd) >= new Date(checkStart)) {
+                if (new Date(roomRelevantEnd) >= new Date(checkStart)) {
                     const intention = getContractIntention(intentions, c.id);
                     const nonLockIntents = ['not_renew', 'renew_no_room', 'renew'];
                     if (!nonLockIntents.includes(intention)) return false;
@@ -68,6 +79,11 @@ export const isRoomAvailable = (
                 if (!nonLockIntents.includes(intention)) return false;
             }
         }
+    }
+
+    // ถ้าช่วงล่าสุดก่อน checkStart เป็น `temp` ให้ถือว่าห้องว่างได้ทันที (ไม่ต้องเช็ค renewal_intentions)
+    if (latestEndStr && latestPeriodType === 'temp') {
+        return true;
     }
 
     // 🎯 LOGIC ใหม่: ทบยอดห้องว่างสะสม (Rollover) ป้องกันปัญหา Timezone บั๊ก
@@ -141,7 +157,8 @@ export const getRoomOccupancyIntervals = (contracts: any[], roomId: string) => {
     contracts.forEach((c: any) => {
         if (c.main_room_id === roomId) {
             const s = c.main_start_date || c.actual_check_in_date || c.contract_start_date;
-            const e = c.contract_end_date || c.main_end_date;
+            // Prefer the explicit main_end_date for when tenant moved rooms mid-contract.
+            const e = c.main_end_date || c.contract_end_date;
             if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
         }
         if (c.temp_room_id === roomId) {
@@ -151,12 +168,44 @@ export const getRoomOccupancyIntervals = (contracts: any[], roomId: string) => {
         }
         if (c.move_to_room_id === roomId) {
             const s = c.move_start_date;
-            const e = c.contract_end_date || c.move_end_date;
+            // Prefer the explicit move_end_date if present (more precise than contract_end_date)
+            const e = c.move_end_date || c.contract_end_date;
             if (s && e) intervals.push({ start: new Date(s), end: new Date(e) });
         }
     });
 
     return intervals;
+};
+
+export const getEarliestVacancyBefore = (contracts: any[], roomId: string, beforeDateStr: string) => {
+    const intervals = getRoomOccupancyIntervals(contracts, roomId);
+    if (!intervals || intervals.length === 0) return null;
+
+    // merge intervals
+    const merged: { start: Date; end: Date }[] = [];
+    intervals.sort((a, b) => a.start.getTime() - b.start.getTime());
+    intervals.forEach(curr => {
+        if (merged.length === 0) {
+            merged.push({ ...curr });
+        } else {
+            const prev = merged[merged.length - 1];
+            if (curr.start <= prev.end) {
+                if (curr.end > prev.end) prev.end = curr.end;
+            } else {
+                merged.push({ ...curr });
+            }
+        }
+    });
+
+    const before = new Date(beforeDateStr);
+    const addDays = (d: Date, days: number) => { const t = new Date(d); t.setDate(t.getDate() + days); return t; };
+
+    for (let i = 0; i < merged.length; i++) {
+        const candidate = addDays(merged[i].end, 1);
+        if (candidate <= before) return candidate;
+    }
+
+    return null;
 };
 
 export const getRoomAvailability = (contracts: any[], roomId: string, targetDateStr: string) => {
@@ -183,13 +232,20 @@ export const getRoomAvailability = (contracts: any[], roomId: string, targetDate
 
     const overlapping = merged.find(i => target >= i.start && target < i.end);
 
+    const addDays = (d: Date, days: number) => {
+        const t = new Date(d);
+        t.setDate(t.getDate() + days);
+        return t;
+    };
+
     if (overlapping) {
-        availableFrom = new Date(overlapping.end);
-        const next = merged.find(i => i.start > availableFrom);
+        // available is the day after the current occupying interval ends
+        availableFrom = addDays(new Date(overlapping.end), 1);
+        const next = merged.find(i => i.start > addDays(new Date(overlapping.end), 1));
         availableUntil = next ? new Date(next.start) : null;
     } else {
         const prev = [...merged].reverse().find(i => i.end <= target);
-        availableFrom = prev ? new Date(prev.end) : new Date(0);
+        availableFrom = prev ? addDays(new Date(prev.end), 1) : new Date(0);
         const next = merged.find(i => i.start > target);
         availableUntil = next ? new Date(next.start) : null;
     }
@@ -205,7 +261,9 @@ export const getNextAvailableDate = (contracts: any[], roomId: string, requested
 
     for (const interval of intervals) {
         if (currentStart >= interval.start && currentStart < interval.end) {
+            // move to the day after the interval end
             currentStart = new Date(interval.end);
+            currentStart.setDate(currentStart.getDate() + 1);
         }
     }
 

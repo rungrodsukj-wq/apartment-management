@@ -78,7 +78,7 @@ export default function AvailableRoomsPage() {
         const byContract: Record<string, any> = {};
         intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
 
-        const nonLockIntents = ['not_renew', 'renew_no_room'];
+        const nonLockIntents = ['not_renew', 'renew_no_room','renew'];
 
         for (const c of contracts) {
             const roomIds = [c.main_room_id, c.temp_room_id, c.move_to_room_id].filter(Boolean) as string[];

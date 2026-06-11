@@ -275,7 +275,7 @@ export default function AllocateRoomPage() {
         }
 
         alert(`✅ จัดสรร${assignAs === 'main' ? 'ห้องหลัก' : 'ห้องชั่วคราว'} และสร้างสัญญาสำเร็จ!` + (assignAs === 'temp' ? ' รายการ waitlist จะยังไม่ปิดจนกว่าจะเลือกห้องหลัก' : ''));
-        router.push(assignAs === 'main' ? '/bookings' : '/waitlists');
+        router.push(assignAs === 'main' ? '/waitlists' : '/waitlists');
     };
 
     if (authLoading || loading) return <div className="p-10 text-center text-gray-500">กำลังโหลดข้อมูล...</div>;

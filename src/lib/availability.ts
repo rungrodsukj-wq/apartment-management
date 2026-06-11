@@ -282,3 +282,18 @@ export const getRoomAvailabilityText = (contracts: any[], roomId: string, target
 
     return `ว่าง : ${fromStr} - ${untilStr}`;
 };
+
+export const computeGapInfo = (from: Date | null, to: Date) => {
+    if (!from) return null;
+    if (from.getTime && from.getTime() === 0) return null;
+    if (from >= to) return null;
+
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const totalDays = Math.ceil((to.getTime() - from.getTime()) / msPerDay);
+    const months = Math.floor(totalDays / 30);
+    const days = totalDays % 30;
+    const human = months > 0 ? `${months} เดือน${days ? ` ${days} วัน` : ''}` : `${totalDays} วัน`;
+    const untilStr = to.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    return { totalDays, months, days, human, untilStr };
+};

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
-import { getRoomOccupancyIntervals, getRoomAvailability, getNextAvailableDate, getRoomAvailabilityText, isRoomAvailable } from '../../../lib/availability';
+import { getRoomOccupancyIntervals, getRoomAvailability, getNextAvailableDate, getRoomAvailabilityText, isRoomAvailable, computeGapInfo } from '../../../lib/availability';
 import { useAuth } from '../../../context/AuthContext';
 import { canEdit } from '../../../lib/permissions';
 import { logAudit, describeChanges } from '../../../lib/audit';
@@ -179,6 +179,13 @@ export default function AllocateRoomPage() {
         const days = totalDays % 30;
         if (months > 0) return `${months} เดือน${days ? ` ${days} วัน` : ''}`;
         return `${totalDays} วัน`;
+    };
+
+    const daysBetween = (from: Date | null, to: Date | null): number => {
+        if (!from || !to) return 0;
+        if (from.getTime && from.getTime() === 0) return 0;
+        const msPerDay = 1000 * 60 * 60 * 24;
+        return Math.max(0, Math.ceil((to.getTime() - from.getTime()) / msPerDay));
     };
 
     const getSearchStartDate = () => {
@@ -486,12 +493,16 @@ export default function AllocateRoomPage() {
                                             <span>🍳 {room.kitchen_type}</span>
                                             <span>🧭 {room.view_direction}</span>
                                         </div>
-                                        <div className="text-xs font-semibold text-gray-600 mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex items-center gap-1.5 w-full">
-                                            📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
-                                        </div>
-                                        {gap && (
-                                            <div className="text-xs text-amber-700 mt-2 font-medium">ช่องว่าง: {gap}</div>
-                                        )}
+                                                <div className="text-xs font-semibold text-gray-600 mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex items-center gap-1.5 w-full">
+                                                    📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
+                                                </div>
+                                                {(() => {
+                                                    const gapInfo = computeGapInfo(availableFrom, new Date(waitlist.start_date));
+                                                    if (!gapInfo) return null;
+                                                    return (
+                                                        <div className="text-xs text-amber-700 mt-2 font-medium">ช่องว่าง: {gapInfo.totalDays} วัน</div>
+                                                    );
+                                                })()}
                                     </div>
                                 );
                             }) : (
@@ -579,7 +590,7 @@ export default function AllocateRoomPage() {
                             {availableLaterMatches.length > 0 ? availableLaterMatches.map(room => {
                                 const nextAvailDate = getNextAvailableDate(allContracts, room.id, waitlist.start_date);
                                 const { availableFrom } = getRoomAvailability(allContracts, room.id, searchStartDate);
-                                const tempGap = formatGap(new Date(waitlist.start_date), availableFrom);
+                                const tempGapInfo = computeGapInfo(new Date(waitlist.start_date), availableFrom);
 
                                 return (
                                     <div
@@ -594,9 +605,9 @@ export default function AllocateRoomPage() {
                                                 <div className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-bold">
                                                     ว่างวันที่ {new Date(nextAvailDate).toLocaleDateString('th-TH')}
                                                 </div>
-                                                {tempGap && (
+                                                {tempGapInfo && (
                                                     <div className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-bold">
-                                                        ต้องอยู่ห้องชั่วคราว {tempGap}
+                                                        ต้องอยู่ห้องชั่วคราว {tempGapInfo.totalDays} วัน (ถึง {tempGapInfo.untilStr})
                                                     </div>
                                                 )}
                                             </div>

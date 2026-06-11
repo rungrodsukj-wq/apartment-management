@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { isOverlap, isRoomAvailable, getRoomAvailability, getRoomAvailabilityText } from '../../lib/availability';
+import { isOverlap, isRoomAvailable, getRoomAvailability, getRoomAvailabilityText, computeGapInfo } from '../../lib/availability';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -482,7 +482,7 @@ export default function AvailableRoomsPage() {
                                                         {availableRoomsList.map((r, idx) => {
                                                             const { availableFrom, availableUntil } = getRoomAvailability(contracts, r.id, checkStart);
                                                             const availText = getRoomAvailabilityText(contracts, r.id, checkStart);
-                                                            const tempGap = formatGap(availableFrom, new Date(checkStart));
+                                                            const gapInfo = computeGapInfo(new Date(checkStart), availableFrom);
                                                             return (
                                                                 <tr key={r.id} className="hover:bg-slate-50">
                                                                     <td className="p-3 border-b border-slate-100 align-top">{idx + 1}</td>
@@ -496,9 +496,9 @@ export default function AvailableRoomsPage() {
                                                                     <td className="p-3 border-b border-slate-100 align-top">{r.building || '-'}</td>
                                                                     <td className="p-3 border-b border-slate-100 align-top">
                                                                         <div className="text-xs font-semibold text-gray-600">{availText}</div>
-                                                                        {tempGap && (
+                                                                        {gapInfo && (
                                                                             <div className="text-xs mt-1 inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">
-                                                                                ต้องอยู่ชั่วคราว {tempGap}
+                                                                                ต้องอยู่ชั่วคราว {gapInfo.totalDays} วัน (ถึง {gapInfo.untilStr})
                                                                             </div>
                                                                         )}
                                                                     </td>

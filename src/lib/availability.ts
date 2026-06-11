@@ -59,12 +59,12 @@ export const isRoomAvailable = (
             try {
                 if (new Date(contractEnd) >= new Date(checkStart)) {
                     const intention = getContractIntention(intentions, c.id);
-                    const nonLockIntents = ['not_renew', 'renew_no_room'];
+                    const nonLockIntents = ['not_renew', 'renew_no_room', 'renew'];
                     if (!nonLockIntents.includes(intention)) return false;
                 }
             } catch (e) {
                 const intention = getContractIntention(intentions, c.id);
-                const nonLockIntents = ['not_renew', 'renew_no_room'];
+                const nonLockIntents = ['not_renew', 'renew_no_room', 'renew'];
                 if (!nonLockIntents.includes(intention)) return false;
             }
         }

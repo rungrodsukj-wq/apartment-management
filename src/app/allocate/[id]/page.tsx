@@ -687,8 +687,8 @@ export default function AllocateRoomPage() {
                                     <div className="grid grid-cols-1 gap-3">
                                         {/* Card: ห้องหลัก */}
                                         <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${assignAs === 'main'
-                                            ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500'
-                                            : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                            ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500 dark:bg-blue-900/40 dark:border-blue-400 dark:text-white'
+                                            : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:hover:bg-neutral-800'
                                             }`}>
                                             <input
                                                 type="radio"
@@ -717,8 +717,8 @@ export default function AllocateRoomPage() {
 
                                         {/* Card: ห้องชั่วคราว */}
                                         <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${assignAs === 'temp'
-                                            ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-500'
-                                            : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                            ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-500 dark:bg-purple-900/40 dark:border-purple-400 dark:text-white'
+                                            : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:hover:bg-neutral-800'
                                             }`}>
                                             <input
                                                 type="radio"

@@ -319,7 +319,7 @@ export default function BookingsPage() {
                             key={room.id}
                             type="button"
                             onClick={() => onSelect(room.id)}
-                            className={`text-left rounded-3xl p-5 min-h-[150px] border transition-all ${isSelected ? 'border-[#4F81FF] bg-blue-50/70 shadow-lg shadow-blue-100/50 ring-2 ring-[#4F81FF]/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-sm'}`}
+                            className={`text-left rounded-3xl p-5 min-h-[150px] border transition-all ${isSelected ? 'border-[#4F81FF] bg-blue-50/70 shadow-lg shadow-blue-100/50 ring-2 ring-[#4F81FF]/20 dark:border-[#4F81FF]/20 dark:bg-[#4F81FF]/10 dark:shadow-none dark:ring-[#4F81FF]/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-sm'}`}
                         >
                             <p className="text-base font-bold text-slate-900">ห้อง {room.room_number}</p>
                             <div className="mt-3 text-sm text-slate-600 leading-6 space-y-1">
@@ -983,7 +983,7 @@ export default function BookingsPage() {
                     type="button"
                     onClick={() => setCreateForm({ ...createForm, temp_room_id: createForm.temp_room_id === room.id ? '' : room.id })}
                     className={`relative text-left rounded-2xl p-4 border transition-all w-full ${isSelected
-                        ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20'
+                        ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20 dark:border-[#4F81FF]/20 dark:bg-[#4F81FF]/10 dark:shadow-none dark:ring-[#4F81FF]/10'
                         : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50'
                         }`}
                 >
@@ -1647,7 +1647,7 @@ export default function BookingsPage() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setCreateForm({ ...createForm, main_room_id: createForm.main_room_id === room.id ? '' : room.id })}
-                                                                className={`relative text-left rounded-xl p-3 border text-xs font-medium transition-all ${isSelected ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                                                                className={`relative text-left rounded-xl p-3 border text-xs font-medium transition-all ${isSelected ? 'border-[#4F81FF] bg-blue-50 ring-2 ring-[#4F81FF]/20 dark:border-[#4F81FF]/20 dark:bg-[#4F81FF]/10 dark:shadow-none dark:ring-[#4F81FF]/10' : 'border-slate-200 bg-white hover:border-slate-300'}`}
                                                             >
                                                                 <p className="font-bold text-sm text-slate-900">ห้อง {room.room_number}</p>
                                                                 <p className="text-slate-500 font-semibold mt-1 truncate">{room.room_type || '-'}</p>

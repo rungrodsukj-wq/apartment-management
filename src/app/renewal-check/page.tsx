@@ -512,14 +512,16 @@ export default function RenewalCheckPage() {
                         <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-sm">
                             {index}
                         </div>
-                        {/* Room badge */}
-                        <div className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center shrink-0 shadow-inner ${currentIntention === 'not_renew' ? 'bg-red-50 text-red-600' :
-                            currentIntention === 'renew' ? 'bg-emerald-50 text-emerald-600' :
-                                'bg-amber-50 text-amber-600'
-                            }`}>
+                        {/* Room badge (clickable, styled like currentRoomId) */}
+                        <button
+                            type="button"
+                            onClick={() => room?.id && router.push(`/bookings?roomId=${room.id}`)}
+                            disabled={!room}
+                            className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center shrink-0 shadow-inner transition-all ${room ? (currentIntention === 'not_renew' ? 'bg-red-50 text-red-600 hover:scale-105 cursor-pointer' : currentIntention === 'renew' ? 'bg-emerald-50 text-emerald-600 hover:scale-105 cursor-pointer' : 'bg-amber-50 text-amber-600 hover:scale-105 cursor-pointer') : 'bg-slate-50 text-slate-400 cursor-default opacity-60'}`}
+                        >
                             <span className="text-xs font-medium opacity-70 mb-[-2px]">ห้อง</span>
-                            <span className="font-extrabold text-xl">{room?.room_number || '?'}</span>
-                        </div>
+                            <span className="font-extrabold text-lg">{room?.room_number || '-'}</span>
+                        </button>
                     </div>
 
                     <div className="flex-1 min-w-0">

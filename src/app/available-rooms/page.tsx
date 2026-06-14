@@ -86,42 +86,123 @@ export default function AvailableRoomsPage() {
     const lockedRoomIds = useMemo(() => {
         const locked = new Set<string>();
 
+        // จับคู่ intention เข้ากับ contract_id
         const byContract: Record<string, any> = {};
         intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
 
-        const nonLockIntents = ['not_renew', 'renew_no_room','renew'];
+        // 1. หารายการสัญญาล่าสุดของแต่ละห้อง (อิงจากวันที่เริ่ม และเก็บวันที่สิ้นสุดไว้ด้วย)
+        const latestContractByRoom: Record<string, any> = {};
+
+        for (const c of contracts) {
+            if (c.status === 'cancelled') continue;
+
+            const updateLatest = (roomId: string, role: string, specificStartDate: string | null, specificEndDate: string | null) => {
+                if (!roomId) return;
+                
+                const startDateStr = specificStartDate || c.start_date;
+                const startDate = startDateStr ? new Date(startDateStr).getTime() : 0;
+                
+                if (!latestContractByRoom[roomId] || latestContractByRoom[roomId].startDate < startDate) {
+                    latestContractByRoom[roomId] = { 
+                        contract: c, 
+                        startDate, 
+                        role, 
+                        endDateStr: specificEndDate 
+                    };
+                }
+            };
+
+            // ส่ง End Date เข้าไปเก็บด้วยเพื่อใช้คำนวณเดือนที่เริ่มว่าง
+            updateLatest(c.main_room_id, 'main', c.main_start_date, c.main_end_date);
+            updateLatest(c.temp_room_id, 'temp', c.temp_start_date, c.temp_end_date);
+            updateLatest(c.move_to_room_id, 'move_to', c.move_start_date, c.move_end_date);
+        }
+
+        // 2. กฎล็อกห้องตาม Intention และกฎพิเศษสำหรับห้อง Temp
+        const lockedIntents = ['not_asked', 'pending'];
+
+        for (const roomId in latestContractByRoom) {
+            const { contract: c, role, endDateStr } = latestContractByRoom[roomId];
+            
+            // ✅ กฎพิเศษสำหรับห้องชั่วคราว: แสดงห้องว่างแค่เดือนแรก จนกว่าเวลาจริงจะถึงเดือนนั้นถึงจะทบไปเดือนหน้าได้
+            if (role === 'temp') {
+                if (endDateStr) {
+                    const endD = new Date(endDateStr);
+                    let vacantY = endD.getFullYear();
+                    let vacantM = endD.getMonth() + 1; // เดือนที่หมดสัญญา
+                    
+                    // ขยับเป็นเดือนถัดไป (หา "เดือนแรก" ที่ห้องจะเริ่มว่าง)
+                    vacantM++;
+                    if (vacantM > 12) { vacantM = 1; vacantY++; }
+                    
+                    // แปลงค่าเดือนเป็นตัวเลขเพื่อเปรียบเทียบง่ายขึ้น (เช่น 2026 * 12 + 8)
+                    const vacantValue = vacantY * 12 + vacantM;
+                    
+                    const viewDate = new Date(checkStart);
+                    const viewValue = viewDate.getFullYear() * 12 + (viewDate.getMonth() + 1); // เดือนที่กำลังกดดูบนหน้าเว็บ
+                    
+                    const currD = new Date();
+                    const currValue = currD.getFullYear() * 12 + (currD.getMonth() + 1); // เดือนปัจจุบันของเวลาในโลกความเป็นจริง
+                    
+                    // ถ้ากำลังดู "เดือนในอนาคต" ที่เลยเดือนแรกที่ว่างไปแล้ว (เช่น ดู ก.ย. ทั้งที่ว่างตั้งแต่ ส.ค.)
+                    // แต่ "เวลาในโลกจริง" ยังเดินทางไม่ถึงเดือนที่ว่างนั้น (เช่น ตอนนี้เพิ่งเดือน มิ.ย.)
+                    // -> ให้ระงับการโชว์ว่าง (ล็อคห้อง) ไว้ก่อน
+                    if (viewValue > vacantValue && currValue < vacantValue) {
+                        locked.add(roomId);
+                    }
+                }
+                continue; // ข้ามการเช็ค Intention สำหรับห้องชั่วคราว
+            }
+
+            const intent = byContract[c.id];
+            const intentStatus = intent?.intention || 'not_asked'; 
+            
+            if (lockedIntents.includes(intentStatus)) {
+                locked.add(roomId);
+            }
+        }
+
+        // 3. กฎเดิม: สำหรับสัญญาที่ยังคาบเกี่ยวเข้ามาในเดือนที่ระบบกำลังคำนวณอยู่
+        const nonLockIntents = ['not_renew', 'renew_no_room', 'renew'];
 
         for (const c of contracts) {
             if (c.status === 'cancelled') continue;
             const intent = byContract[c.id];
 
-            if (c.main_room_id) {
-                const endDate = c.main_end_date || c.contract_end_date;
-                if (endDate && new Date(endDate) >= new Date(checkStart)) {
-                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.main_room_id);
+            const checkOverlapAndLock = (roomId: string, endDateStr: string | null, role: string) => {
+                if (!roomId) return;
+                
+                let endDate = endDateStr;
+                if (role !== 'temp' && !endDate) {
+                    endDate = c.contract_end_date;
                 }
-            }
+                
+                if (endDate && new Date(endDate) >= new Date(checkStart)) {
+                    if (role === 'temp') {
+                        locked.add(roomId);
+                    } else {
+                        if (!intent || !nonLockIntents.includes(intent.intention)) {
+                            locked.add(roomId);
+                        }
+                    }
+                }
+            };
 
-            if (c.temp_room_id) {
-                const endDate = c.temp_end_date;
-                if (endDate && new Date(endDate) >= new Date(checkStart)) {
-                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.temp_room_id);
-                }
-            }
-
-            if (c.move_to_room_id) {
-                const endDate = c.move_end_date || c.contract_end_date;
-                if (endDate && new Date(endDate) >= new Date(checkStart)) {
-                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.move_to_room_id);
-                }
-            }
+            checkOverlapAndLock(c.main_room_id, c.main_end_date, 'main');
+            checkOverlapAndLock(c.temp_room_id, c.temp_end_date, 'temp');
+            checkOverlapAndLock(c.move_to_room_id, c.move_end_date, 'move_to');
         }
 
+        // 4. สำหรับข้อมูล Intention ที่ถูกผูกลอยไว้กับห้อง (Room-based) ไม่ได้ผูกกับสัญญา
         for (const intent of intentions) {
             if (intent.room_id) {
-                if (!intent.intention || !nonLockIntents.includes(intent.intention)) {
-                    // If the room is already available for the requested range, don't mark it locked
-                    if (!isRoomAvailable(contracts, intentions, intent.room_id, checkStart, checkEnd)) {
+                // ข้ามการล็อค หากห้องนี้เป็นห้องชั่วคราวและถูกจัดการด้วยกฎด้านบนไปแล้ว
+                if (latestContractByRoom[intent.room_id]?.role === 'temp') continue;
+
+                if (intent.intention === 'not_asked' || intent.intention === 'pending') {
+                    locked.add(intent.room_id);
+                } else if (!intent.intention || !nonLockIntents.includes(intent.intention)) {
+                    if (!locked.has(intent.room_id)) {
                         locked.add(intent.room_id);
                     }
                 }
@@ -129,19 +210,10 @@ export default function AvailableRoomsPage() {
         }
 
         return locked;
-    }, [intentions, contracts, checkStart]);
+    }, [intentions, contracts, checkStart, checkEnd]);
 
     const overlappingData = useMemo(() => {
-        // ฟังก์ชันช่วยจัดกลุ่มคิวจองให้ตรงกับ 5 ช่องในตารางเป๊ะๆ
-        const getBucket = (k: string | null | undefined, v: string | null | undefined) => {
-            if (k === 'ครัวหน้า' && v === 'ทิศตะวันตก') return 'frontWest';
-            if (k === 'ครัวหน้า' && v === 'ทิศตะวันออก') return 'frontEast';
-            if (k === 'ครัวหลัง' && v === 'ทิศตะวันตก') return 'backWest';
-            if (k === 'ครัวหลัง' && v === 'ทิศตะวันออก') return 'backEast';
-            return 'unspecified';
-        };
-
-        // 1. หาเดือน/ปีที่เก่าที่สุดที่มีคนยังรอคิวอยู่ เพื่อเป็นจุดเริ่มต้นการคำนวณ
+        // 1. หาเดือน/ปีที่เก่าที่สุดที่มีคนยังรอคิวอยู่
         let minYear = selectedYear;
         let minMonth = selectedMonth;
         waitlists.forEach(w => {
@@ -158,60 +230,142 @@ export default function AvailableRoomsPage() {
         let currY = minYear;
         let currM = minMonth;
 
-        // ตัวแปรเก็บ "รายชื่อคนที่ยังไม่ได้ห้อง" เพื่อย้ายข้ามเดือน
         let carriedOverWaitlists: any[] = [];
+        
+        // ตัวแปรเก็บข้อมูลเฉพาะของเดือนเป้าหมาย (เดือนที่ผู้ใช้เลือกดู)
+        let targetMonthStocks: Record<string, any> = {};
+        let carriedOverIntoTarget: any[] = [];
+        let targetMonthDemand: any[] = [];
 
-        // 2. วนลูปจำลองแจกห้องตั้งแต่อดีต มาหยุดที่ "เดือนก่อนหน้า" เดือนที่เลือกดู
-        while (currY < selectedYear || (currY === selectedYear && currM < selectedMonth)) {
+        // 2. วนลูปจำลองแจกห้องตั้งแต่อดีต **รวมถึงเดือนปัจจุบัน (<= selectedMonth)**
+        while (currY < selectedYear || (currY === selectedYear && currM <= selectedMonth)) {
             const checkStartStr = `${currY}-${pad(currM)}-01`;
             const checkEndStr = calculateEndDate(currY, currM);
+            const isTargetMonth = (currY === selectedYear && currM === selectedMonth);
 
-            // หาห้องว่างทั้งหมดในเดือนอดีตนั้น
+            // เก็บรายชื่อคิวที่ทบจากเดือนที่แล้ว เพื่อนำมาใช้ในเดือนเป้าหมาย
+            if (isTargetMonth) {
+                carriedOverIntoTarget = [...carriedOverWaitlists];
+            }
+
             const monthAvailable = roomsL.filter(r => 
                 isRoomAvailable(contracts, intentions, r.id, checkStartStr, checkEndStr) &&
                 !lockedRoomIds.has(r.id)
             );
 
-            // หาคิวใหม่ที่เกิดขึ้นในเดือนอดีตนั้น
             const monthWaitlists = waitlists.filter(w => {
                 if (!w.start_date) return false;
                 const d = new Date(w.start_date);
                 return d.getFullYear() === currY && (d.getMonth() + 1) === currM;
             });
 
-            // ความต้องการรวม = คิวตกค้างที่ยกมา + คิวใหม่ในเดือนนั้น
+            // ความต้องการรวมในเดือนนี้
             const currentDemand = [...carriedOverWaitlists, ...monthWaitlists];
+            if (isTargetMonth) {
+                targetMonthDemand = currentDemand;
+            }
+
             let nextCarryOver: any[] = [];
+            let stocksRecord: Record<string, any> = {};
 
             const roomTypes = ['One Bedroom', 'One Bedroom Exclusive', 'One Bedroom Suite', 'Triple Bedroom'];
-            const buckets = ['frontWest', 'frontEast', 'backWest', 'backEast', 'unspecified'];
 
-            // 3. แจกแจงคิวตามสเปคเป๊ะๆ (Room Type + Kitchen + View)
             roomTypes.forEach(rt => {
-                buckets.forEach(bucket => {
-                    // ดึงเฉพาะคนที่รอคิวสเปคนี้
-                    const matchedWaitlists = currentDemand.filter(w => w.room_type === rt && getBucket(w.kitchen_type, w.view_preference) === bucket);
-                    
-                    if (matchedWaitlists.length > 0) {
-                        let supply = 0;
-                        if (bucket === 'unspecified') {
-                            supply = monthAvailable.filter(r => r.room_type === rt && !r.kitchen_type && !r.view_direction).length;
-                        } else {
-                            const isFront = bucket.includes('front') ? 'ครัวหน้า' : 'ครัวหลัง';
-                            const isWest = bucket.includes('West') ? 'ทิศตะวันตก' : 'ทิศตะวันออก';
-                            supply = monthAvailable.filter(r => r.room_type === rt && (r.kitchen_type || null) === isFront && (r.view_direction || null) === isWest).length;
-                        }
+                const demandsOfType = currentDemand.filter(w => w.room_type === rt);
+                
+                // ✅ จัดเรียงคิว: ให้คนที่ระบุครบ (2) มาก่อน -> ระบุอย่างใดอย่างหนึ่ง (1) -> ไม่ระบุเลย (0)
+                const sortedDemands = [...demandsOfType].sort((a, b) => {
+                    const aK = (!a.kitchen_type || a.kitchen_type === 'ไม่ระบุ' || a.kitchen_type === '-') ? null : a.kitchen_type;
+                    const aV = (!a.view_preference || a.view_preference === 'ไม่ระบุ' || a.view_preference === '-') ? null : a.view_preference;
+                    const bK = (!b.kitchen_type || b.kitchen_type === 'ไม่ระบุ' || b.kitchen_type === '-') ? null : b.kitchen_type;
+                    const bV = (!b.view_preference || b.view_preference === 'ไม่ระบุ' || b.view_preference === '-') ? null : b.view_preference;
 
-                        // 🎯 ทริคสำคัญ: ถ้าคิวรอ (เช่น 3 คน) มีมากกว่า ห้องว่าง (เช่น 1 ห้อง)
-                        // แปลว่า 2 คนหลังจะ "ไม่ได้ห้อง" ให้จับ 2 คนนี้ยัดใส่ตะกร้าตกค้างไปยังเดือนถัดไป
-                        if (matchedWaitlists.length > supply) {
-                            nextCarryOver.push(...matchedWaitlists.slice(supply));
+                    const aScore = (aK ? 1 : 0) + (aV ? 1 : 0);
+                    const bScore = (bK ? 1 : 0) + (bV ? 1 : 0);
+
+                    return bScore - aScore; // เรียงจากคะแนนมากไปน้อย
+                });
+
+                const availableRoomsOfType = monthAvailable.filter(r => r.room_type === rt);
+                
+                let stock = {
+                    frontWest: availableRoomsOfType.filter(r => r.kitchen_type === 'ครัวหน้า' && r.view_direction === 'ทิศตะวันตก').length,
+                    frontEast: availableRoomsOfType.filter(r => r.kitchen_type === 'ครัวหน้า' && r.view_direction === 'ทิศตะวันออก').length,
+                    backWest: availableRoomsOfType.filter(r => r.kitchen_type === 'ครัวหลัง' && r.view_direction === 'ทิศตะวันตก').length,
+                    backEast: availableRoomsOfType.filter(r => r.kitchen_type === 'ครัวหลัง' && r.view_direction === 'ทิศตะวันออก').length,
+                    unspecifiedPhysical: availableRoomsOfType.filter(r => !r.kitchen_type && !r.view_direction).length
+                };
+
+                let totalNetQuota = availableRoomsOfType.length;
+                let unspecifiedWaitlistsCount = 0;
+
+                // เปลี่ยนมาวนลูปจาก sortedDemands ที่จัดเรียงลำดับแล้วแทน
+                sortedDemands.forEach(w => {
+                    const k = (!w.kitchen_type || w.kitchen_type === 'ไม่ระบุ' || w.kitchen_type === '-') ? null : w.kitchen_type;
+                    const v = (!w.view_preference || w.view_preference === 'ไม่ระบุ' || w.view_preference === '-') ? null : w.view_preference;
+                    let allocated = false;
+
+                    if (k && v) {
+                        if (k === 'ครัวหน้า' && v === 'ทิศตะวันตก' && stock.frontWest > 0) { stock.frontWest--; allocated = true; }
+                        else if (k === 'ครัวหน้า' && v === 'ทิศตะวันออก' && stock.frontEast > 0) { stock.frontEast--; allocated = true; }
+                        else if (k === 'ครัวหลัง' && v === 'ทิศตะวันตก' && stock.backWest > 0) { stock.backWest--; allocated = true; }
+                        else if (k === 'ครัวหลัง' && v === 'ทิศตะวันออก' && stock.backEast > 0) { stock.backEast--; allocated = true; }
+                        if (allocated) totalNetQuota--;
+                    }
+                    else if (k && !v) {
+                        if (k === 'ครัวหน้า') {
+                            if (stock.frontWest > 0) { stock.frontWest--; allocated = true; }
+                            else if (stock.frontEast > 0) { stock.frontEast--; allocated = true; }
+                        } else if (k === 'ครัวหลัง') {
+                            if (stock.backWest > 0) { stock.backWest--; allocated = true; }
+                            else if (stock.backEast > 0) { stock.backEast--; allocated = true; }
+                        }
+                        if (allocated) totalNetQuota--;
+                    }
+                    else if (!k && v) {
+                        if (v === 'ทิศตะวันตก') {
+                            if (stock.frontWest > 0) { stock.frontWest--; allocated = true; }
+                            else if (stock.backWest > 0) { stock.backWest--; allocated = true; }
+                        } else if (v === 'ทิศตะวันออก') {
+                            if (stock.frontEast > 0) { stock.frontEast--; allocated = true; }
+                            else if (stock.backEast > 0) { stock.backEast--; allocated = true; }
+                        }
+                        if (allocated) totalNetQuota--;
+                    }
+                    else if (!k && !v) {
+                        if (totalNetQuota > 0) {
+                            totalNetQuota--;
+                            allocated = true;
+                            unspecifiedWaitlistsCount++;
+                            
+                            if (stock.unspecifiedPhysical > 0) stock.unspecifiedPhysical--;
+                            else if (stock.frontWest > 0) stock.frontWest--;
+                            else if (stock.backWest > 0) stock.backWest--;
+                            else if (stock.frontEast > 0) stock.frontEast--;
+                            else if (stock.backEast > 0) stock.backEast--;
                         }
                     }
+
+                    if (!allocated) {
+                        nextCarryOver.push(w);
+                    }
                 });
+
+                stocksRecord[rt] = {
+                    totalNetQuota,
+                    frontWest: stock.frontWest,
+                    frontEast: stock.frontEast,
+                    backWest: stock.backWest,
+                    backEast: stock.backEast,
+                    unspecifiedWaitlistsCount
+                };
             });
 
-            carriedOverWaitlists = nextCarryOver; // ส่งคิวตกค้างข้ามไปวงลูปเดือนหน้า
+            if (isTargetMonth) {
+                targetMonthStocks = stocksRecord;
+            }
+
+            carriedOverWaitlists = nextCarryOver;
 
             currM++;
             if (currM > 12) {
@@ -220,16 +374,10 @@ export default function AvailableRoomsPage() {
             }
         }
 
-        // 4. เมื่อวงลูปวิ่งมาจนถึง "เดือนปัจจุบันที่เลือกดู" เราจะนำคิวตกค้างจากข้อ 3 มารวมกับคิวเดือนปัจจุบัน
-        const targetWaitlists = waitlists.filter(w => {
-            if (!w.start_date) return false;
-            const d = new Date(w.start_date);
-            return d.getFullYear() === selectedYear && (d.getMonth() + 1) === selectedMonth;
-        });
-
         return {
-            combined: [...carriedOverWaitlists, ...targetWaitlists],
-            carriedOver: carriedOverWaitlists
+            combined: targetMonthDemand,
+            carriedOver: carriedOverIntoTarget, // คิวที่ทบจากเดือนก่อนเพื่อมาใช้ในเดือนเป้าหมาย
+            stocks: targetMonthStocks // สต๊อกห้องสุทธิของเดือนเป้าหมาย
         };
 
     }, [waitlists, contracts, intentions, roomsL, lockedRoomIds, selectedYear, selectedMonth]);
@@ -253,52 +401,41 @@ export default function AvailableRoomsPage() {
         const availableRooms = availableRoomsList;
 
         return rowTypes.map(rt => {
-            const rOfType = roomsL.filter(r => r.room_type === rt.key);
+            const rOfTypeTotal = roomsL.filter(r => r.room_type === rt.key);
+            const rOfTypeAvail = availableRooms.filter(r => r.room_type === rt.key);
             const wOfType = overlappingWaitlists.filter(w => w.room_type === rt.key);
 
-            const getCellData = (kitchen: string | null, view: string | null) => {
-                const isUnspecifiedColumn = kitchen === null && view === null;
-                
-                if (isUnspecifiedColumn) {
-                    const total = rOfType.filter(r => !r.kitchen_type && !r.view_direction).length;
-                    const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && !r.kitchen_type && !r.view_direction).length;
-                    
-                    const waitlistMatches = wOfType.filter(w => {
-                        const k = w.kitchen_type;
-                        const v = w.view_preference;
-                        const isFullySpecific = (k === 'ครัวหน้า' || k === 'ครัวหลัง') && (v === 'ทิศตะวันตก' || v === 'ทิศตะวันออก');
-                        return !isFullySpecific;
-                    }).length;
-
-                    const net = physicalAvailable - waitlistMatches;
-                    return { total, available: physicalAvailable, waitlist: waitlistMatches, net };
-                }
-
-                const total = rOfType.filter(r => (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
-                const physicalAvailable = availableRooms.filter(r => r.room_type === rt.key && (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
-                
-                const waitlistMatches = wOfType.filter(w => (w.kitchen_type || null) === kitchen && (w.view_preference || null) === view).length;
-                
-                const net = physicalAvailable - waitlistMatches;
-                return { total, available: physicalAvailable, waitlist: waitlistMatches, net };
+            // ดึงผลลัพธ์จากระบบจำลองที่หักลบห้องตามกฎมาแล้วเรียบร้อย
+            const stockInfo = overlappingData.stocks[rt.key] || {
+                totalNetQuota: 0, frontWest: 0, frontEast: 0, backWest: 0, backEast: 0, unspecifiedWaitlistsCount: 0
             };
 
-            const totalAvailable = availableRooms.filter(r => r.room_type === rt.key).length;
-            const netQuota = totalAvailable - wOfType.length; 
+            const getCellData = (kitchen: string | null, view: string | null, netAfterSimulation: number) => {
+                const total = rOfTypeTotal.filter(r => (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
+                const available = rOfTypeAvail.filter(r => (r.kitchen_type || null) === kitchen && (r.view_direction || null) === view).length;
+                
+                // คำนวณว่าในช่องนี้โดนคิวมาแย่งห้องไปเท่าไหร่ (ห้องว่างตอนแรก - ห้องที่เหลือหลังจำลอง)
+                const waitlist = available - netAfterSimulation;
+                return { total, available, net: netAfterSimulation, waitlist };
+            };
+
+            const totalAvailable = rOfTypeAvail.length;
 
             return {
                 ...rt,
                 waitlistCount: wOfType.length,
                 totalAvailable,
-                netQuota,
-                frontWest: getCellData('ครัวหน้า', 'ทิศตะวันตก'),
-                frontEast: getCellData('ครัวหน้า', 'ทิศตะวันออก'),
-                backWest: getCellData('ครัวหลัง', 'ทิศตะวันตก'),
-                backEast: getCellData('ครัวหลัง', 'ทิศตะวันออก'),
-                unspecified: getCellData(null, null),
+                netQuota: stockInfo.totalNetQuota, // จะหยุดที่ 0 ตามระบบจำลอง ไม่เกิดเลขติดลบแล้ว
+                frontWest: getCellData('ครัวหน้า', 'ทิศตะวันตก', stockInfo.frontWest),
+                frontEast: getCellData('ครัวหน้า', 'ทิศตะวันออก', stockInfo.frontEast),
+                backWest: getCellData('ครัวหลัง', 'ทิศตะวันตก', stockInfo.backWest),
+                backEast: getCellData('ครัวหลัง', 'ทิศตะวันออก', stockInfo.backEast),
+                unspecified: {
+                    waitlist: stockInfo.unspecifiedWaitlistsCount // นับเฉพาะคิวที่ไม่ระบุและได้ห้องสำเร็จ
+                }
             };
         });
-    }, [rooms, contracts, waitlists, checkStart, checkEnd, roomsL, lockedRoomIds]);
+    }, [roomsL, availableRoomsList, overlappingWaitlists, overlappingData]);
 
     const monthsTH = [
         "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",

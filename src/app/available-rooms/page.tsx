@@ -15,15 +15,10 @@ export default function AvailableRoomsPage() {
     const [showWaitlistModal, setShowWaitlistModal] = useState(false);
     const [showAvailableModal, setShowAvailableModal] = useState(false);
 
-    // Default to next month
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 2 > 12 ? 1 : new Date().getMonth() + 2);
-
-    useEffect(() => {
-        if (new Date().getMonth() + 2 > 12) {
-            setSelectedYear(new Date().getFullYear() + 1);
-        }
-    }, []);
+    // Default to current month/year
+    const now = new Date();
+    const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+    const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
 
     useEffect(() => {
         fetchData();
@@ -858,7 +853,7 @@ export default function AvailableRoomsPage() {
                                                                         </div>
                                                                     </div>
                                                                     <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-                                                                        (นำไปหักลบในยอดรวมแล้ว)
+                                                                        (นำไปหักลบในยอดแล้ว)
                                                                     </div>
                                                                 </div>
                                                             ) : (

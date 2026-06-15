@@ -76,8 +76,10 @@ export default function DashboardPage() {
 
   const [dayWidth, setDayWidth] = useState(3);
 
-  const defaultStart = new Date(); defaultStart.setMonth(defaultStart.getMonth() - 1);
-  const defaultEnd = new Date(); defaultEnd.setMonth(defaultEnd.getMonth() + 11);
+  const defaultStart = new Date();
+  const defaultEnd = new Date();
+  // Default custom range: start = today, end = today + 1 year
+  defaultEnd.setFullYear(defaultEnd.getFullYear() + 1);
 
   const [searchStartDate, setSearchStartDate] = useState(defaultStart.toISOString().split('T')[0]);
   const [searchEndDate, setSearchEndDate] = useState(defaultEnd.toISOString().split('T')[0]);
@@ -88,8 +90,9 @@ export default function DashboardPage() {
   const [endYear, setEndYear] = useState(new Date().getFullYear() + 1);
   const [selectedMonthStart, setSelectedMonthStart] = useState(new Date().getMonth() + 1);
   const [selectedYearStart, setSelectedYearStart] = useState(new Date().getFullYear());
+  // For monthly default: start = current month this year, end = same month next year
   const [selectedMonthEnd, setSelectedMonthEnd] = useState(new Date().getMonth() + 1);
-  const [selectedYearEnd, setSelectedYearEnd] = useState(new Date().getFullYear());
+  const [selectedYearEnd, setSelectedYearEnd] = useState(new Date().getFullYear() + 1);
 
   // --- Virtual Scroll State ---
   const [scrollTop, setScrollTop] = useState(0);

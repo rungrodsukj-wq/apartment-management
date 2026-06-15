@@ -92,17 +92,28 @@ export default function RenewalCheckPage() {
         if (cData && iData) {
             const existingContractIds = new Set(iData.map((item: any) => item.contract_id));
             const missingContracts = cData.filter((contract: any) => contract.id && !existingContractIds.has(contract.id));
-            if (missingContracts.length > 0) {
+                if (missingContracts.length > 0) {
                 const today = new Date();
                 const surveyMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
-                const inserts = missingContracts.map((contract: any) => ({
-                    contract_id: contract.id,
-                    room_id: contract.main_room_id || contract.temp_room_id || contract.move_to_room_id || null,
-                    tenant_name: contract.tenant_name || '',
-                    intention: 'not_asked',
-                    survey_month: surveyMonth,
-                    note: '',
-                }));
+                const inserts = missingContracts.map((contract: any) => {
+                    const today = new Date();
+                    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    const isDateInRange = (start?: string, end?: string) => !!start && !!end && start <= todayStr && todayStr <= end;
+                    const currentRoomId = contract.move_to_room_id && isDateInRange(contract.move_start_date, contract.move_end_date)
+                        ? contract.move_to_room_id
+                        : contract.temp_room_id && isDateInRange(contract.temp_start_date, contract.temp_end_date)
+                            ? contract.temp_room_id
+                            : (contract.main_room_id || null);
+
+                    return {
+                        contract_id: contract.id,
+                        room_id: currentRoomId,
+                        tenant_name: contract.tenant_name || '',
+                        intention: 'not_asked',
+                        survey_month: surveyMonth,
+                        note: '',
+                    };
+                });
                 const { error: insertError } = await supabase.from('renewal_intentions').insert(inserts);
                 if (insertError) {
                     console.warn('Failed to backfill renewal intentions', insertError.message);
@@ -110,6 +121,36 @@ export default function RenewalCheckPage() {
                     const { data: refreshed } = await supabase.from('renewal_intentions').select('*');
                     if (refreshed) setIntentions(refreshed);
                 }
+            }
+
+            // Backfill existing renewal_intentions rows that are missing room_id
+            const intentsMissingRoom = (iData || []).filter((it: any) => !it.room_id && it.contract_id);
+            if (intentsMissingRoom.length > 0) {
+                for (const it of intentsMissingRoom) {
+                    const contract = cData.find((c: any) => c.id === it.contract_id);
+                    if (!contract) continue;
+                    const today = new Date();
+                    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    const isDateInRange = (start?: string, end?: string) => !!start && !!end && start <= todayStr && todayStr <= end;
+                    const currentRoomId = contract.move_to_room_id && isDateInRange(contract.move_start_date, contract.move_end_date)
+                        ? contract.move_to_room_id
+                        : contract.temp_room_id && isDateInRange(contract.temp_start_date, contract.temp_end_date)
+                            ? contract.temp_room_id
+                            : (contract.main_room_id || null);
+
+                    if (!currentRoomId) continue;
+                    const { error: updateErr } = await supabase
+                        .from('renewal_intentions')
+                        .update({ room_id: currentRoomId })
+                        .eq('id', it.id);
+                    if (updateErr) {
+                        console.warn('Failed to update renewal_intentions.room_id for id', it.id, updateErr.message);
+                    } else {
+                        await logAudit(profile, 'renewal_intentions', 'update', it.id, 'backfill room_id', { room_id: currentRoomId });
+                    }
+                }
+                const { data: refreshed2 } = await supabase.from('renewal_intentions').select('*');
+                if (refreshed2) setIntentions(refreshed2);
             }
         }
 
@@ -120,6 +161,19 @@ export default function RenewalCheckPage() {
 
     const getIntention = (contractId: string): any | null => {
         return intentions.find(i => i.contract_id === contractId) || null;
+    };
+
+    const getCurrentRoomId = (contract: any) => {
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const isDateInRange = (start?: string, end?: string) => !!start && !!end && start <= todayStr && todayStr <= end;
+        if (contract.move_to_room_id && isDateInRange(contract.move_start_date, contract.move_end_date)) {
+            return contract.move_to_room_id;
+        }
+        if (contract.temp_room_id && isDateInRange(contract.temp_start_date, contract.temp_end_date)) {
+            return contract.temp_room_id;
+        }
+        return contract.main_room_id || '';
     };
 
     // Filter contracts that expire within X months (or all upcoming if 'all')
@@ -150,13 +204,13 @@ export default function RenewalCheckPage() {
             .filter(c => {
                 const query = searchQuery.trim().toLowerCase();
                 if (!query) return true;
-                const roomNumber = String(getRoom(c.main_room_id)?.room_number ?? '').toLowerCase();
+                const roomNumber = String(getRoom(getCurrentRoomId(c))?.room_number ?? '').toLowerCase();
                 const tenantName = String(c.tenant_name ?? '').toLowerCase();
                 return roomNumber.includes(query) || tenantName.includes(query);
             })
             .sort((a, b) => {
-                const roomA = getRoom(a.main_room_id)?.room_number ?? '';
-                const roomB = getRoom(b.main_room_id)?.room_number ?? '';
+                const roomA = getRoom(getCurrentRoomId(a))?.room_number ?? '';
+                const roomB = getRoom(getCurrentRoomId(b))?.room_number ?? '';
                 const numA = Number(roomA);
                 const numB = Number(roomB);
                 if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
@@ -487,7 +541,8 @@ export default function RenewalCheckPage() {
     }, [expiringContracts]);
 
     const renderContractCard = (contract: any, index: number) => {
-        const room = getRoom(contract.main_room_id);
+        const currentRoomId = getCurrentRoomId(contract);
+        const room = getRoom(currentRoomId);
         const intention = getIntention(contract.id);
         const currentIntention: Intention = intention?.intention || 'not_asked';
         const cfg = intentionConfig[currentIntention] ?? intentionConfig['not_asked'];

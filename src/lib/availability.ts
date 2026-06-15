@@ -283,6 +283,117 @@ export const getRoomAvailabilityText = (contracts: any[], roomId: string, target
     return `ว่าง : ${fromStr} - ${untilStr}`;
 };
 
+export const computeLockedRooms = (
+    contracts: any[],
+    intentions: any[],
+    checkStart?: string,
+    checkEnd?: string,
+    currentContractId?: string | null
+) => {
+    const locked = new Set<string>();
+
+    const startRef = checkStart && checkStart !== '' ? checkStart : (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    })();
+
+    // Map intentions by contract
+    const byContract: Record<string, any> = {};
+    intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
+
+    // 1) Find latest contract per room (by start date)
+    const latestContractByRoom: Record<string, { contract: any; startDate: number; role: string; endDateStr: string | null }> = {};
+
+    const updateLatest = (roomId: string | null | undefined, role: string, specificStartDate: string | null, specificEndDate: string | null, c: any) => {
+        if (!roomId) return;
+        const startDateStr = specificStartDate || '';
+        const startDate = startDateStr ? new Date(startDateStr).getTime() : 0;
+        if (!latestContractByRoom[roomId] || latestContractByRoom[roomId].startDate < startDate) {
+            latestContractByRoom[roomId] = { contract: c, startDate, role, endDateStr: specificEndDate };
+        }
+    };
+
+    for (const c of contracts) {
+        if (currentContractId && c.id === currentContractId) continue;
+        if (c.status === 'cancelled') continue;
+
+        updateLatest(c.main_room_id, 'main', c.main_start_date, c.main_end_date, c);
+        updateLatest(c.temp_room_id, 'temp', c.temp_start_date, c.temp_end_date, c);
+        updateLatest(c.move_to_room_id, 'move_to', c.move_start_date, c.move_end_date, c);
+    }
+
+    const lockedIntents = ['not_asked', 'pending'];
+
+    // 2) Special rules for temp + intentions
+    for (const roomId in latestContractByRoom) {
+        const { contract: c, role, endDateStr } = latestContractByRoom[roomId];
+        if (role === 'temp') {
+            if (endDateStr) {
+                const endD = new Date(endDateStr);
+                let vacantY = endD.getFullYear();
+                let vacantM = endD.getMonth() + 1;
+                vacantM++;
+                if (vacantM > 12) { vacantM = 1; vacantY++; }
+                const vacantValue = vacantY * 12 + vacantM;
+
+                const viewDate = new Date(startRef);
+                const viewValue = viewDate.getFullYear() * 12 + (viewDate.getMonth() + 1);
+                const currD = new Date();
+                const currValue = currD.getFullYear() * 12 + (currD.getMonth() + 1);
+
+                if (viewValue > vacantValue && currValue < vacantValue) {
+                    locked.add(roomId);
+                }
+            }
+            continue;
+        }
+
+        const intent = byContract[c.id];
+        const intentStatus = intent?.intention || 'not_asked';
+        if (lockedIntents.includes(intentStatus)) locked.add(roomId);
+    }
+
+    const nonLockIntents = ['not_renew', 'renew_no_room', 'renew'];
+
+    // 3) Lock rooms for contracts that overlap the checkStart month
+    for (const c of contracts) {
+        if (currentContractId && c.id === currentContractId) continue;
+        if (c.status === 'cancelled') continue;
+
+        const checkOverlapAndLock = (roomId: string | null | undefined, endDateStr: string | null | undefined, role: string) => {
+            if (!roomId) return;
+            let endDate = endDateStr;
+            if (role !== 'temp' && !endDate) endDate = c.contract_end_date;
+            if (endDate && new Date(endDate) >= new Date(startRef)) {
+                if (role === 'temp') {
+                    locked.add(roomId);
+                } else {
+                    const intent = byContract[c.id];
+                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(roomId);
+                }
+            }
+        };
+
+        checkOverlapAndLock(c.main_room_id, c.main_end_date, 'main');
+        checkOverlapAndLock(c.temp_room_id, c.temp_end_date, 'temp');
+        checkOverlapAndLock(c.move_to_room_id, c.move_end_date, 'move_to');
+    }
+
+    // 4) Intentions that refer directly to a room
+    for (const intent of intentions) {
+        if (!intent.room_id) continue;
+        if (latestContractByRoom[intent.room_id]?.role === 'temp') continue;
+
+        if (intent.intention === 'not_asked' || intent.intention === 'pending') {
+            locked.add(intent.room_id);
+        } else if (!intent.intention || !nonLockIntents.includes(intent.intention)) {
+            locked.add(intent.room_id);
+        }
+    }
+
+    return locked;
+};
+
 export const computeGapInfo = (from: Date | null, to: Date) => {
     if (!from) return null;
     if (from.getTime && from.getTime() === 0) return null;

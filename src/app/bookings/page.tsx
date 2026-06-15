@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { canEditPage } from '../../lib/permissions';
 import { logAudit, describeChanges } from '../../lib/audit';
-import { isOverlap, isRoomAvailable, getRoomFreeWindow } from '../../lib/availability';
+import { isOverlap, isRoomAvailable, getRoomFreeWindow, computeLockedRooms } from '../../lib/availability';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 const parseDateFromYYYYMMDD = (dateStr: string) => {
@@ -1012,7 +1012,8 @@ export default function BookingsPage() {
             if (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') return true;
             return prefVal === roomVal;
         };
-        const availableRooms = rooms.filter(r => r.id !== createForm.main_room_id && isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
+        const lockedRooms = computeLockedRooms(contracts, intentions, start, end, null);
+        const availableRooms = rooms.filter(r => r.id !== createForm.main_room_id && isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r) && !lockedRooms.has(r.id));
         const perfectMatchRooms = availableRooms.filter(r =>
             isMatch(customerPref.room_type, r.room_type) &&
             isMatch(customerPref.kitchen_type, r.kitchen_type) &&
@@ -1697,7 +1698,8 @@ export default function BookingsPage() {
                                                     const start = createForm.main_start_date || createForm.contract_start_date;
                                                     const end = createForm.main_end_date || createForm.contract_end_date;
                                                     const customerPref = waitlists.find(w => w.name === createForm.tenant_name) || {};
-                                                    const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r));
+                                                    const lockedRooms = computeLockedRooms(contracts, intentions, start, end, null);
+                                                    const availableRooms = rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, start, end) && applyRoomFilters(r) && !lockedRooms.has(r.id));
                                                     const isMatch = (prefVal: any, roomVal: any) => (!prefVal || prefVal === 'ไม่ระบุ' || prefVal === '-') ? true : prefVal === roomVal;
                                                     const perfectMatchRooms = availableRooms.filter(r => isMatch(customerPref.room_type, r.room_type) && isMatch(customerPref.kitchen_type, r.kitchen_type) && isMatch(customerPref.view_preference, r.view_direction));
                                                     const otherRooms = availableRooms.filter(r => !perfectMatchRooms.includes(r));
@@ -1979,30 +1981,39 @@ export default function BookingsPage() {
                             <button onClick={() => setEditRoomPicker(null)} className="text-slate-400 hover:text-slate-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
-                            {editRoomPicker === 'temp' && renderRoomButtonGrid(
-                                rooms.filter(r => r.id !== editForm.main_room_id && isRoomAvailable(contracts, intentions, r.id, editForm.temp_start_date, editForm.temp_end_date, editForm.id) && applyRoomFilters(r)),
-                                editForm.temp_room_id,
-                                (roomId) => {
-                                    const start = editForm.temp_start_date || editForm.actual_check_in_date || editForm.main_start_date || editForm.contract_start_date || '';
-                                    const defaultEnd = start ? addMonths(start, 2) : '';
-                                    const clamped = (editForm.contract_end_date && defaultEnd && new Date(defaultEnd) > new Date(editForm.contract_end_date)) ? editForm.contract_end_date : defaultEnd;
-                                    setEditForm({ ...editForm, temp_room_id: roomId, temp_end_date: clamped });
-                                    setEditRoomPicker(null);
-                                },
-                                { searchStart: editForm.temp_start_date, searchEnd: editForm.temp_end_date }
-                            )}
-                            {editRoomPicker === 'main' && renderRoomButtonGrid(
-                                rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id) && applyRoomFilters(r)),
-                                editForm.main_room_id,
-                                (roomId) => { setEditForm({ ...editForm, main_room_id: roomId }); setEditRoomPicker(null); },
-                                { searchStart: editForm.main_start_date, searchEnd: editForm.main_end_date }
-                            )}
-                            {editRoomPicker === 'move' && renderRoomButtonGrid(
-                                rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.move_start_date, editForm.move_end_date, editForm.id) && applyRoomFilters(r)),
-                                editForm.move_to_room_id,
-                                (roomId) => { setEditForm({ ...editForm, move_to_room_id: roomId }); setEditRoomPicker(null); },
-                                { searchStart: editForm.move_start_date, searchEnd: editForm.move_end_date }
-                            )}
+                            {editRoomPicker === 'temp' && (() => {
+                                const lockedEditTemp = computeLockedRooms(contracts, intentions, editForm.temp_start_date, editForm.temp_end_date, editForm.id);
+                                return renderRoomButtonGrid(
+                                    rooms.filter(r => r.id !== editForm.main_room_id && isRoomAvailable(contracts, intentions, r.id, editForm.temp_start_date, editForm.temp_end_date, editForm.id) && applyRoomFilters(r) && !lockedEditTemp.has(r.id)),
+                                    editForm.temp_room_id,
+                                    (roomId) => {
+                                        const start = editForm.temp_start_date || editForm.actual_check_in_date || editForm.main_start_date || editForm.contract_start_date || '';
+                                        const defaultEnd = start ? addMonths(start, 2) : '';
+                                        const clamped = (editForm.contract_end_date && defaultEnd && new Date(defaultEnd) > new Date(editForm.contract_end_date)) ? editForm.contract_end_date : defaultEnd;
+                                        setEditForm({ ...editForm, temp_room_id: roomId, temp_end_date: clamped });
+                                        setEditRoomPicker(null);
+                                    },
+                                    { searchStart: editForm.temp_start_date, searchEnd: editForm.temp_end_date }
+                                );
+                            })()}
+                            {editRoomPicker === 'main' && (() => {
+                                const lockedEditMain = computeLockedRooms(contracts, intentions, editForm.main_start_date, editForm.main_end_date, editForm.id);
+                                return renderRoomButtonGrid(
+                                    rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.main_start_date, editForm.main_end_date, editForm.id) && applyRoomFilters(r) && !lockedEditMain.has(r.id)),
+                                    editForm.main_room_id,
+                                    (roomId) => { setEditForm({ ...editForm, main_room_id: roomId }); setEditRoomPicker(null); },
+                                    { searchStart: editForm.main_start_date, searchEnd: editForm.main_end_date }
+                                );
+                            })()}
+                            {editRoomPicker === 'move' && (() => {
+                                const lockedEditMove = computeLockedRooms(contracts, intentions, editForm.move_start_date, editForm.move_end_date, editForm.id);
+                                return renderRoomButtonGrid(
+                                    rooms.filter(r => isRoomAvailable(contracts, intentions, r.id, editForm.move_start_date, editForm.move_end_date, editForm.id) && applyRoomFilters(r) && !lockedEditMove.has(r.id)),
+                                    editForm.move_to_room_id,
+                                    (roomId) => { setEditForm({ ...editForm, move_to_room_id: roomId }); setEditRoomPicker(null); },
+                                    { searchStart: editForm.move_start_date, searchEnd: editForm.move_end_date }
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

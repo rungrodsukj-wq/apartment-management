@@ -762,6 +762,28 @@ export default function BookingsPage() {
             alert('เกิดข้อผิดพลาด: ' + error.message);
         } else {
             await logAudit(profile, 'contracts', 'update', editForm.id, 'แก้ไขสัญญาเช่า', describeChanges(updatePayload));
+
+            // Sync renewal_intentions.room_id when main/temp/move room changed or cleared
+            try {
+                const desiredRoomId = updatePayload.main_room_id || updatePayload.temp_room_id || updatePayload.move_to_room_id || null;
+                const { data: existing, error: fetchErr } = await supabase.from('renewal_intentions').select('*').eq('contract_id', editForm.id).limit(1);
+                if (fetchErr) {
+                    console.warn('Failed to fetch renewal_intention for contract', editForm.id, fetchErr.message);
+                } else if (existing && existing.length > 0) {
+                    const intentRec = existing[0];
+                    if ((intentRec.room_id || null) !== (desiredRoomId || null)) {
+                        const { error: updErr } = await supabase.from('renewal_intentions').update({ room_id: desiredRoomId, updated_at: new Date().toISOString() }).eq('id', intentRec.id);
+                        if (updErr) {
+                            console.warn('Failed to update renewal_intention.room_id', updErr.message);
+                        } else {
+                            await logAudit(profile, 'renewal_intentions', 'update', intentRec.id, 'อัปเดต room_id (หลังแก้ไขสัญญา)', describeChanges({ room_id: desiredRoomId }));
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to sync renewal_intention after contract edit', e);
+            }
+
             setIsEditModalOpen(false);
             fetchData();
         }

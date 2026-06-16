@@ -341,9 +341,11 @@ export default function RenewalCheckPage() {
         }
 
         const existing = getIntention(contractId);
-        const shouldRemoveCreatedRenewalContract = existing &&
+        // If an existing intention had created a renewal (either `renew` or `renew_no_room`),
+        // and the new intention is different from the existing one, remove created renewal artifacts.
+        const shouldRemoveCreatedRenewalContract = !!existing &&
             (existing.intention === 'renew' || existing.intention === 'renew_no_room') &&
-            (intention !== 'renew' && intention !== 'renew_no_room');
+            (intention !== existing.intention);
 
         if (shouldRemoveCreatedRenewalContract) {
             if (existing.intention === 'renew_no_room') {

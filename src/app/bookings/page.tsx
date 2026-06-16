@@ -96,6 +96,8 @@ export default function BookingsPage() {
         search: '',
     });
 
+    const [showNeedsActionFilter, setShowNeedsActionFilter] = useState(false);
+
     const [waitlists, setWaitlists] = useState<any[]>([]);
     const searchParams = useSearchParams();
 
@@ -226,6 +228,12 @@ export default function BookingsPage() {
 
     const filteredContracts = useMemo(() => {
         return contracts.filter((contract) => {
+            // If the "ต้องดำเนินการ" filter is active, only include contracts without a main room
+            if (showNeedsActionFilter) {
+                if (contract.main_room_id) return false;
+                if (contract.status === 'cancelled') return false;
+            }
+
             const currentRoomId = getCurrentRoomId(contract);
             const room = rooms.find((r: any) => r.id === currentRoomId) || null;
 
@@ -254,7 +262,7 @@ export default function BookingsPage() {
 
             return true;
         });
-    }, [contracts, rooms, listFilters]);
+    }, [contracts, rooms, listFilters, showNeedsActionFilter]);
 
     const handleRoomClick = (roomId: string) => {
         const room = rooms.find(r => r.id === roomId);
@@ -397,9 +405,14 @@ export default function BookingsPage() {
     };
 
     const handleEditClick = (contract: any) => {
+        const initialMainEndDate = !contract.move_start_date
+            ? (contract.contract_end_date || contract.main_end_date || '')
+            : (contract.main_end_date || '');
+
         setEditForm({
             ...contract,
             has_temp_room: !!contract.temp_room_id,
+            main_end_date: initialMainEndDate,
         });
         setEditRoomPicker(null);
         setIsEditModalOpen(true);
@@ -554,7 +567,11 @@ export default function BookingsPage() {
                 main_end_date: editForm.contract_end_date && new Date(dayBefore) > new Date(editForm.contract_end_date) ? editForm.contract_end_date : dayBefore,
             });
         } else {
-            setEditForm({ ...editForm, move_start_date: '' });
+            setEditForm({
+                ...editForm,
+                move_start_date: '',
+                main_end_date: editForm.contract_end_date || editForm.main_end_date || '',
+            });
         }
     };
 
@@ -1241,7 +1258,13 @@ export default function BookingsPage() {
                             <p className="text-2xl font-extrabold text-[#0A2647]">{filteredContracts.filter(c => c.status === 'active').length} <span className="text-sm font-bold text-slate-400">รายการ</span></p>
                         </div>
                     </div>
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex items-center gap-5 transition-transform hover:scale-[1.01]">
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setShowNeedsActionFilter(prev => !prev)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowNeedsActionFilter(prev => !prev); } }}
+                        className={`bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 transition-transform hover:scale-[1.01] ${showNeedsActionFilter ? 'border-[#4F81FF] bg-blue-50/70 ring-2 ring-[#4F81FF]/20' : 'border border-slate-100'}`}
+                    >
                         <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shadow-inner">
                             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>

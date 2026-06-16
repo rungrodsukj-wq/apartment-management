@@ -29,9 +29,9 @@ const pageList = [
   { key: 'renewal_check', name: 'สอบถามต่อสัญญา' },
 ];
 
-const buildPagePermission = (pageKey: string, mode: 'view' | 'edit') => `${pageKey}:${mode}`;
+const buildPagePermission = (pageKey: string, mode: 'view' | 'edit' | 'delete') => `${pageKey}:${mode}`;
 
-const hasPagePermission = (perms: string[] = [], pageKey: string, mode: 'view' | 'edit') => {
+const hasPagePermission = (perms: string[] = [], pageKey: string, mode: 'view' | 'edit' | 'delete') => {
   if (mode === 'view') {
     return (
       perms.includes(pageKey) ||
@@ -39,7 +39,14 @@ const hasPagePermission = (perms: string[] = [], pageKey: string, mode: 'view' |
       perms.includes(buildPagePermission(pageKey, 'edit'))
     );
   }
-  return perms.includes(buildPagePermission(pageKey, 'edit'));
+  if (mode === 'edit') {
+    return perms.includes(buildPagePermission(pageKey, 'edit'));
+  }
+  // delete
+  if (mode === 'delete') {
+    return perms.includes(buildPagePermission(pageKey, 'delete'));
+  }
+  return false;
 };
 
 export default function UsersManagementPage() {
@@ -140,12 +147,13 @@ export default function UsersManagementPage() {
   const handleTogglePermission = async (
     staffId: string,
     pageKey: string,
-    mode: 'view' | 'edit',
+    mode: 'view' | 'edit' | 'delete',
     currentPerms: string[]
   ) => {
     let newPerms = [...currentPerms];
     const viewKey = buildPagePermission(pageKey, 'view');
     const editKey = buildPagePermission(pageKey, 'edit');
+    const deleteKey = buildPagePermission(pageKey, 'delete');
     const hasView = hasPagePermission(newPerms, pageKey, 'view');
     const hasEdit = hasPagePermission(newPerms, pageKey, 'edit');
 
@@ -155,12 +163,21 @@ export default function UsersManagementPage() {
       } else {
         if (!newPerms.includes(viewKey)) newPerms.push(viewKey);
       }
-    } else {
+    } else if (mode === 'edit') {
       if (hasEdit) {
         newPerms = newPerms.filter((p) => p !== editKey);
       } else {
         if (!newPerms.includes(viewKey)) newPerms.push(viewKey);
         if (!newPerms.includes(editKey)) newPerms.push(editKey);
+      }
+    } else if (mode === 'delete') {
+      // toggle delete permission; ensure view exists when granting delete
+      const hasDelete = hasPagePermission(newPerms, pageKey, 'delete');
+      if (hasDelete) {
+        newPerms = newPerms.filter((p) => p !== deleteKey);
+      } else {
+        if (!newPerms.includes(viewKey)) newPerms.push(viewKey);
+        if (!newPerms.includes(deleteKey)) newPerms.push(deleteKey);
       }
     }
 
@@ -408,6 +425,25 @@ export default function UsersManagementPage() {
                               />
                               แก้ไขได้
                             </label>
+                            
+                              {(page.key === 'waitlists' || page.key === 'bookings') && (
+                                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm cursor-pointer hover:border-slate-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={hasPagePermission(selectedStaff.page_permissions || [], page.key, 'delete')}
+                                    onChange={() =>
+                                      handleTogglePermission(
+                                        selectedStaff.id,
+                                        page.key,
+                                        'delete',
+                                        selectedStaff.page_permissions || []
+                                      )
+                                    }
+                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                                  />
+                                  ลบได้
+                                </label>
+                              )}
                           </div>
                         </div>
                       </div>

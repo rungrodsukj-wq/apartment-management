@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { canEditPage } from '../../lib/permissions';
+import { canEditPage, canDeletePage } from '../../lib/permissions';
 import { logAudit, describeChanges } from '../../lib/audit';
 import { isOverlap, isRoomAvailable, getRoomFreeWindow, computeLockedRooms } from '../../lib/availability';
 
@@ -76,6 +76,9 @@ export default function BookingsPage() {
     const [cancelContractId, setCancelContractId] = useState<string | null>(null);
     const [cancelEndDate, setCancelEndDate] = useState(formatDateInput(new Date()));
     const [cancelTenantName, setCancelTenantName] = useState('');
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deleteContractId, setDeleteContractId] = useState<string | null>(null);
+    const [deleteTenantName, setDeleteTenantName] = useState('');
 
     const [roomFilters, setRoomFilters] = useState({
         building: '',
@@ -426,6 +429,60 @@ export default function BookingsPage() {
             setCancelTenantName('');
             alert('ยกเลิกสัญญาเรียบร้อยแล้ว');
             fetchData();
+        }
+    };
+
+    const openDeleteModal = (contract: any) => {
+        // Only allow users who have delete permission for bookings
+        if (!profile || !canDeletePage(profile, 'bookings')) {
+            alert('คุณไม่มีสิทธิ์ลบสัญญานี้');
+            return;
+        }
+        setDeleteContractId(contract.id);
+        setDeleteTenantName(contract.tenant_name || '');
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteContract = async () => {
+        if (!deleteContractId) return;
+        // Double-check permissions on action (require delete permission)
+        if (!profile || !canDeletePage(profile, 'bookings')) {
+            alert('คุณไม่มีสิทธิ์ลบสัญญานี้');
+            setIsDeleteModalOpen(false);
+            return;
+        }
+
+        try {
+            // fetch existing renewal_intentions for audit logging
+            const { data: existingIntents, error: fetchErr } = await supabase.from('renewal_intentions').select('*').eq('contract_id', deleteContractId);
+            if (fetchErr) {
+                console.warn('Failed to fetch renewal_intentions for delete', fetchErr.message);
+            } else if (existingIntents && existingIntents.length > 0) {
+                const { error: delIntentErr } = await supabase.from('renewal_intentions').delete().eq('contract_id', deleteContractId);
+                if (delIntentErr) {
+                    alert('เกิดข้อผิดพลาดในการลบ renewal_intentions: ' + delIntentErr.message);
+                    return;
+                }
+                for (const rec of existingIntents) {
+                    try { await logAudit(profile, 'renewal_intentions', 'delete', rec.id, 'ลบ renewal_intention เมื่อสัญญาถูกลบ', { contract_id: deleteContractId }); } catch (e) { console.warn('Audit failed for renewal_intentions', e); }
+                }
+            }
+
+            const { error: delContractErr } = await supabase.from('contracts').delete().eq('id', deleteContractId);
+            if (delContractErr) {
+                alert('เกิดข้อผิดพลาดในการลบสัญญา: ' + delContractErr.message);
+                return;
+            }
+
+            await logAudit(profile, 'contracts', 'delete', deleteContractId, 'ลบสัญญาเช่าและ renewal_intentions ที่เกี่ยวข้อง', {});
+            setIsDeleteModalOpen(false);
+            setDeleteContractId(null);
+            setDeleteTenantName('');
+            alert('ลบสัญญาเรียบร้อยแล้ว');
+            fetchData();
+        } catch (e) {
+            console.warn('Failed to delete contract', e);
+            alert('เกิดข้อผิดพลาดในการลบสัญญา');
         }
     };
 
@@ -1446,6 +1503,16 @@ export default function BookingsPage() {
                                                     ยกเลิกสัญญา
                                                 </button>
                                             )}
+                                            {canDeletePage(profile, 'bookings') && (
+                                                <button
+                                                    onClick={() => openDeleteModal(contract)}
+                                                    className="h-[40px] bg-white text-red-600 hover:bg-red-50 border border-red-100 px-4 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                                                    title="ลบสัญญา"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>
+                                                    ลบสัญญา
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1843,6 +1910,44 @@ export default function BookingsPage() {
                 </div>
             )}
 
+            {/* ─── Delete Contract Modal ─── */}
+            {isDeleteModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl flex flex-col border border-slate-100">
+                        <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/60">
+                            <div>
+                                <h2 className="text-lg font-extrabold text-[#0A2647]">ยืนยันการลบสัญญา</h2>
+                                <p className="text-xs text-slate-500 font-medium mt-0.5">การกระทำนี้จะลบสัญญาและข้อมูล renewal_intentions ที่เกี่ยวข้อง ไม่สามารถกู้คืนได้</p>
+                            </div>
+                            <button onClick={() => setIsDeleteModalOpen(false)} className="text-slate-400 hover:text-slate-600"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                        </div>
+                        <div className="p-8 space-y-4">
+                            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl">
+                                <p className="text-xs font-bold text-red-800">คุณกำลังจะลบสัญญาของ:</p>
+                                <p className="text-sm font-extrabold text-slate-900 mt-0.5">{deleteTenantName}</p>
+                                <p className="text-xs text-red-600 mt-2">การกระทำนี้จะลบสัญญาและข้อมูล `renewal_intentions` ที่มี `contract_id` ตรงกัน</p>
+                            </div>
+                        </div>
+                        <div className="px-8 py-5 border-t border-slate-100 dark:border-slate-800 flex gap-3 bg-slate-50 dark:bg-slate-900/60">
+                            <button
+                                type="button"
+                                onClick={() => setIsDeleteModalOpen(false)}
+                                className="flex-1 px-4 py-3 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+                            >
+                                ปิดหน้าต่าง
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDeleteContract}
+                                className="flex-1 px-4 py-3 text-xs font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-md shadow-red-600/10"
+                            >
+                                ยืนยันลบสัญญา
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ─── Edit Modal ─── */}
             {isEditModalOpen && editForm && (
                 <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
@@ -1949,14 +2054,25 @@ export default function BookingsPage() {
                                                     ⚠️ ใส่วันที่ก่อน
                                                 </p>
                                             ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setEditRoomPicker('move')}
-                                                    className="w-full inline-flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 hover:border-purple-300 hover:bg-purple-50 transition-all"
-                                                >
-                                                    <span>{editForm.move_to_room_id ? `ห้อง ${getRoomNumber(editForm.move_to_room_id)}` : 'เลือกห้องใหม่'}</span>
-                                                    <span className="text-purple-500">เลือก</span>
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditRoomPicker('move')}
+                                                        className="flex-1 inline-flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 hover:border-purple-300 hover:bg-purple-50 transition-all"
+                                                    >
+                                                        <span>{editForm.move_to_room_id ? `ห้อง ${getRoomNumber(editForm.move_to_room_id)}` : 'เลือกห้องใหม่'}</span>
+                                                        <span className="text-purple-500">เลือก</span>
+                                                    </button>
+                                                    {editForm.move_to_room_id && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditForm({ ...editForm, move_to_room_id: null, move_start_date: null, move_end_date: null })}
+                                                            className="text-xs font-bold text-red-500"
+                                                        >
+                                                            ลบออก
+                                                        </button>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     </div>

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { canEditPage } from '../../lib/permissions';
+import { canEditPage, canDeletePage } from '../../lib/permissions';
 import { logAudit, describeChanges } from '../../lib/audit';
 
 interface Waitlist {
@@ -31,6 +31,7 @@ interface Waitlist {
 export default function BookingsPage() {
     const { profile } = useAuth();
     const isEditable = canEditPage(profile, 'waitlists');
+    const canDelete = canDeletePage(profile, 'waitlists');
 
     const router = useRouter();
     const [items, setItems] = useState<Waitlist[]>([]);
@@ -336,6 +337,11 @@ export default function BookingsPage() {
     }
 
     async function deleteItem(id: string) {
+        if (!canDelete) {
+            alert('คุณไม่มีสิทธิ์ลบรายการนี้');
+            return;
+        }
+
         if (confirm('ยืนยันการลบรายการจองนี้?')) {
             const { error } = await supabase.from('waitlists').delete().eq('id', id);
             if (!error) {
@@ -598,9 +604,12 @@ export default function BookingsPage() {
                                             <button onClick={() => handleEdit(item)} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-[#4F81FF] transition-colors" title="แก้ไข">
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                             </button>
-                                            <button onClick={() => deleteItem(item.id)} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-red-500 transition-colors" title="ลบ">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                            </button>
+                                                {canDelete && (
+                                                    <button onClick={() => deleteItem(item.id)} className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-red-500 transition-colors" title="ลบ">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                    </button>
+                                                )}
+                                            
                                             <button onClick={() => router.push(`/allocate/${item.id}`)} className="bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200 hover:border-emerald-500 px-4 py-2 rounded-xl text-sm font-bold ml-2 transition-all flex items-center gap-2">
                                                 จัดสรรห้อง <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                                             </button>

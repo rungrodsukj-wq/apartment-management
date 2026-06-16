@@ -297,6 +297,10 @@ export const computeLockedRooms = (
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
     })();
 
+    // Normalize check range strings for overlap checks
+    const checkStartStr = checkStart && checkStart !== '' ? checkStart : null;
+    const checkEndStr = checkEnd && checkEnd !== '' ? checkEnd : null;
+
     // Map intentions by contract
     const byContract: Record<string, any> = {};
     intentions.forEach(i => { if (i.contract_id) byContract[i.contract_id] = i; });
@@ -329,20 +333,29 @@ export const computeLockedRooms = (
         const { contract: c, role, endDateStr } = latestContractByRoom[roomId];
         if (role === 'temp') {
             if (endDateStr) {
-                const endD = new Date(endDateStr);
-                let vacantY = endD.getFullYear();
-                let vacantM = endD.getMonth() + 1;
-                vacantM++;
-                if (vacantM > 12) { vacantM = 1; vacantY++; }
-                const vacantValue = vacantY * 12 + vacantM;
+                // If a specific search range is provided, prefer precise overlap checks
+                if (checkStartStr && checkEndStr) {
+                    const tempStartStr = c.temp_start_date || '';
+                    if (tempStartStr && isOverlap(checkStartStr, checkEndStr, tempStartStr, endDateStr)) {
+                        locked.add(roomId);
+                    }
+                } else {
+                    // Fallback to original month-based heuristic when no explicit end is provided
+                    const endD = new Date(endDateStr);
+                    let vacantY = endD.getFullYear();
+                    let vacantM = endD.getMonth() + 1;
+                    vacantM++;
+                    if (vacantM > 12) { vacantM = 1; vacantY++; }
+                    const vacantValue = vacantY * 12 + vacantM;
 
-                const viewDate = new Date(startRef);
-                const viewValue = viewDate.getFullYear() * 12 + (viewDate.getMonth() + 1);
-                const currD = new Date();
-                const currValue = currD.getFullYear() * 12 + (currD.getMonth() + 1);
+                    const viewDate = new Date(startRef);
+                    const viewValue = viewDate.getFullYear() * 12 + (viewDate.getMonth() + 1);
+                    const currD = new Date();
+                    const currValue = currD.getFullYear() * 12 + (currD.getMonth() + 1);
 
-                if (viewValue > vacantValue && currValue < vacantValue) {
-                    locked.add(roomId);
+                    if (viewValue > vacantValue && currValue < vacantValue) {
+                        locked.add(roomId);
+                    }
                 }
             }
             continue;
@@ -360,11 +373,29 @@ export const computeLockedRooms = (
         if (currentContractId && c.id === currentContractId) continue;
         if (c.status === 'cancelled') continue;
 
-        const checkOverlapAndLock = (roomId: string | null | undefined, endDateStr: string | null | undefined, role: string) => {
+        const checkOverlapAndLock = (roomId: string | null | undefined, periodStartStr: string | null | undefined, periodEndStr: string | null | undefined, role: string) => {
             if (!roomId) return;
-            let endDate = endDateStr;
-            if (role !== 'temp' && !endDate) endDate = c.contract_end_date;
-            if (endDate && new Date(endDate) >= new Date(startRef)) {
+
+            // Determine period start/end for this room role
+            let periodStart = periodStartStr || null;
+            let periodEnd = periodEndStr || null;
+            if (!periodEnd && role !== 'temp') periodEnd = c.contract_end_date || null;
+
+            // If caller provided an explicit search range, use precise overlap checks
+            if (checkStartStr && checkEndStr && periodStart && periodEnd) {
+                if (isOverlap(checkStartStr, checkEndStr, periodStart, periodEnd)) {
+                    if (role === 'temp') {
+                        locked.add(roomId);
+                    } else {
+                        const intent = byContract[c.id];
+                        if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(roomId);
+                    }
+                }
+                return;
+            }
+
+            // Fallback: original month-based comparison (legacy behavior)
+            if (periodEnd && new Date(periodEnd) >= new Date(startRef)) {
                 if (role === 'temp') {
                     locked.add(roomId);
                 } else {
@@ -374,9 +405,9 @@ export const computeLockedRooms = (
             }
         };
 
-        checkOverlapAndLock(c.main_room_id, c.main_end_date, 'main');
-        checkOverlapAndLock(c.temp_room_id, c.temp_end_date, 'temp');
-        checkOverlapAndLock(c.move_to_room_id, c.move_end_date, 'move_to');
+        checkOverlapAndLock(c.main_room_id, c.main_start_date || c.actual_check_in_date || c.contract_start_date, c.main_end_date, 'main');
+        checkOverlapAndLock(c.temp_room_id, c.temp_start_date, c.temp_end_date, 'temp');
+        checkOverlapAndLock(c.move_to_room_id, c.move_start_date, c.move_end_date || c.contract_end_date, 'move_to');
     }
 
     // 4) Intentions that refer directly to a room

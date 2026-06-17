@@ -774,7 +774,7 @@ export default function AvailableRoomsPage() {
                                                     TYPE ROOM
                                                 </th>
                                                 <th rowSpan={3} className="p-4 bg-gradient-to-br from-amber-100 to-white dark:from-amber-950/40 dark:to-slate-900 text-slate-800 dark:text-amber-200 font-bold border-r border-slate-200 dark:border-slate-800 text-center align-middle max-w-[150px]">
-                                                    โควต้าจองไม่ระบุห้อง<br />(Waitlists ทั้งหมด)
+                                                    โควต้าจองห้อง<br />(หลังหักจองไม่ระบุห้องแล้ว)
                                                 </th>
                                                 <th colSpan={2} className="p-3 bg-gradient-to-br from-sky-100 to-white dark:from-sky-950/40 dark:to-slate-900 text-slate-800 dark:text-sky-200 font-bold border-r border-slate-200 dark:border-slate-800 text-center">
                                                     ครัวหน้า
@@ -796,13 +796,13 @@ export default function AvailableRoomsPage() {
                                             </tr>
                                             <tr>
                                                 <th className="p-3 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-[10px] font-bold border-r border-slate-200 dark:border-slate-800 text-center max-w-[160px]">
-                                                    SALAYA ONE RESIDENCES<br />(ตะวันตก)
+                                                    คอนโด<br />(ตะวันตก)
                                                 </th>
                                                 <th className="p-3 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-[10px] font-bold border-r border-slate-200 dark:border-slate-800 text-center max-w-[160px]">
                                                     ซอยตั้งสิน<br />(ตะวันออก)
                                                 </th>
                                                 <th className="p-3 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-[10px] font-bold border-r border-slate-200 dark:border-slate-800 text-center max-w-[160px]">
-                                                    SALAYA ONE RESIDENCES<br />(ตะวันตก)
+                                                    คอนโด<br />(ตะวันตก)
                                                 </th>
                                                 <th className="p-3 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-[10px] font-bold border-r border-slate-200 dark:border-slate-800 text-center max-w-[160px]">
                                                     ซอยตั้งสิน<br />(ตะวันออก)

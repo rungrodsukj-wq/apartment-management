@@ -112,6 +112,29 @@ export const isRoomAvailable = (
             // สำรอง: หาก latestEndDate ไม่ได้ < targetDate (ไม่ควรเกิดจากการตั้งค่า latestEndStr)
             return false;
         }
+    } else {
+        // กรณีไม่มีสัญญาใดๆ เลยในห้องนี้ (ว่างตลอดกาล)
+        // ต้องการให้ว่างแค่ใน "เดือนถัดไป" เดือนเดียว (อิงตามเวลาโลกจริง)
+        let hasAnyContract = false;
+        for (const c of contracts) {
+            if (currentContractId && c.id === currentContractId) continue;
+            if (c.status === 'cancelled') continue;
+            if (c.main_room_id === roomId || c.temp_room_id === roomId || c.move_to_room_id === roomId) {
+                hasAnyContract = true;
+                break;
+            }
+        }
+
+        if (!hasAnyContract) {
+            const today = new Date();
+            const targetDate = new Date(checkStart);
+            const targetValue = targetDate.getFullYear() * 12 + targetDate.getMonth();
+            const nextMonthValue = today.getFullYear() * 12 + (today.getMonth() + 1);
+
+            if (targetValue !== nextMonthValue) {
+                return false;
+            }
+        }
     }
 
     return true;

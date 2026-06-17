@@ -100,7 +100,7 @@ export default function LoginPage() {
 
           {/* Environment Selector */}
           <div className="flex flex-col items-center mb-8">
-            <span className="text-[10px] text-[#e8d8c3]/60 uppercase tracking-[0.2em] mb-2 font-medium">สภาพแวดล้อมระบบ / Environment</span>
+            
             <div className="bg-[#001128]/60 p-1.5 rounded-2xl border border-white/10 flex w-full max-w-[320px] backdrop-blur-md">
               <button
                 type="button"
@@ -111,7 +111,7 @@ export default function LoginPage() {
                     : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
               >
-                ระบบจริง (Production)
+                Production
               </button>
               <button
                 type="button"
@@ -122,14 +122,14 @@ export default function LoginPage() {
                     : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
               >
-                ระบบทดลอง (Demo)
+                Demo
               </button>
             </div>
           </div>
 
           {/* Form Title */}
           <h2 className="text-lg text-white/90 mb-10 text-center font-light tracking-wide">
-            เข้าสู่ระบบเพื่อจัดการหอพักของคุณ {envMode === 'demo' && <span className="text-amber-400 font-normal">(Demo)</span>}
+            เข้าสู่ระบบเพื่อจัดการห้องพัก {envMode === 'demo' && <span className="text-amber-400 font-normal">(Demo)</span>}
           </h2>
 
           {/* Form */}

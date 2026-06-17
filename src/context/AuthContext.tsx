@@ -44,7 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', userId)
       .single();
     if (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error fetching user profile:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
       setProfile(null);
       return null;
     }
@@ -112,10 +117,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .rpc('get_email_by_username', { p_username: usernameOrEmail });
 
-      if (error || !data) {
+      if (error) {
+        console.warn('RPC get_email_by_username failed, attempting direct query fallback:', error);
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('user_profiles')
+          .select('email')
+          .eq('user_name', usernameOrEmail)
+          .maybeSingle();
+
+        if (fallbackError || !fallbackData) {
+          console.error('Fallback query failed:', fallbackError);
+          return { error: 'ไม่พบบัญชีผู้ใช้งานหรือ Username นี้ในระบบ' };
+        }
+        email = fallbackData.email;
+      } else if (!data) {
         return { error: 'ไม่พบบัญชีผู้ใช้งานหรือ Username นี้ในระบบ' };
+      } else {
+        email = data;
       }
-      email = data;
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });

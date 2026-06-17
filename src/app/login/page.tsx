@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -20,6 +20,42 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false); // เพิ่มฟังก์ชันเปิด-ปิดตาดูรหัสผ่าน
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [envMode, setEnvMode] = useState<'production' | 'demo'>('production');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const mode = (localStorage.getItem('supabase_mode') as 'production' | 'demo') || 'production';
+      setEnvMode(mode);
+    }
+  }, []);
+
+  const handleSwitchEnv = (mode: 'production' | 'demo') => {
+    if (typeof window !== 'undefined') {
+      // ล้าง sessionStorage และ localStorage ที่เกี่ยวกับ Supabase เพื่อหลีกเลี่ยง session ข้ามระบบกัน
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('sb-')) {
+          localStorage.removeItem(key);
+        }
+      }
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith('sb-')) {
+          sessionStorage.removeItem(key);
+        }
+      }
+      document.cookie.split(";").forEach((c) => {
+        const eqPos = c.indexOf("=");
+        const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
+        if (name.startsWith("sb-")) {
+          document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+        }
+      });
+      localStorage.setItem('supabase_mode', mode);
+      window.location.reload();
+    }
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +80,7 @@ export default function LoginPage() {
         className="absolute inset-0 z-0 pointer-events-none opacity-40 bg-[url('https://salayaone.com/img/banner.jpg')] bg-cover bg-center"
         style={{ filter: 'grayscale(100%) contrast(1.2) brightness(0.4)' }}
       />
-      <div className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-b from-[#031222]/80 via-[#031222]/90 to-[#031222]" />
+      {/* <div className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-b from-[#031222]/80 via-[#031222]/90 to-[#031222]" /> */}
 
       <main className="w-full max-w-[540px] px-5 md:px-0 z-10">
         {/* Login Glassmorphic Card */}
@@ -62,9 +98,38 @@ export default function LoginPage() {
             <p className="text-[#e8d8c3]/70 mt-1 font-light uppercase tracking-wider text-xs">Premium Serviced Apartment</p>
           </div>
 
+          {/* Environment Selector */}
+          <div className="flex flex-col items-center mb-8">
+            <span className="text-[10px] text-[#e8d8c3]/60 uppercase tracking-[0.2em] mb-2 font-medium">สภาพแวดล้อมระบบ / Environment</span>
+            <div className="bg-[#001128]/60 p-1.5 rounded-2xl border border-white/10 flex w-full max-w-[320px] backdrop-blur-md">
+              <button
+                type="button"
+                onClick={() => handleSwitchEnv('production')}
+                className={`flex-1 py-2 rounded-xl text-xs font-medium tracking-wide transition-all duration-300 ${
+                  envMode === 'production'
+                    ? 'bg-[#e8d8c3] text-[#001128] font-bold shadow-md'
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                ระบบจริง (Production)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchEnv('demo')}
+                className={`flex-1 py-2 rounded-xl text-xs font-medium tracking-wide transition-all duration-300 ${
+                  envMode === 'demo'
+                    ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                ระบบทดลอง (Demo)
+              </button>
+            </div>
+          </div>
+
           {/* Form Title */}
           <h2 className="text-lg text-white/90 mb-10 text-center font-light tracking-wide">
-            เข้าสู่ระบบเพื่อจัดการหอพักของคุณ
+            เข้าสู่ระบบเพื่อจัดการหอพักของคุณ {envMode === 'demo' && <span className="text-amber-400 font-normal">(Demo)</span>}
           </h2>
 
           {/* Form */}

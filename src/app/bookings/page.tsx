@@ -79,6 +79,7 @@ export default function BookingsPage() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteContractId, setDeleteContractId] = useState<string | null>(null);
     const [deleteTenantName, setDeleteTenantName] = useState('');
+    const [deleteContractData, setDeleteContractData] = useState<any | null>(null);
 
     const [roomFilters, setRoomFilters] = useState({
         building: '',
@@ -428,37 +429,62 @@ export default function BookingsPage() {
     const handleCancelContract = async () => {
         if (!cancelContractId) return;
 
+        // 1. ดึงข้อมูลสัญญาที่กำลังดำเนินการ
+        const contract = contracts.find(c => c.id === cancelContractId);
+        if (!contract) return;
+
+        // 2. เช็คว่า cancelEndDate ห้ามมาก่อนวันเริ่มต้นสัญญา
+        if (contract.contract_start_date && new Date(cancelEndDate) < new Date(contract.contract_start_date)) {
+            alert('❌ วันที่สิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มต้นสัญญา');
+            return;
+        }
+
+        // 3. เตรียมข้อมูลอัปเดต (ไม่เปลี่ยน status ให้เป็นค่าเดิม)
+        const updatePayload: any = {
+            contract_end_date: cancelEndDate
+        };
+
+        // 4. เช็ควันสิ้นสุดห้อง Main, Temp, Move ถ้าเกินให้ปรับเป็น cancelEndDate
+        if (contract.main_end_date && new Date(contract.main_end_date) > new Date(cancelEndDate)) {
+            updatePayload.main_end_date = cancelEndDate;
+        }
+        if (contract.temp_end_date && new Date(contract.temp_end_date) > new Date(cancelEndDate)) {
+            updatePayload.temp_end_date = cancelEndDate;
+        }
+        if (contract.move_end_date && new Date(contract.move_end_date) > new Date(cancelEndDate)) {
+            updatePayload.move_end_date = cancelEndDate;
+        }
+
         const { error } = await supabase
             .from('contracts')
-            .update({ status: 'cancelled', contract_end_date: cancelEndDate })
+            .update(updatePayload)
             .eq('id', cancelContractId);
 
         if (error) {
-            alert('เกิดข้อผิดพลาดในการยกเลิก: ' + error.message);
+            alert('เกิดข้อผิดพลาด: ' + error.message);
         } else {
-            await logAudit(profile, 'contracts', 'update', cancelContractId, 'ยกเลิกสัญญา', { status: 'cancelled', contract_end_date: cancelEndDate });
+            await logAudit(profile, 'contracts', 'update', cancelContractId, 'แก้ไขวันสิ้นสุดสัญญา (ยกเลิก)', updatePayload);
             setIsCancelModalOpen(false);
             setCancelContractId(null);
             setCancelTenantName('');
-            alert('ยกเลิกสัญญาเรียบร้อยแล้ว');
+            alert('ปรับเปลี่ยนวันสิ้นสุดสัญญาเรียบร้อยแล้ว');
             fetchData();
         }
     };
 
     const openDeleteModal = (contract: any) => {
-        // Only allow users who have delete permission for bookings
         if (!profile || !canDeletePage(profile, 'bookings')) {
             alert('คุณไม่มีสิทธิ์ลบสัญญานี้');
             return;
         }
         setDeleteContractId(contract.id);
         setDeleteTenantName(contract.tenant_name || '');
+        setDeleteContractData(contract); // 🔥 เก็บข้อมูลสัญญาไว้ใช้งานตอนสร้าง Waitlist
         setIsDeleteModalOpen(true);
     };
 
     const handleDeleteContract = async () => {
         if (!deleteContractId) return;
-        // Double-check permissions on action (require delete permission)
         if (!profile || !canDeletePage(profile, 'bookings')) {
             alert('คุณไม่มีสิทธิ์ลบสัญญานี้');
             setIsDeleteModalOpen(false);
@@ -466,19 +492,54 @@ export default function BookingsPage() {
         }
 
         try {
-            // fetch existing renewal_intentions for audit logging
-            const { data: existingIntents, error: fetchErr } = await supabase.from('renewal_intentions').select('*').eq('contract_id', deleteContractId);
-            if (fetchErr) {
-                console.warn('Failed to fetch renewal_intentions for delete', fetchErr.message);
-            } else if (existingIntents && existingIntents.length > 0) {
-                const { error: delIntentErr } = await supabase.from('renewal_intentions').delete().eq('contract_id', deleteContractId);
-                if (delIntentErr) {
-                    alert('เกิดข้อผิดพลาดในการลบ renewal_intentions: ' + delIntentErr.message);
-                    return;
+            // -----------------------------------------------------------
+            // 🌟 1. จัดการระบบ Waitlist (ตรวจสอบก่อนว่ามีชื่ออยู่แล้วหรือไม่)
+            // -----------------------------------------------------------
+            const { data: existingWaitlist } = await supabase
+                .from('waitlists')
+                .select('id')
+                .eq('name', deleteTenantName)
+                .maybeSingle();
+
+            if (existingWaitlist) {
+                // ✅ กรณีที่ 1: ถ้ามี Waitlist เดิมอยู่แล้ว -> อัปเดตสถานะเป็น "รอเลือกห้องให้"
+                await supabase
+                    .from('waitlists')
+                    .update({ status: 'รอเลือกห้องให้' })
+                    .eq('id', existingWaitlist.id);
+            } else {
+                // 🆕 กรณีที่ 2: ถ้าไม่มี Waitlist (Walk-in) -> สร้างใหม่จากข้อมูลห้องเดิม
+                const currentRoom = rooms.find(r => r.id === deleteContractData?.main_room_id);
+
+                const { error: insertErr } = await supabase
+                    .from('waitlists')
+                    .insert([
+                        {
+                            name: deleteTenantName,
+                            status: 'รอเลือกห้องให้',
+                            room_type: currentRoom?.room_type || 'ไม่ระบุ',
+                            kitchen_type: currentRoom?.kitchen_type || 'ไม่ระบุ',
+                            view_preference: currentRoom?.view_direction || 'ไม่ระบุ',
+                            start_date: deleteContractData?.contract_start_date || new Date().toISOString().split('T')[0],
+                            end_date: deleteContractData?.contract_end_date || new Date().toISOString().split('T')[0],
+                            bed_size: 'ไม่ระบุ',
+                            special_request: 'ย้ายมาจากสัญญาเก่าที่ถูกลบ',
+                            preferred_floors: [],
+                            allocation_note: `สร้างอัตโนมัติเนื่องจากลบสัญญา (ห้องเดิม: ${currentRoom?.room_number || '-'})`
+                        }
+                    ]);
+
+                if (insertErr) {
+                    console.error("Waitlist Insert Error:", insertErr);
+                    alert("ไม่สามารถสร้าง Waitlist อัตโนมัติได้: " + insertErr.message);
                 }
-                for (const rec of existingIntents) {
-                    try { await logAudit(profile, 'renewal_intentions', 'delete', rec.id, 'ลบ renewal_intention เมื่อสัญญาถูกลบ', { contract_id: deleteContractId }); } catch (e) { console.warn('Audit failed for renewal_intentions', e); }
-                }
+            }
+            // -----------------------------------------------------------
+
+            // 2. ลบข้อมูลสัญญาตามขั้นตอนเดิม
+            const { data: existingIntents } = await supabase.from('renewal_intentions').select('*').eq('contract_id', deleteContractId);
+            if (existingIntents && existingIntents.length > 0) {
+                await supabase.from('renewal_intentions').delete().eq('contract_id', deleteContractId);
             }
 
             const { error: delContractErr } = await supabase.from('contracts').delete().eq('id', deleteContractId);
@@ -487,11 +548,13 @@ export default function BookingsPage() {
                 return;
             }
 
-            await logAudit(profile, 'contracts', 'delete', deleteContractId, 'ลบสัญญาเช่าและ renewal_intentions ที่เกี่ยวข้อง', {});
+            await logAudit(profile, 'contracts', 'delete', deleteContractId, 'ลบสัญญาเช่า', {});
             setIsDeleteModalOpen(false);
             setDeleteContractId(null);
             setDeleteTenantName('');
-            alert('ลบสัญญาเรียบร้อยแล้ว');
+            setDeleteContractData(null);
+
+            alert('ลบสัญญาและอัปเดต Waitlist เรียบร้อยแล้ว');
             fetchData();
         } catch (e) {
             console.warn('Failed to delete contract', e);
@@ -837,6 +900,45 @@ export default function BookingsPage() {
         } else {
             await logAudit(profile, 'contracts', 'update', editForm.id, 'แก้ไขสัญญาเช่า', describeChanges(updatePayload));
 
+            // -----------------------------------------------------------
+            // 🌟 แก้ไขโค้ดส่วนนี้ใน handleSaveEdit: จัดการ Waitlist อัตโนมัติ
+            // -----------------------------------------------------------
+            if (!updatePayload.main_room_id) {
+                // 1. ตรวจสอบก่อนว่าผู้เช่าคนนี้มีข้อมูลใน waitlists อยู่แล้วหรือไม่
+                const { data: existingWaitlist } = await supabase
+                    .from('waitlists')
+                    .select('id')
+                    .eq('name', editForm.tenant_name)
+                    .maybeSingle();
+
+                if (existingWaitlist) {
+                    // ✅ กรณีที่ 1: ถ้ามี Waitlist เดิมอยู่แล้ว -> อัปเดตสถานะเป็น "รอเลือกห้องให้"
+                    await supabase
+                        .from('waitlists')
+                        .update({ status: 'รอเลือกห้องให้' })
+                        .eq('id', existingWaitlist.id);
+                } else {
+                    // 🆕 กรณีที่ 2: ถ้าไม่มี Waitlist (พวก Walk-in) -> ค้นหาข้อมูลห้องเดิมก่อนกดลบ เพื่อเอาความต้องการไปสร้าง Waitlist
+                    const oldContract = contracts.find(c => c.id === editForm.id);
+                    const originalRoom = rooms.find(r => r.id === oldContract?.main_room_id);
+
+                    await supabase
+                        .from('waitlists')
+                        .insert([
+                            {
+                                name: editForm.tenant_name,
+                                status: 'รอเลือกห้องให้',
+                                room_type: originalRoom?.room_type || 'ไม่ระบุ',
+                                kitchen_type: originalRoom?.kitchen_type || 'ไม่ระบุ',
+                                view_preference: originalRoom?.view_direction || 'ไม่ระบุ',
+                                contract_id: editForm.id, // ผูก ID สัญญาไว้ด้วยเลยกันพลาด
+                                note: `สร้างอัตโนมัติเนื่องจากถูกลบห้องหลักออก (ห้องเดิม: ${originalRoom?.room_number || '-'})`
+                            }
+                        ]);
+                }
+            }
+            // -----------------------------------------------------------
+
             // Sync renewal_intentions.room_id when main/temp/move room changed or cleared
             try {
                 const desiredRoomId = updatePayload.main_room_id || updatePayload.temp_room_id || updatePayload.move_to_room_id || null;
@@ -1033,25 +1135,25 @@ export default function BookingsPage() {
         if (!intentionObj) return null;
 
         const config: any = {
-            not_asked: { 
-                label: 'ยังไม่สอบถาม', color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-300', 
-                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 
+            not_asked: {
+                label: 'ยังไม่สอบถาม', color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-300',
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             },
-            pending: { 
-                label: 'รอตอบกลับ', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', 
-                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 
+            pending: {
+                label: 'รอตอบกลับ', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300',
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             },
-            renew: { 
-                label: 'ต่อสัญญาห้องเดิม', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300', 
-                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 
+            renew: {
+                label: 'ต่อสัญญาห้องเดิม', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-300',
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             },
-            renew_no_room: { 
-                label: 'ต่อสัญญาไม่ระบุห้อง', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300', 
-                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> 
+            renew_no_room: {
+                label: 'ต่อสัญญาไม่ระบุห้อง', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-300',
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             },
-            not_renew: { 
-                label: 'ไม่ต่อสัญญา', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-300', 
-                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg> 
+            not_renew: {
+                label: 'ไม่ต่อสัญญา', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-300',
+                icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             },
         };
 
@@ -1948,7 +2050,7 @@ export default function BookingsPage() {
                             <div className="p-4 bg-red-50 border border-red-100 rounded-2xl">
                                 <p className="text-xs font-bold text-red-800">คุณกำลังจะลบสัญญาของ:</p>
                                 <p className="text-sm font-extrabold text-slate-900 mt-0.5">{deleteTenantName}</p>
-                                <p className="text-xs text-red-600 mt-2">การกระทำนี้จะลบสัญญาและข้อมูล `renewal_intentions` ที่มี `contract_id` ตรงกัน</p>
+                                <p className="text-xs text-red-600 mt-2">ข้อมูลจะถูกย้ายไปที่จองไม่ระบุห้องแทน</p>
                             </div>
                         </div>
                         <div className="px-8 py-5 border-t border-slate-100 dark:border-slate-800 flex gap-3 bg-slate-50 dark:bg-slate-900/60">
@@ -2057,7 +2159,7 @@ export default function BookingsPage() {
                             <div className="pt-4 border-t border-slate-100">
                                 <p className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-3">ย้ายห้อง (ถ้ามี)</p>
                                 <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4">
-                                        <div className="grid grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-3 gap-3">
                                         <div>
                                             <label className={labelCls}>วันที่ย้ายเข้าห้องใหม่</label>
                                             <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg w-full"

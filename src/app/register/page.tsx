@@ -111,9 +111,9 @@ export default function RegisterPage() {
       {/* Background Image Pattern with Filter */}
       <div 
         className="absolute inset-0 z-0 pointer-events-none opacity-40 bg-[url('https://salayaone.com/img/banner.jpg')] bg-cover bg-center" 
-        style={{ filter: 'grayscale(100%) contrast(1.2) brightness(0.4)' }}
+        // style={{ filter: 'grayscale(100%) contrast(1.2) brightness(0.4)' }}
       />
-      <div className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-b from-[#031222]/80 via-[#031222]/90 to-[#031222]" />
+      {/* <div className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-b from-[#031222]/80 via-[#031222]/90 to-[#031222]" /> */}
 
       <main className="w-full max-w-[540px] px-5 md:px-0 my-8 z-10">
         {/* Register Glassmorphic Card */}
@@ -125,7 +125,7 @@ export default function RegisterPage() {
           {/* Header Section */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 mx-auto bg-gradient-to-br from-[#001128] to-[#0a2647] rounded-xl flex items-center justify-center shadow-lg border border-[#e8d8c3]/20 mb-5">
-              <span className="text-[#e8d8c3] text-3xl font-light tracking-widest">S</span>
+              <span className="text-[#e8d8c3] text-3xl font-light tracking-widest">L</span>
             </div>
             <h1 className="text-2xl font-semibold text-white tracking-[0.2em] font-light">SALAYA ONE</h1>
             <p className="text-[#e8d8c3]/70 mt-1 font-light uppercase tracking-wider text-xs">Premium Serviced Apartment</p>

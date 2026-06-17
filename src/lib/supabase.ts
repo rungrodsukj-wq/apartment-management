@@ -57,4 +57,23 @@ export const supabase = new Proxy({} as SupabaseClient, {
     }
     return value;
   },
+});
+
+// Export a Proxy that always targets the production Supabase instance
+export const productionSupabase = new Proxy({} as SupabaseClient, {
+  get(target, prop, receiver) {
+    if (!prodClient) {
+      prodClient = createClient(prodUrl, prodKey, {
+        auth: {
+          persistSession: isBrowser,
+          storage: isBrowser ? window.sessionStorage : undefined,
+        },
+      });
+    }
+    const value = Reflect.get(prodClient, prop, receiver);
+    if (typeof value === 'function') {
+      return value.bind(prodClient);
+    }
+    return value;
+  },
 });

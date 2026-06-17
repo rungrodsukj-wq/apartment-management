@@ -211,7 +211,7 @@ export default function ClientLayoutWrapper({
                     </linearGradient>
                   </defs>
                   <rect x="5" y="5" width="90" height="90" rx="20" fill="url(#logo-grad)" stroke="#e8d8c3" strokeWidth="4" strokeOpacity="0.3" />
-                  <text x="50%" y="55%" dominantBaseline="middle" textAnchor="middle" fill="#e8d8c3" fontSize="52" fontWeight="300" letterSpacing="0.1em">S</text>
+                  <text x="50%" y="55%" dominantBaseline="middle" textAnchor="middle" fill="#e8d8c3" fontSize="52" fontWeight="300" letterSpacing="0.1em">L</text>
                 </svg>
               </div>
               {(!sidebarCollapsed || isMobileOpen) && (

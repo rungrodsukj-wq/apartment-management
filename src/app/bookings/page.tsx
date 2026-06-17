@@ -617,17 +617,11 @@ export default function BookingsPage() {
     const handleMoveStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newDate = e.target.value;
         if (newDate) {
-            const d = new Date(newDate);
-            d.setDate(d.getDate() - 1);
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            const dayBefore = `${year}-${month}-${day}`;
             setEditForm({
                 ...editForm,
                 move_start_date: newDate,
                 move_end_date: editForm.contract_end_date || editForm.move_end_date,
-                main_end_date: editForm.contract_end_date && new Date(dayBefore) > new Date(editForm.contract_end_date) ? editForm.contract_end_date : dayBefore,
+                main_end_date: editForm.contract_end_date && new Date(newDate) > new Date(editForm.contract_end_date) ? editForm.contract_end_date : newDate,
             });
         } else {
             setEditForm({
@@ -667,17 +661,9 @@ export default function BookingsPage() {
             return;
         }
 
-        // main_end_date should be the day before temp_start_date
-        const d = new Date(newDate);
-        d.setDate(d.getDate() - 1);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        let dayBefore = `${year}-${month}-${day}`;
-
-        // Ensure main_end_date does not exceed contract_end_date
-        if (editForm.contract_end_date && new Date(dayBefore) > new Date(editForm.contract_end_date)) {
-            dayBefore = editForm.contract_end_date;
+        let clampedMainEnd = newDate;
+        if (editForm.contract_end_date && new Date(newDate) > new Date(editForm.contract_end_date)) {
+            clampedMainEnd = editForm.contract_end_date;
         }
 
         // Default temp_end_date = temp_start_date + 2 months, clamped to contract_end_date if present
@@ -690,7 +676,7 @@ export default function BookingsPage() {
             ...editForm,
             temp_start_date: newDate,
             temp_end_date: tempEnd,
-            main_end_date: dayBefore,
+            main_end_date: clampedMainEnd,
         });
     };
 

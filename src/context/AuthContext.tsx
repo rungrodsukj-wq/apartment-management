@@ -4,7 +4,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
 import { logAudit } from '../lib/audit';
-import { supabase } from '../lib/supabase';
+import { supabase, productionSupabase } from '../lib/supabase';
 
 export type UserRole = 'admin' | 'owner' | 'staff' | 'viewer';
 export type UserStatus = 'pending' | 'active' | 'disabled';
@@ -164,15 +164,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function register(email: string, password: string, username: string): Promise<{ error: string | null }> {
-    // ตรวจสอบก่อนว่ามี username นี้ถูกใช้ไปแล้วหรือยัง (ผ่าน RPC เพื่อไม่ให้ติด RLS)
-    const { data: usernameExists } = await supabase
+    // ตรวจสอบก่อนว่ามี username นี้ถูกใช้ไปแล้วหรือยัง (ผ่าน RPC เพื่อไม่ให้ติด RLS) - เผื่อกรณีเลือกใช้ตัวเดโมอยู่ แต่สมัครสมาชิกจะวิ่งเข้าระบบหลักเสมอ
+    const { data: usernameExists } = await productionSupabase
       .rpc('check_username_exists', { p_username: username });
 
     if (usernameExists) {
       return { error: 'Username นี้ถูกใช้งานแล้ว กรุณาใช้ชื่ออื่น' };
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { error } = await productionSupabase.auth.signUp({
       email,
       password,
       options: {

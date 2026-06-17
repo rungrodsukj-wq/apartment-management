@@ -217,7 +217,7 @@ export default function DashboardPage() {
 
   const isDateOverlapping = (start1: string, end1: string, start2: string, end2: string) => {
     if (!start1 || !end1 || !start2 || !end2) return false;
-    return new Date(start1) <= new Date(end2) && new Date(end1) >= new Date(start2);
+    return new Date(start1) < new Date(end2) && new Date(end1) > new Date(start2);
   };
 
   async function fetchDashboardData() {

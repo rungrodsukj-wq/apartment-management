@@ -1,12 +1,12 @@
 // Shared availability helpers
 export const isOverlap = (start1: string, end1: string, start2: string, end2: string) => {
     if (!start1 || !end1 || !start2 || !end2) return false;
-    // Treat date ranges as inclusive: ranges that touch should count as overlapping.
+    // Treat date ranges as exclusive on transition boundaries (touching dates do not overlap).
     const s1 = new Date(start1).getTime();
     const e1 = new Date(end1).getTime();
     const s2 = new Date(start2).getTime();
     const e2 = new Date(end2).getTime();
-    return s1 <= e2 && s2 <= e1;
+    return s1 < e2 && s2 < e1;
 };
 
 export const getContractIntention = (intentions: any[], contractId?: string | null) => {
@@ -358,6 +358,14 @@ export const computeLockedRooms = (
                     }
                 }
             }
+            continue;
+        }
+
+        // If this contract has a move_to room, and this room is NOT the move_to room,
+        // it means the tenant is moving/has moved away from this room.
+        // Therefore, the contract's renewal intention (which applies to their stay at the end of the contract)
+        // should NOT lock this room.
+        if (c.move_to_room_id && c.move_to_room_id !== roomId) {
             continue;
         }
 

@@ -149,6 +149,14 @@ export default function AvailableRoomsPage() {
                 continue; // ข้ามการเช็ค Intention สำหรับห้องชั่วคราว
             }
 
+            // If this contract has a move_to room, and this room is NOT the move_to room,
+            // it means the tenant is moving/has moved away from this room.
+            // Therefore, the contract's renewal intention (which applies to their stay at the end of the contract)
+            // should NOT lock this room.
+            if (c.move_to_room_id && c.move_to_room_id !== roomId) {
+                continue;
+            }
+
             const intent = byContract[c.id];
             const intentStatus = intent?.intention || 'not_asked'; 
             

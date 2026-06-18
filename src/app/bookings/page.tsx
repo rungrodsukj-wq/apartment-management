@@ -542,6 +542,18 @@ export default function BookingsPage() {
                 await supabase.from('renewal_intentions').delete().eq('contract_id', deleteContractId);
             }
 
+            if (deleteContractData?.parent_contract_id) {
+                const { error: revertErr } = await supabase
+                    .from('renewal_intentions')
+                    .update({ intention: 'pending', updated_at: new Date().toISOString() })
+                    .eq('contract_id', deleteContractData.parent_contract_id);
+                if (revertErr) {
+                    console.warn('Failed to revert parent contract renewal intention:', revertErr);
+                } else {
+                    await logAudit(profile, 'renewal_intentions', 'update', deleteContractData.parent_contract_id, 'รีเซ็ตสถานะกลับเป็นรอตอบกลับ (เนื่องจากสัญญาต่ออายุถูกลบ)', { intention: 'pending' });
+                }
+            }
+
             const { error: delContractErr } = await supabase.from('contracts').delete().eq('id', deleteContractId);
             if (delContractErr) {
                 alert('เกิดข้อผิดพลาดในการลบสัญญา: ' + delContractErr.message);

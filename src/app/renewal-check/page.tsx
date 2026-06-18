@@ -232,6 +232,16 @@ export default function RenewalCheckPage() {
         if (!childContracts || childContracts.length === 0) return true;
 
         const childIds = childContracts.map((c: any) => c.id);
+
+        // Delete associated renewal_intentions first to prevent foreign key constraint violations
+        const { error: delIntentionError } = await supabase
+            .from('renewal_intentions')
+            .delete()
+            .in('contract_id', childIds);
+        if (delIntentionError) {
+            console.warn('Failed to delete associated renewal intentions for child contracts', delIntentionError);
+        }
+
         const { error: deleteError } = await supabase
             .from('contracts')
             .delete()
@@ -960,13 +970,17 @@ export default function RenewalCheckPage() {
                             </button>
                             <button
                                 type="button"
-                                onClick={() => {
+                                onClick={async () => {
                                     if (!confirmModal) return;
                                     // For renew actions, navigate to the creation flow but
                                     // do NOT change the intention here — the status should
                                     // be updated only after a new contract is created.
                                     if (confirmModal.intention === 'renew') {
                                         const cid = confirmModal.contractId;
+                                        const existing = getIntention(cid);
+                                        if (existing && existing.intention === 'renew_no_room') {
+                                            await deleteRenewalWaitlists(cid);
+                                        }
                                         setConfirmModal(null);
                                         router.push(`/bookings?renewContractId=${cid}`);
                                         return;
@@ -974,6 +988,10 @@ export default function RenewalCheckPage() {
                                     if (confirmModal.intention === 'renew_no_room') {
                                         const tenant = confirmModal.tenantName;
                                         const cid = confirmModal.contractId;
+                                        const existing = getIntention(cid);
+                                        if (existing && existing.intention === 'renew') {
+                                            await deleteRenewalChildContracts(cid);
+                                        }
                                         setConfirmModal(null);
                                         router.push(`/waitlists?quickAction=newWaitlist&tenantName=${encodeURIComponent(tenant)}&contractId=${cid}`);
                                         return;

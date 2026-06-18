@@ -343,8 +343,36 @@ export default function BookingsPage() {
         }
 
         if (confirm('ยืนยันการลบรายการจองนี้?')) {
+            const itemToDelete = items.find(item => item.id === id);
+            
             const { error } = await supabase.from('waitlists').delete().eq('id', id);
             if (!error) {
+                let parentContractId = itemToDelete?.contract_id;
+                
+                if (!parentContractId && itemToDelete?.name) {
+                    const { data: intentData } = await supabase
+                        .from('renewal_intentions')
+                        .select('contract_id')
+                        .eq('tenant_name', itemToDelete.name)
+                        .eq('intention', 'renew_no_room')
+                        .limit(1);
+                    if (intentData && intentData.length > 0) {
+                        parentContractId = intentData[0].contract_id;
+                    }
+                }
+
+                if (parentContractId) {
+                    const { error: revertErr } = await supabase
+                        .from('renewal_intentions')
+                        .update({ intention: 'pending', updated_at: new Date().toISOString() })
+                        .eq('contract_id', parentContractId);
+                    if (revertErr) {
+                        console.warn('Failed to revert parent contract renewal intention:', revertErr);
+                    } else {
+                        await logAudit(profile, 'renewal_intentions', 'update', parentContractId, 'รีเซ็ตสถานะกลับเป็นรอตอบกลับ (เนื่องจากรายการจองถูกลบ)', { intention: 'pending' });
+                    }
+                }
+
                 await logAudit(profile, 'waitlists', 'delete', id, 'ลบรายการจอง', null);
                 fetchWaitlist();
             } else {

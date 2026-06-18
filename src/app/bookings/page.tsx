@@ -1593,15 +1593,31 @@ export default function BookingsPage() {
                                                         </div>
                                                     </button>
                                                 ) : (
-                                                    <div className="shrink-0 w-[160px] rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/5 p-3 flex flex-col justify-between opacity-60">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (contract.waitlist_id) {
+                                                                window.location.href = `/allocate/${contract.waitlist_id}`;
+                                                            } else {
+                                                                alert('ไม่พบ Waitlist ที่ผูกกับสัญญานี้');
+                                                            }
+                                                        }}
+                                                        className="shrink-0 w-[160px] rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-900/10 p-3 flex flex-col justify-between text-left hover:bg-amber-100/60 hover:border-amber-400 transition-all cursor-pointer group"
+                                                    >
                                                         <div>
-                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">ห้องพักหลัก</div>
-                                                            <div className="font-bold text-slate-400 dark:text-slate-500 truncate">ยังไม่ระบุห้อง</div>
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5 flex items-center gap-1">
+                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                                                                จัดสรรห้องหลัก
+                                                            </div>
+                                                            <div className="font-bold text-amber-700 dark:text-amber-400 truncate group-hover:text-amber-800 flex items-center gap-1">
+                                                                คลิกเพื่อเลือก
+                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+                                                            </div>
                                                         </div>
-                                                        <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 truncate">
+                                                        <div className="text-[11px] text-amber-500 dark:text-amber-500 mt-2 truncate">
                                                             {formatDateTH(contract.main_start_date) || '-'} - {formatDateTH(contract.main_end_date) || '-'}
                                                         </div>
-                                                    </div>
+                                                    </button>
                                                 )}
 
                                                 {contract.move_to_room_id && (
@@ -2155,23 +2171,36 @@ export default function BookingsPage() {
 
                             {/* Main Room selector inside Edit */}
                             <div className="pt-4 border-t border-slate-100">
-                                <div className="flex justify-between items-center mb-2">
-                                    <label className={labelCls}>ห้องพักหลัก (Main Room)</label>
-                                    <div className="flex items-center gap-2">
-                                        <button type="button" onClick={() => setEditRoomPicker('main')} className="px-3 py-1 bg-white border border-slate-200 text-xs font-bold rounded-lg hover:bg-slate-50">
-                                            {editForm.main_room_id ? `ห้องหลัก: ${getRoomNumber(editForm.main_room_id)}` : 'จัดสรรห้องหลักใหม่'}
-                                        </button>
-                                        {editForm.main_room_id && (
-                                            <button type="button" onClick={() => setEditForm({ ...editForm, main_room_id: null, main_start_date: null, main_end_date: null })} className="text-xs font-bold text-red-500">
-                                                ลบออก
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">การจัดสรรห้องพักหลัก</p>
+                                {!editForm.main_room_id ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (editForm.waitlist_id) {
+                                                setIsEditModalOpen(false);
+                                                window.location.href = `/allocate/${editForm.waitlist_id}`;
+                                            } else {
+                                                alert('ไม่พบ Waitlist ที่ผูกกับสัญญานี้');
+                                            }
+                                        }}
+                                        className="w-full py-3 bg-blue-50 text-[#4F81FF] font-bold text-xs border border-dashed border-[#4F81FF]/40 rounded-xl hover:bg-blue-100/70 hover:border-[#4F81FF]/60 transition-all"
+                                    >
+                                        + จัดสรรห้องพักหลัก
+                                    </button>
+                                ) : (
+                                    <div className="bg-slate-50/40 border border-slate-200 rounded-xl p-4 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <button type="button" onClick={() => setEditRoomPicker('main')} className="px-3 py-1.5 bg-white border border-slate-300 text-xs font-bold rounded-xl text-slate-800">
+                                                ห้องหลัก: {getRoomNumber(editForm.main_room_id)}
                                             </button>
-                                        )}
+                                            <button type="button" onClick={() => setEditForm({ ...editForm, main_room_id: null, main_start_date: null, main_end_date: null })} className="text-xs font-bold text-red-500">ลบออก</button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_start_date || ''} onChange={handleEditMainStartDateChange} />
+                                            <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_end_date || ''} onChange={handleEditMainEndDateChange} />
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_start_date || ''} onChange={handleEditMainStartDateChange} />
-                                    <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_end_date || ''} onChange={handleEditMainEndDateChange} />
-                                </div>
+                                )}
                             </div>
 
                             {/* Move Room section inside Edit */}

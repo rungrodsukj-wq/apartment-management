@@ -221,6 +221,10 @@ export default function AllocateRoomPage() {
             // If there's an existing contract for this waitlist, update it to include main room
             if (tempContractId) {
                 const updatePayload: any = { main_room_id: selectedRoomId, main_start_date: finalMainStartDate, main_end_date: waitlist.end_date, status: 'active' };
+                // ซิงค์วันที่ย้ายออกห้องชั่วคราวให้ตรงกับวันที่ห้องหลักว่าง (ตามที่ผู้ใช้ร้องขอ)
+                if (finalMainStartDate) {
+                    updatePayload.temp_end_date = finalMainStartDate;
+                }
                 const { error: updateErr } = await supabase.from('contracts').update(updatePayload).eq('id', tempContractId);
                 if (updateErr) {
                     alert('เกิดข้อผิดพลาดในการอัปเดตสัญญา: ' + updateErr.message);
@@ -337,10 +341,9 @@ export default function AllocateRoomPage() {
 
             // temp room (use its explicit end date)
             if (c.temp_room_id) {
-                const endDate = c.temp_end_date;
-                if (endDate && new Date(endDate) >= new Date(searchStartDate)) {
-                    if (!intent || !nonLockIntents.includes(intent.intention)) locked.add(c.temp_room_id);
-                }
+                // Temp rooms are inherently temporary and have a guaranteed end date (temp_end_date).
+                // They do not require a renewal intention survey to determine if the tenant will move out.
+                // Thus, we should NEVER lock a temp room. getRoomAvailability will handle the gap calculation.
             }
 
             // move-to room
@@ -354,6 +357,12 @@ export default function AllocateRoomPage() {
 
         for (const intent of intentions) {
             if (intent.room_id) {
+                // Ignore intents that are tied to a temp room, because temp rooms have a fixed end date.
+                const c = allContracts.find(contract => contract.id === intent.contract_id);
+                if (c && c.temp_room_id === intent.room_id) {
+                    continue;
+                }
+
                 if (!intent.intention || !nonLockIntents.includes(intent.intention)) {
                     // If the room is already available for the requested range, don't mark it locked
                     if (!isRoomAvailable(allContracts, intentions, intent.room_id, searchStartDate, waitlist.end_date)) {
@@ -493,16 +502,16 @@ export default function AllocateRoomPage() {
                                             <span>🍳 {room.kitchen_type}</span>
                                             <span>🧭 {room.view_direction}</span>
                                         </div>
-                                                <div className="text-xs font-semibold text-gray-600 mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex items-center gap-1.5 w-full">
-                                                    📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
-                                                </div>
-                                                {(() => {
-                                                    const gapInfo = computeGapInfo(availableFrom, new Date(waitlist.start_date));
-                                                    if (!gapInfo) return null;
-                                                    return (
-                                                        <div className="text-xs text-amber-700 mt-2 font-medium">ช่องว่าง: {gapInfo.totalDays} วัน</div>
-                                                    );
-                                                })()}
+                                        <div className="text-xs font-semibold text-gray-600 mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100 inline-flex items-center gap-1.5 w-full">
+                                            📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
+                                        </div>
+                                        {(() => {
+                                            const gapInfo = computeGapInfo(availableFrom, new Date(waitlist.start_date));
+                                            if (!gapInfo) return null;
+                                            return (
+                                                <div className="text-xs text-amber-700 mt-2 font-medium">ช่องว่าง: {gapInfo.totalDays} วัน</div>
+                                            );
+                                        })()}
                                     </div>
                                 );
                             }) : (
@@ -571,7 +580,7 @@ export default function AllocateRoomPage() {
                                         <span className={waitlist.view_preference && waitlist.view_preference !== 'ไม่ระบุ' && waitlist.view_preference !== room.view_direction ? 'text-red-500' : ''}>🧭 {room.view_direction}</span>
                                     </div>
                                     <div className="text-xs font-semibold text-gray-600 mt-3 bg-white p-2 rounded-lg border border-gray-200 inline-flex items-center gap-1.5 w-full">
-                                                📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
+                                        📅 {getRoomAvailabilityText(allContracts, room.id, searchStartDate)}
                                     </div>
                                 </div>
                             )) : (
@@ -595,8 +604,12 @@ export default function AllocateRoomPage() {
                                 return (
                                     <div
                                         key={room.id}
-                                        // 🌟 เลือกให้เป็น Main Room
-                                        onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
+                                        // 🌟 เลือกให้เป็น Main Room และอัปเดตวันสิ้นสุดห้องชั่วคราวให้ตรงกับวันที่ห้องนี้ว่าง
+                                        onClick={() => { 
+                                            setSelectedRoomId(room.id); 
+                                            setAssignAs('main'); 
+                                            setTempEndDate(nextAvailDate);
+                                        }}
                                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/40 dark:text-white' : 'border-gray-200 bg-white hover:border-orange-200 dark:border-gray-700 dark:bg-neutral-800 dark:hover:border-orange-300 dark:text-gray-300 dark:opacity-60 dark:hover:opacity-100'}`}
                                     >
                                         <div className="flex justify-between items-center">
@@ -630,7 +643,7 @@ export default function AllocateRoomPage() {
                         </div>
                     </div>
 
-                    
+
                 </div>
 
                 {/* แผงควบคุมด้านขวา (ปรับ UI ใหม่ให้เข้าใจง่ายขึ้น) */}
@@ -665,13 +678,13 @@ export default function AllocateRoomPage() {
                                     <label className="block text-sm font-bold text-gray-800">
                                         📅 วันที่เข้าพักจริง (Actual Check-in)
                                     </label>
-                                        <input
-                                            type="date"
-                                            className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 dark:text-white bg-white dark:bg-neutral-800 focus:ring-2 focus:ring-blue-500 transition-shadow outline-none"
-                                            value={actualCheckInDate}
-                                            onChange={(e) => setActualCheckInDate(e.target.value)}
-                                            required
-                                        />
+                                    <input
+                                        type="date"
+                                        className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 dark:text-white bg-white dark:bg-neutral-800 focus:ring-2 focus:ring-blue-500 transition-shadow outline-none"
+                                        value={actualCheckInDate}
+                                        onChange={(e) => setActualCheckInDate(e.target.value)}
+                                        required
+                                    />
                                     <p className="text-[11px] text-gray-500">
                                         * กำหนดการตามสัญญาคือ {new Date(waitlist.start_date).toLocaleDateString('th-TH')}
                                     </p>
@@ -839,7 +852,7 @@ export default function AllocateRoomPage() {
 
                             <div>
                                 <label className="block text-sm font-bold text-gray-800 mb-2">📅 วันที่เริ่ม (Temp Start)</label>
-                                    <input
+                                <input
                                     type="date"
                                     className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 dark:text-white bg-white dark:bg-neutral-800 focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                                     value={tempStartDate}
@@ -849,7 +862,7 @@ export default function AllocateRoomPage() {
 
                             <div>
                                 <label className="block text-sm font-bold text-gray-800 mb-2">📅 วันที่สิ้นสุด (Temp End)</label>
-                                    <input
+                                <input
                                     type="date"
                                     className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-900 dark:text-white bg-white dark:bg-neutral-800 focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                                     value={tempEndDate}

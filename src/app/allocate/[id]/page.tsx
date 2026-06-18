@@ -454,7 +454,7 @@ export default function AllocateRoomPage() {
                         </div>
                         <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
                             <span className="text-blue-400 block text-[10px] uppercase font-bold">ช่วงเวลาที่ต้องการ</span>
-                            <span className="font-bold text-blue-700">{new Date(waitlist.start_date).toLocaleDateString('th-TH')} - {new Date(waitlist.end_date).toLocaleDateString('th-TH')}</span>
+                            <span className="font-bold text-blue-700">{new Date(waitlist.start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} - {new Date(waitlist.end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                         </div>
                         <div className="bg-green-50 px-4 py-2 rounded-xl border border-green-100">
                             <span className="text-green-400 block text-[10px] uppercase font-bold">ชั้นที่ต้องการ</span>

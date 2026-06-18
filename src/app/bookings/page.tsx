@@ -628,18 +628,23 @@ export default function BookingsPage() {
 
     const handleMoveStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newDate = e.target.value;
+        if (!editForm) return;
         if (newDate) {
+            let clamped = newDate;
+            if (editForm.contract_end_date && new Date(newDate) > new Date(editForm.contract_end_date)) {
+                clamped = editForm.contract_end_date;
+            }
             setEditForm({
                 ...editForm,
-                move_start_date: newDate,
+                move_start_date: clamped,
                 move_end_date: editForm.contract_end_date || editForm.move_end_date,
-                main_end_date: editForm.contract_end_date && new Date(newDate) > new Date(editForm.contract_end_date) ? editForm.contract_end_date : newDate,
+                main_end_date: clamped,
             });
         } else {
             setEditForm({
                 ...editForm,
                 move_start_date: '',
-                main_end_date: editForm.contract_end_date || editForm.main_end_date || '',
+                main_end_date: '',
             });
         }
     };
@@ -656,12 +661,10 @@ export default function BookingsPage() {
             setEditForm({
                 ...editForm,
                 temp_end_date: clamped,
-                main_start_date: (!editForm.main_start_date || editForm.main_start_date === editForm.temp_end_date)
-                    ? clamped
-                    : editForm.main_start_date,
+                main_start_date: clamped,
             });
         } else {
-            setEditForm({ ...editForm, temp_end_date: '' });
+            setEditForm({ ...editForm, temp_end_date: '', main_start_date: '' });
         }
     };
 
@@ -696,14 +699,32 @@ export default function BookingsPage() {
         const newDate = e.target.value;
         if (!editForm) return;
         if (!newDate) {
-            setEditForm({ ...editForm, main_end_date: '' });
+            setEditForm({ ...editForm, main_end_date: '', move_start_date: '' });
             return;
         }
         let clamped = newDate;
         if (editForm.contract_end_date && new Date(newDate) > new Date(editForm.contract_end_date)) {
             clamped = editForm.contract_end_date;
         }
-        setEditForm({ ...editForm, main_end_date: clamped });
+        setEditForm({
+            ...editForm,
+            main_end_date: clamped,
+            move_start_date: clamped,
+        });
+    };
+
+    const handleEditMainStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newDate = e.target.value;
+        if (!editForm) return;
+        if (newDate) {
+            setEditForm({
+                ...editForm,
+                main_start_date: newDate,
+                temp_end_date: editForm.has_temp_room ? newDate : editForm.temp_end_date,
+            });
+        } else {
+            setEditForm({ ...editForm, main_start_date: '', temp_end_date: editForm.has_temp_room ? '' : editForm.temp_end_date });
+        }
     };
 
     const handleCreateTempEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2148,7 +2169,7 @@ export default function BookingsPage() {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_start_date || ''} onChange={(e) => setEditForm({ ...editForm, main_start_date: e.target.value })} />
+                                    <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_start_date || ''} onChange={handleEditMainStartDateChange} />
                                     <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg" value={editForm.main_end_date || ''} onChange={handleEditMainEndDateChange} />
                                 </div>
                             </div>

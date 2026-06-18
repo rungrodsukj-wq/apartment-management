@@ -104,12 +104,14 @@ export const isRoomAvailable = (
                 const currentValue = today.getFullYear() * 12 + today.getMonth();
                 // แสดงค้างสต๊อกได้ก็ต่อเมื่อ target เดือนได้เริ่มแล้วในโลกจริง (ไม่ใช่เดือนในอนาคต)
                 if (targetValue > currentValue) {
+                    if (currentContractId) return true; // อนุญาตถ้าเป็นการแก้ไขสัญญา
                     return false;
                 }
             }
             // otherwise: same month (earlier day) หรือ เดือนก่อนหน้า -> อนุญาตให้ว่างได้
         } else {
             // สำรอง: หาก latestEndDate ไม่ได้ < targetDate (ไม่ควรเกิดจากการตั้งค่า latestEndStr)
+            if (currentContractId) return true;
             return false;
         }
     } else {
@@ -126,6 +128,8 @@ export const isRoomAvailable = (
         }
 
         if (!hasAnyContract) {
+            if (currentContractId) return true; // อนุญาตถ้าเป็นการแก้ไขสัญญา
+
             const today = new Date();
             const targetDate = new Date(checkStart);
             const targetValue = targetDate.getFullYear() * 12 + targetDate.getMonth();

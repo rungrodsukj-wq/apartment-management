@@ -194,16 +194,17 @@ export default function AllocateRoomPage() {
 
     const handleAllocate = async () => {
         if (!selectedRoomId || !waitlist) return;
+
+        // เช็คว่าห้องที่เลือกว่างในช่วงวันที่ต้องการจะย้าย (actualCheckInDate) หรือไม่
+        const { availableFrom } = getRoomAvailability(allContracts, selectedRoomId, actualCheckInDate);
+        if (new Date(actualCheckInDate) < availableFrom) {
+            alert(`ไม่สามารถย้ายเข้าได้ในวันที่เลือก! ห้องนี้จะว่างตั้งแต่วันที่ ${availableFrom.toLocaleDateString('th-TH')} เป็นต้นไป โปรดเปลี่ยน "วันที่ต้องการจะย้าย" หรือเลือกห้องอื่น`);
+            return;
+        }
+
         setIsSubmitting(true);
 
-        const referenceStart = assignAs === 'main' && tempContractId && tempEndDate ? tempEndDate : waitlist.start_date;
-        const { availableFrom } = getRoomAvailability(allContracts, selectedRoomId, referenceStart);
-        const reqStart = new Date(referenceStart);
-        const isLate = reqStart < availableFrom;
-
-        const finalMainStartDate = isLate
-            ? getNextAvailableDate(allContracts, selectedRoomId, referenceStart)
-            : (assignAs === 'main' && tempContractId && tempEndDate ? referenceStart : actualCheckInDate);
+        const finalMainStartDate = actualCheckInDate; // ใช้วันที่ผู้ใช้ระบุมาได้เลย เพราะผ่านการตรวจสอบแล้วว่าว่าง
 
         const basePayload: any = {
             waitlist_id: waitlistId,
@@ -609,6 +610,7 @@ export default function AllocateRoomPage() {
                                             setSelectedRoomId(room.id); 
                                             setAssignAs('main'); 
                                             setTempEndDate(nextAvailDate);
+                                            setActualCheckInDate(nextAvailDate); // เปลี่ยนวันที่ย้ายเป็นวันที่ห้องว่างด้วย
                                         }}
                                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/40 dark:text-white' : 'border-gray-200 bg-white hover:border-orange-200 dark:border-gray-700 dark:bg-neutral-800 dark:hover:border-orange-300 dark:text-gray-300 dark:opacity-60 dark:hover:opacity-100'}`}
                                     >
@@ -676,7 +678,7 @@ export default function AllocateRoomPage() {
                                 {/* 2. วันที่เข้าพัก (จำเป็นสำหรับทุกคน) */}
                                 <div className="space-y-2">
                                     <label className="block text-sm font-bold text-gray-800">
-                                        📅 วันที่เข้าพักจริง (Actual Check-in)
+                                        📅 วันที่ต้องการจะย้ายเข้า
                                     </label>
                                     <input
                                         type="date"
@@ -729,34 +731,36 @@ export default function AllocateRoomPage() {
                                         </label>
 
                                         {/* Card: ห้องชั่วคราว */}
-                                        <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${assignAs === 'temp'
-                                            ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-500 dark:bg-purple-900/40 dark:border-purple-400 dark:text-white'
-                                            : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:hover:bg-neutral-800'
-                                            }`}>
-                                            <input
-                                                type="radio"
-                                                name="assignAs"
-                                                value="temp"
-                                                className="sr-only"
-                                                checked={assignAs === 'temp'}
-                                                onChange={() => setAssignAs('temp')}
-                                            />
-                                            <span className="flex flex-1">
-                                                <span className="flex flex-col">
-                                                    <span className="block text-sm font-bold text-purple-900 flex items-center gap-2">
-                                                        🧳 ให้เป็น "ห้องพักชั่วคราว"
-                                                    </span>
-                                                    <span className="mt-1 flex items-center text-xs text-purple-700/70 leading-relaxed">
-                                                        ให้เข้าพักชั่วคราวก่อน แล้วค่อยทำเรื่องย้ายห้องภายหลัง
+                                        {!tempContractId && (
+                                            <label className={`relative flex cursor-pointer rounded-xl border p-4 shadow-sm focus:outline-none transition-all ${assignAs === 'temp'
+                                                ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-500 dark:bg-purple-900/40 dark:border-purple-400 dark:text-white'
+                                                : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:border-gray-700 dark:hover:bg-neutral-800'
+                                                }`}>
+                                                <input
+                                                    type="radio"
+                                                    name="assignAs"
+                                                    value="temp"
+                                                    className="sr-only"
+                                                    checked={assignAs === 'temp'}
+                                                    onChange={() => setAssignAs('temp')}
+                                                />
+                                                <span className="flex flex-1">
+                                                    <span className="flex flex-col">
+                                                        <span className="block text-sm font-bold text-purple-900 flex items-center gap-2">
+                                                            🧳 ให้เป็น "ห้องพักชั่วคราว"
+                                                        </span>
+                                                        <span className="mt-1 flex items-center text-xs text-purple-700/70 leading-relaxed">
+                                                            ให้เข้าพักชั่วคราวก่อน แล้วค่อยทำเรื่องย้ายห้องภายหลัง
+                                                        </span>
                                                     </span>
                                                 </span>
-                                            </span>
-                                            {assignAs === 'temp' && (
-                                                <svg className="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
-                                                </svg>
-                                            )}
-                                        </label>
+                                                {assignAs === 'temp' && (
+                                                    <svg className="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                                                    </svg>
+                                                )}
+                                            </label>
+                                        )}
                                     </div>
                                 </div>
 

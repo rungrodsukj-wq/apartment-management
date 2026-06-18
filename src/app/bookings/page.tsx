@@ -631,9 +631,17 @@ export default function BookingsPage() {
         if (!editForm) return;
         if (newDate) {
             let clamped = newDate;
-            if (editForm.contract_end_date && new Date(newDate) > new Date(editForm.contract_end_date)) {
+            const minAllowedDate = editForm.main_start_date || editForm.actual_check_in_date || editForm.contract_start_date;
+            
+            if (minAllowedDate && new Date(newDate) < new Date(minAllowedDate)) {
+                clamped = minAllowedDate;
+                alert(`วันที่ย้ายเข้าห้องใหม่ต้องไม่เร็วกว่าวันเข้าอยู่ห้องหลัก (${new Date(minAllowedDate).toLocaleDateString('th-TH')})`);
+            }
+            
+            if (editForm.contract_end_date && new Date(clamped) > new Date(editForm.contract_end_date)) {
                 clamped = editForm.contract_end_date;
             }
+            
             setEditForm({
                 ...editForm,
                 move_start_date: clamped,
@@ -783,6 +791,15 @@ export default function BookingsPage() {
             main_start_date: '',
             main_end_date: '',
         });
+    };
+
+    const handleRedirectToMoveAllocate = async () => {
+        if (!editForm || !editForm.move_start_date || !editForm.id) return;
+        
+        setIsEditModalOpen(false);
+        const moveStart = editForm.move_start_date || '';
+        const moveEnd = editForm.move_end_date || editForm.contract_end_date || '';
+        window.location.href = `/allocate/move?move=true&contract_id=${editForm.id}&move_start=${moveStart}&move_end=${moveEnd}`;
     };
 
     const moveCreateTempToMain = () => {
@@ -2207,47 +2224,31 @@ export default function BookingsPage() {
                             <div className="pt-4 border-t border-slate-100">
                                 <p className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-3">ย้ายห้อง (ถ้ามี)</p>
                                 <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4">
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div>
-                                            <label className={labelCls}>วันที่ย้ายเข้าห้องใหม่</label>
-                                            <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg w-full"
+                                    <div className="flex flex-col gap-3">
+                                        <label className={labelCls}>วันที่ต้องการย้ายเข้าห้องใหม่</label>
+                                        <div className="flex gap-3">
+                                            <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg flex-1"
+                                                min={editForm.main_start_date || editForm.actual_check_in_date || editForm.contract_start_date || undefined}
                                                 value={editForm.move_start_date || ''}
                                                 onChange={handleMoveStartDateChange} />
+                                            <button
+                                                type="button"
+                                                onClick={handleRedirectToMoveAllocate}
+                                                disabled={!editForm.move_start_date}
+                                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${!editForm.move_start_date ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'}`}
+                                            >
+                                                ดำเนินการย้ายห้อง
+                                            </button>
                                         </div>
-                                        <div>
-                                            <label className={labelCls}>ถึงวันที่</label>
-                                            <input type="date" className="p-2 text-xs bg-white border border-slate-200 rounded-lg w-full"
-                                                value={editForm.move_end_date || ''}
-                                                onChange={(e) => setEditForm({ ...editForm, move_end_date: e.target.value })} />
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>เลือกห้องใหม่</label>
-                                            {(!editForm.move_start_date || !editForm.move_end_date) ? (
-                                                <p className="py-2 px-3 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs">
-                                                    ⚠️ ใส่วันที่ก่อน
-                                                </p>
-                                            ) : (
+                                        {editForm.move_to_room_id && (
+                                            <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setEditRoomPicker('move')}
-                                                        className="flex-1 inline-flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 hover:border-purple-300 hover:bg-purple-50 transition-all"
-                                                    >
-                                                        <span>{editForm.move_to_room_id ? `ห้อง ${getRoomNumber(editForm.move_to_room_id)}` : 'เลือกห้องใหม่'}</span>
-                                                        <span className="text-purple-500">เลือก</span>
-                                                    </button>
-                                                    {editForm.move_to_room_id && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setEditForm({ ...editForm, move_to_room_id: null, move_start_date: null, move_end_date: null })}
-                                                            className="text-xs font-bold text-red-500"
-                                                        >
-                                                            ลบออก
-                                                        </button>
-                                                    )}
+                                                    <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                                    <p className="text-xs font-bold text-purple-800">จองย้ายไปห้อง: {getRoomNumber(editForm.move_to_room_id)}</p>
                                                 </div>
-                                            )}
-                                        </div>
+                                                <button type="button" onClick={() => setEditForm({ ...editForm, move_to_room_id: null, move_start_date: null, move_end_date: null })} className="text-[10px] text-red-500 font-bold hover:underline">ยกเลิกการย้าย</button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

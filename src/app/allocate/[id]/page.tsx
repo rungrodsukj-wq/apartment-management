@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
 import { getRoomOccupancyIntervals, getRoomAvailability, getNextAvailableDate, getRoomAvailabilityText, isRoomAvailable, computeGapInfo } from '../../../lib/availability';
 import { useAuth } from '../../../context/AuthContext';
@@ -53,7 +53,10 @@ export default function AllocateRoomPage() {
     const { profile, loading: authLoading } = useAuth();
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const waitlistId = params.id as string;
+    const isMove = searchParams.get('move') === 'true';
+    const moveContractId = searchParams.get('contract_id');
 
     const [waitlist, setWaitlist] = useState<Waitlist | null>(null);
     const [rooms, setRooms] = useState<Room[]>([]);
@@ -111,22 +114,46 @@ export default function AllocateRoomPage() {
 
     async function fetchData() {
         setLoading(true);
-        const { data: wData } = await supabase.from('waitlists').select('*').eq('id', waitlistId).single();
-        if (wData) setWaitlist(wData);
-
-        // load any existing contract for this waitlist (to allow editing temp dates)
-        const { data: existingContract } = await supabase.from('contracts').select('id,main_room_id,main_start_date,main_end_date,temp_room_id,temp_start_date,temp_end_date').eq('waitlist_id', waitlistId).maybeSingle();
-        if (existingContract) {
-            setTempContractId(existingContract.id ?? null);
-            if (existingContract.temp_room_id) {
-                setSelectedRoomId(existingContract.temp_room_id);
-                setAssignAs('temp');
-                setTempStartDate(existingContract.temp_start_date || '');
-                setTempEndDate(existingContract.temp_end_date || '');
+        if (waitlistId === 'move') {
+            const moveStart = searchParams.get('move_start');
+            const moveEnd = searchParams.get('move_end');
+            if (moveContractId) {
+                const { data: contract } = await supabase.from('contracts').select('*').eq('id', moveContractId).single();
+                if (contract) {
+                    const { data: currentRoom } = await supabase.from('rooms').select('*').eq('id', contract.main_room_id).single();
+                    setWaitlist({
+                        id: 'move',
+                        name: contract.tenant_name || 'ไม่ระบุ',
+                        room_type: currentRoom?.room_type || 'ไม่ระบุ',
+                        kitchen_type: currentRoom?.kitchen_type || 'ไม่ระบุ',
+                        view_preference: currentRoom?.view_direction || 'ไม่ระบุ',
+                        start_date: moveStart || '',
+                        end_date: moveEnd || contract.contract_end_date || '',
+                        status: 'รอเลือกห้องให้',
+                        special_request: 'ย้ายห้อง',
+                        monthly_rent: contract.monthly_rent || 0,
+                        preferred_floors: [],
+                    });
+                }
             }
-            if (existingContract.main_room_id) {
-                setSelectedRoomId(existingContract.main_room_id);
-                setAssignAs('main');
+        } else {
+            const { data: wData } = await supabase.from('waitlists').select('*').eq('id', waitlistId).single();
+            if (wData) setWaitlist(wData);
+
+            // load any existing contract for this waitlist (to allow editing temp dates)
+            const { data: existingContract } = await supabase.from('contracts').select('id,main_room_id,main_start_date,main_end_date,temp_room_id,temp_start_date,temp_end_date').eq('waitlist_id', waitlistId).maybeSingle();
+            if (existingContract) {
+                setTempContractId(existingContract.id ?? null);
+                if (existingContract.temp_room_id) {
+                    setSelectedRoomId(existingContract.temp_room_id);
+                    setAssignAs('temp');
+                    setTempStartDate(existingContract.temp_start_date || '');
+                    setTempEndDate(existingContract.temp_end_date || '');
+                }
+                if (existingContract.main_room_id) {
+                    setSelectedRoomId(existingContract.main_room_id);
+                    setAssignAs('main');
+                }
             }
         }
 
@@ -297,6 +324,38 @@ export default function AllocateRoomPage() {
 
         alert(`✅ จัดสรร${assignAs === 'main' ? 'ห้องหลัก' : 'ห้องชั่วคราว'} และสร้างสัญญาสำเร็จ!` + (assignAs === 'temp' ? ' รายการ waitlist จะยังไม่ปิดจนกว่าจะเลือกห้องหลัก' : ''));
         router.push(assignAs === 'main' ? '/waitlists' : '/waitlists');
+    };
+
+    const handleMoveAllocation = async (roomId: string) => {
+        if (!moveContractId || !waitlist) return;
+
+        const room = rooms.find(r => r.id === roomId);
+        if (!window.confirm(`ยืนยันการย้ายไปยังห้อง ${room?.room_number} ใช่หรือไม่?`)) return;
+
+        setIsSubmitting(true);
+
+        const updatePayload = {
+            move_to_room_id: roomId,
+            move_start_date: waitlist.start_date,
+            move_end_date: waitlist.end_date,
+            main_end_date: waitlist.start_date, // End main room on the move date
+        };
+
+        const { error } = await supabase.from('contracts').update(updatePayload).eq('id', moveContractId);
+        if (error) {
+            alert('เกิดข้อผิดพลาดในการย้ายห้อง: ' + error.message);
+            setIsSubmitting(false);
+            return;
+        }
+
+        await logAudit(profile, 'contracts', 'update', moveContractId, 'ทำการย้ายห้อง', updatePayload);
+        
+        if (waitlistId !== 'move') {
+            await supabase.from('waitlists').update({ status: 'จัดสรรห้องแล้ว' }).eq('id', waitlistId);
+        }
+
+        alert('ทำรายการย้ายห้องเรียบร้อยแล้ว');
+        router.push('/bookings');
     };
 
     if (authLoading || loading) return <div className="p-10 text-center text-gray-500">กำลังโหลดข้อมูล...</div>;
@@ -478,7 +537,7 @@ export default function AllocateRoomPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="col-span-1 lg:col-span-2 space-y-6">
+                <div className={`space-y-6 ${isMove ? 'col-span-1 lg:col-span-3' : 'col-span-1 lg:col-span-2'}`}>
                     <div>
                         <h2 className="text-lg font-bold text-green-600 mb-3 flex items-center gap-2">
                             <span>✨</span> ห้องว่างตรงตามกำหนด (Perfect Match)
@@ -491,7 +550,13 @@ export default function AllocateRoomPage() {
                                     <div
                                         key={room.id}
                                         // 🌟 เลือกให้เป็น Main Room
-                                        onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
+                                        onClick={() => {
+                                            if (isMove) {
+                                                handleMoveAllocation(room.id);
+                                            } else {
+                                                setSelectedRoomId(room.id); setAssignAs('main');
+                                            }
+                                        }}
                                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/40 dark:text-white' : 'border-gray-200 bg-white hover:border-blue-300 dark:border-gray-700 dark:bg-neutral-800 dark:hover:border-blue-400 dark:text-gray-300 dark:opacity-60 dark:hover:opacity-100'}`}
                                     >
                                         <div className="flex justify-between items-center">
@@ -568,7 +633,13 @@ export default function AllocateRoomPage() {
                                 <div
                                     key={room.id}
                                     // 🌟 เลือกให้เป็น Main Room
-                                    onClick={() => { setSelectedRoomId(room.id); setAssignAs('main'); }}
+                                    onClick={() => {
+                                        if (isMove) {
+                                            handleMoveAllocation(room.id);
+                                        } else {
+                                            setSelectedRoomId(room.id); setAssignAs('main');
+                                        }
+                                    }}
                                     className={`p-4 rounded-xl border-2 cursor-pointer transition-all opacity-80 hover:opacity-100 ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30 dark:text-white' : 'border-gray-200 bg-gray-50 hover:border-blue-300 dark:border-gray-700 dark:bg-neutral-800 dark:hover:border-blue-400 dark:text-gray-300 dark:opacity-60 dark:hover:opacity-100'}`}
                                 >
                                     <div className="flex justify-between items-center">
@@ -606,11 +677,15 @@ export default function AllocateRoomPage() {
                                     <div
                                         key={room.id}
                                         // 🌟 เลือกให้เป็น Main Room และอัปเดตวันสิ้นสุดห้องชั่วคราวให้ตรงกับวันที่ห้องนี้ว่าง
-                                        onClick={() => { 
-                                            setSelectedRoomId(room.id); 
-                                            setAssignAs('main'); 
-                                            setTempEndDate(nextAvailDate);
-                                            setActualCheckInDate(nextAvailDate); // เปลี่ยนวันที่ย้ายเป็นวันที่ห้องว่างด้วย
+                                        onClick={() => {
+                                            if (isMove) {
+                                                handleMoveAllocation(room.id);
+                                            } else {
+                                                setSelectedRoomId(room.id); 
+                                                setAssignAs('main'); 
+                                                setTempEndDate(nextAvailDate);
+                                                setActualCheckInDate(nextAvailDate); // เปลี่ยนวันที่ย้ายเป็นวันที่ห้องว่างด้วย
+                                            }
                                         }}
                                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedRoomId === room.id ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/40 dark:text-white' : 'border-gray-200 bg-white hover:border-orange-200 dark:border-gray-700 dark:bg-neutral-800 dark:hover:border-orange-300 dark:text-gray-300 dark:opacity-60 dark:hover:opacity-100'}`}
                                     >
@@ -649,6 +724,7 @@ export default function AllocateRoomPage() {
                 </div>
 
                 {/* แผงควบคุมด้านขวา (ปรับ UI ใหม่ให้เข้าใจง่ายขึ้น) */}
+                {!isMove && (
                 <div className="col-span-1">
                     <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-8 max-h-160 overflow-y-auto">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 pb-3 mb-5 sticky top-0 bg-white z-10">
@@ -837,6 +913,7 @@ export default function AllocateRoomPage() {
                         )}
                     </div>
                 </div>
+                )}
             </div>
 
             {/* Modal สำหรับแก้ไขการจัดสรรชั่วคราว */}

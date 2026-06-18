@@ -24,34 +24,21 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const mode = (localStorage.getItem('supabase_mode') as 'production' | 'demo') || 'production';
+      const mode = (sessionStorage.getItem('supabase_mode') as 'production' | 'demo') || 'production';
       setEnvMode(mode);
     }
   }, []);
 
   const handleSwitchEnv = (mode: 'production' | 'demo') => {
     if (typeof window !== 'undefined') {
-      // ล้าง sessionStorage และ localStorage ที่เกี่ยวกับ Supabase เพื่อหลีกเลี่ยง session ข้ามระบบกัน
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('sb-')) {
-          localStorage.removeItem(key);
-        }
-      }
+      // ล้างเฉพาะ sessionStorage ที่เกี่ยวกับ Supabase สำหรับ Tab นี้
       for (let i = sessionStorage.length - 1; i >= 0; i--) {
         const key = sessionStorage.key(i);
         if (key && key.startsWith('sb-')) {
           sessionStorage.removeItem(key);
         }
       }
-      document.cookie.split(";").forEach((c) => {
-        const eqPos = c.indexOf("=");
-        const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
-        if (name.startsWith("sb-")) {
-          document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-        }
-      });
-      localStorage.setItem('supabase_mode', mode);
+      sessionStorage.setItem('supabase_mode', mode);
       window.location.reload();
     }
   };

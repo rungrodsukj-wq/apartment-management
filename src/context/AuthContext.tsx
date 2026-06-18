@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.error('Supabase auth getSession error:', error);
-        supabase.auth.signOut();
+        supabase.auth.signOut({ scope: 'local' });
         setUser(null);
         setProfile(null);
         setLoading(false);
@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (authEvent.includes('FAILED')) {
           setUser(null);
           setProfile(null);
-          supabase.auth.signOut();
+          supabase.auth.signOut({ scope: 'local' });
           return;
         }
       }
@@ -143,13 +143,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.user) {
       const profileData = await fetchProfile(data.user.id);
       if (!profileData) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         setUser(null);
         return { error: 'ไม่พบข้อมูลโปรไฟล์ผู้ใช้งาน กรุณาติดต่อผู้ดูแลระบบ' };
       }
 
       if (profileData.status !== 'active') {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: 'local' });
         setUser(null);
         return {
           error:
@@ -187,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     setUser(null);
     setProfile(null);
   }

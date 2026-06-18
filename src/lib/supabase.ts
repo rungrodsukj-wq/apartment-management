@@ -23,7 +23,7 @@ function getActiveClient(): SupabaseClient {
     return prodClient;
   }
 
-  const mode = localStorage.getItem('supabase_mode') || 'production';
+  const mode = sessionStorage.getItem('supabase_mode') || 'production';
   if (mode === 'demo') {
     if (!demoClient) {
       demoClient = createClient(demoUrl, demoKey, {

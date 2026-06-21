@@ -841,7 +841,7 @@ export default function AllocateRoomPage() {
                                 </div>
 
                                 {/* 4. Timeline ห้องชั่วคราว (แสดงเฉพาะตอนเลือก Temp) */}
-                                {assignAs === 'temp' && (
+                                {assignAs === 'temp' && !tempContractId && (
                                     <div className="bg-purple-100/50 p-4 rounded-xl border border-purple-200 animate-in fade-in slide-in-from-top-2 duration-200">
                                         <label className="block text-sm font-bold text-purple-800 mb-2">
                                             🛫 วันที่คาดว่าจะต้องย้ายออก
@@ -926,9 +926,15 @@ export default function AllocateRoomPage() {
                         </div>
 
                         <div className="p-6 space-y-4">
-                            <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
-                                <p className="text-xs text-amber-700 font-bold">Contract ID</p>
-                                <p className="text-sm text-amber-900 font-mono mt-1">{tempContractId}</p>
+                            <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 space-y-2">
+                                <div>
+                                    <p className="text-xs text-amber-700 font-bold">ห้องชั่วคราว</p>
+                                    <p className="text-sm text-amber-900 font-bold mt-0.5">ห้อง {rooms.find(r => r.id === allContracts.find(c => c.id === tempContractId)?.temp_room_id)?.room_number || 'ไม่พบข้อมูล'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-amber-700 font-bold">Contract ID</p>
+                                    <p className="text-sm text-amber-900 font-mono mt-0.5">{tempContractId}</p>
+                                </div>
                             </div>
 
                             <div>

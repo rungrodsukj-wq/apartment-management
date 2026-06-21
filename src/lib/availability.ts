@@ -25,7 +25,32 @@ export const isRoomAvailable = (
 ) => {
     if (!checkStart || !checkEnd) return true;
 
-    // ตัวแปรสำหรับเก็บ "วันที่หมดสัญญาล่าสุด" ที่เกิดก่อนวันเข้าพัก
+    const today = new Date();
+
+    // Helper to check if a period has a blocking overlap with the checked month
+    const isBlockingOverlap = (startStr: string, endStr: string) => {
+        if (!isOverlap(checkStart, checkEnd, startStr, endStr)) return false;
+
+        // If it ends in the checked month, check the day it becomes vacant (end + 1 day)
+        const pEnd = new Date(endStr);
+        const cStart = new Date(checkStart);
+        const cEnd = new Date(checkEnd);
+
+        if (pEnd >= cStart && pEnd <= cEnd) {
+            const vacantDate = new Date(pEnd);
+            vacantDate.setDate(vacantDate.getDate() + 1);
+            if (
+                vacantDate.getFullYear() === cStart.getFullYear() &&
+                vacantDate.getMonth() === cStart.getMonth() &&
+                vacantDate.getDate() < 15
+            ) {
+                // Becomes vacant before the 15th of the checked month, so it doesn't block this month.
+                return false;
+            }
+        }
+        return true;
+    };
+
     let latestEndStr: string | null = null;
     let latestPeriodType: string | null = null; // 'main' | 'temp' | 'move'
 
@@ -43,12 +68,12 @@ export const isRoomAvailable = (
             c.move_to_room_id === roomId && c.move_start_date && c.move_end_date ? { start: c.move_start_date, end: c.move_end_date, type: 'move' } : null,
         ].filter(Boolean) as { start: string; end: string; type: string }[];
 
-            for (const period of periods) {
-            // 1. ถ้ามีสัญญาช่วงเวลาทับซ้อน = ไม่ว่างแน่นอน
-            if (isOverlap(checkStart, checkEnd, period.start, period.end)) return false;
+        for (const period of periods) {
+            // 1. ถ้ามีสัญญาช่วงเวลาทับซ้อนและบล็อก = ไม่ว่างแน่นอน
+            if (isBlockingOverlap(period.start, period.end)) return false;
 
-            // 2. หาวันที่หมดสัญญาล่าสุด ที่เกิดก่อน checkStart
-            if (new Date(period.end) < new Date(checkStart)) {
+            // 2. หาวันที่หมดสัญญาล่าสุด ที่เกิดก่อนหรือใน checkEnd
+            if (new Date(period.end) <= new Date(checkEnd)) {
                 if (!latestEndStr || new Date(period.end) > new Date(latestEndStr)) {
                     latestEndStr = period.end;
                     latestPeriodType = period.type;
@@ -83,65 +108,57 @@ export const isRoomAvailable = (
 
     // ถ้าช่วงล่าสุดก่อน checkStart เป็น `temp` ให้ถือว่าห้องว่างได้ทันที (ไม่ต้องเช็ค renewal_intentions)
     if (latestEndStr && latestPeriodType === 'temp') {
-        return true;
+        // We will still check the 15th-day rule below.
     }
 
-    // 🎯 LOGIC ใหม่: ทบยอดห้องว่างสะสม (Rollover) ป้องกันปัญหา Timezone บั๊ก
-    // ปรับเป็นการเทียบระดับวัน/เดือน — หากวันหมดสัญญาล่าสุดเกิดก่อนวันที่ตรวจสอบ ให้ถือว่า "อาจว่าง"
-    // ยกเว้นกรณีเป็น "leftover" (หมดสัญญาลงมาก่อน target เดือนเกิน 1 เดือน) และ target เดือนยังไม่เริ่มในโลกจริง
+    // 🎯 LOGIC ใหม่: กำหนดเดือนที่ห้องจะว่างตามเงื่อนไขของผู้ใช้
+    let V: Date;
     if (latestEndStr) {
-        const targetDate = new Date(checkStart);
-        const latestEndDate = new Date(latestEndStr);
-        const today = new Date();
-
-        if (latestEndDate < targetDate) {
-            const monthsDiff = (targetDate.getFullYear() - latestEndDate.getFullYear()) * 12 +
-                               (targetDate.getMonth() - latestEndDate.getMonth());
-
-            // ถ้าหมดสัญญาก่อน target เดือนเกิน 1 เดือน -> ถือเป็นค้างสต๊อก
-            if (monthsDiff > 1) {
-                const targetValue = targetDate.getFullYear() * 12 + targetDate.getMonth();
-                const currentValue = today.getFullYear() * 12 + today.getMonth();
-                // แสดงค้างสต๊อกได้ก็ต่อเมื่อ target เดือนได้เริ่มแล้วในโลกจริง (ไม่ใช่เดือนในอนาคต)
-                if (targetValue > currentValue) {
-                    if (currentContractId) return true; // อนุญาตถ้าเป็นการแก้ไขสัญญา
-                    return false;
-                }
-            }
-            // otherwise: same month (earlier day) หรือ เดือนก่อนหน้า -> อนุญาตให้ว่างได้
-        } else {
-            // สำรอง: หาก latestEndDate ไม่ได้ < targetDate (ไม่ควรเกิดจากการตั้งค่า latestEndStr)
-            if (currentContractId) return true;
-            return false;
-        }
+        V = new Date(latestEndStr);
+        V.setDate(V.getDate() + 1);
     } else {
         // กรณีไม่มีสัญญาใดๆ เลยในห้องนี้ (ว่างตลอดกาล)
-        // ต้องการให้ว่างแค่ใน "เดือนถัดไป" เดือนเดียว (อิงตามเวลาโลกจริง)
-        let hasAnyContract = false;
-        for (const c of contracts) {
-            if (currentContractId && c.id === currentContractId) continue;
-            if (c.status === 'cancelled') continue;
-            if (c.main_room_id === roomId || c.temp_room_id === roomId || c.move_to_room_id === roomId) {
-                hasAnyContract = true;
-                break;
-            }
-        }
-
-        if (!hasAnyContract) {
-            if (currentContractId) return true; // อนุญาตถ้าเป็นการแก้ไขสัญญา
-
-            const today = new Date();
-            const targetDate = new Date(checkStart);
-            const targetValue = targetDate.getFullYear() * 12 + targetDate.getMonth();
-            const nextMonthValue = today.getFullYear() * 12 + (today.getMonth() + 1);
-
-            if (targetValue !== nextMonthValue) {
-                return false;
-            }
-        }
+        V = new Date(0);
     }
 
-    return true;
+    const getEffectiveVacantMonthYear = (vDate: Date, todayDate: Date) => {
+        const isAlreadyVacant = vDate.getTime() <= todayDate.getTime();
+        if (isAlreadyVacant) {
+            if (todayDate.getDate() < 15) {
+                return { year: todayDate.getFullYear(), month: todayDate.getMonth() + 1 };
+            } else {
+                let nextMonth = todayDate.getMonth() + 2;
+                let nextYear = todayDate.getFullYear();
+                if (nextMonth > 12) {
+                    nextMonth = 1;
+                    nextYear += 1;
+                }
+                return { year: nextYear, month: nextMonth };
+            }
+        } else {
+            if (vDate.getDate() < 15) {
+                return { year: vDate.getFullYear(), month: vDate.getMonth() + 1 };
+            } else {
+                let nextMonth = vDate.getMonth() + 2;
+                let nextYear = vDate.getFullYear();
+                if (nextMonth > 12) {
+                    nextMonth = 1;
+                    nextYear += 1;
+                }
+                return { year: nextYear, month: nextMonth };
+            }
+        }
+    };
+
+    const eff = getEffectiveVacantMonthYear(V, today);
+    const checkDate = new Date(checkStart);
+    const checkYear = checkDate.getFullYear();
+    const checkMonth = checkDate.getMonth() + 1;
+    const checkValue = checkYear * 12 + checkMonth;
+    const effValue = eff.year * 12 + eff.month;
+
+    if (currentContractId) return true;
+    return checkValue === effValue;
 };
 
 export const getRoomFreeWindow = (contracts: any[], roomId: string, searchStart: string, searchEnd: string) => {

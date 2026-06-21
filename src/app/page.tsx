@@ -270,7 +270,20 @@ export default function DashboardPage() {
   const uniqueBuildings = Array.from(new Set(rooms.map(r => r.building).filter(Boolean)));
   const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor).filter(Boolean))).sort((a, b) => Number(a) - Number(b));
   const uniqueKitchens = Array.from(new Set(rooms.map(r => r.kitchen_type).filter(Boolean)));
-  const uniqueRoomTypes = Array.from(new Set(rooms.map(r => r.room_type).filter(Boolean)));
+  const orderedRoomTypes = [
+    'One Bedroom',
+    'One Bedroom Exclusive',
+    'One Bedroom Suite',
+    'Triple Bedroom'
+  ];
+  const uniqueRoomTypes = Array.from(new Set(rooms.map(r => r.room_type).filter(Boolean))).sort((a, b) => {
+    const idxA = orderedRoomTypes.indexOf(a);
+    const idxB = orderedRoomTypes.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.localeCompare(b);
+  });
   const uniqueViews = Array.from(new Set(rooms.map(r => r.view_direction).filter(Boolean)));
 
   const filteredRooms = rooms.filter(room => {

@@ -1100,6 +1100,14 @@ export default function BookingsPage() {
             }
             setIsCreateModalOpen(false);
             setIsShortTermContract(false);
+            setRoomFilters({
+                building: '',
+                floor: '',
+                room_type: '',
+                kitchen: '',
+                view: '',
+                search: '',
+            });
             setCreateForm({
                 tenant_name: '',
                 actual_check_in_date: '',
@@ -1303,6 +1311,49 @@ export default function BookingsPage() {
 
         return (
             <div className="space-y-4">
+                {/* ตัวกรองสำหรับห้องชั่วคราว */}
+                <div className="grid grid-cols-3 gap-2 bg-amber-50/50 p-3 rounded-2xl border border-amber-200/30">
+                    <div>
+                        <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">ประเภทห้อง</label>
+                        <select
+                            className="w-full bg-white border border-amber-200 rounded-xl p-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-amber-400/20"
+                            value={roomFilters.room_type}
+                            onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
+                        >
+                            <option value="">ทุกประเภท</option>
+                            {roomTypeOptions.map((value) => (
+                                <option key={value} value={value}>{value}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">ประเภทครัว</label>
+                        <select
+                            className="w-full bg-white border border-amber-200 rounded-xl p-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-amber-400/20"
+                            value={roomFilters.kitchen}
+                            onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
+                        >
+                            <option value="">ทุกประเภท</option>
+                            {kitchenOptions.map((value) => (
+                                <option key={value} value={value}>{value}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">วิว</label>
+                        <select
+                            className="w-full bg-white border border-amber-200 rounded-xl p-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-amber-400/20"
+                            value={roomFilters.view}
+                            onChange={(e) => setRoomFilters({ ...roomFilters, view: e.target.value })}
+                        >
+                            <option value="">ทุกวิว</option>
+                            {viewOptions.map((value) => (
+                                <option key={value} value={value}>{value}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
                 <div className="flex items-center justify-between text-xs font-bold text-slate-500">
                     <span>ห้องชั่วคราวว่าง <span className="text-slate-700 font-extrabold">{availableRooms.length}</span> ห้อง</span>
                     {perfectMatchRooms.length > 0 && (
@@ -1724,6 +1775,14 @@ export default function BookingsPage() {
                                 onClick={() => {
                                     setIsCreateModalOpen(false);
                                     setIsShortTermContract(false);
+                                    setRoomFilters({
+                                        building: '',
+                                        floor: '',
+                                        room_type: '',
+                                        kitchen: '',
+                                        view: '',
+                                        search: '',
+                                    });
                                 }}
                                 className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200/80 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-inner"
                             >
@@ -1975,6 +2034,49 @@ export default function BookingsPage() {
 
                                                     return (
                                                         <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-1">
+                                                            {/* ตัวกรองสำหรับห้องหลัก */}
+                                                            <div className="grid grid-cols-3 gap-2 bg-slate-200/40 p-3 rounded-2xl border border-slate-200/60 sticky top-0 z-10">
+                                                                <div>
+                                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ประเภทห้อง</label>
+                                                                    <select
+                                                                        className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-[#4F81FF]/25"
+                                                                        value={roomFilters.room_type}
+                                                                        onChange={(e) => setRoomFilters({ ...roomFilters, room_type: e.target.value })}
+                                                                    >
+                                                                        <option value="">ทุกประเภท</option>
+                                                                        {roomTypeOptions.map((value) => (
+                                                                            <option key={value} value={value}>{value}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ประเภทครัว</label>
+                                                                    <select
+                                                                        className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-[#4F81FF]/25"
+                                                                        value={roomFilters.kitchen}
+                                                                        onChange={(e) => setRoomFilters({ ...roomFilters, kitchen: e.target.value })}
+                                                                    >
+                                                                        <option value="">ทุกประเภท</option>
+                                                                        {kitchenOptions.map((value) => (
+                                                                            <option key={value} value={value}>{value}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">วิว</label>
+                                                                    <select
+                                                                        className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-[#4F81FF]/25"
+                                                                        value={roomFilters.view}
+                                                                        onChange={(e) => setRoomFilters({ ...roomFilters, view: e.target.value })}
+                                                                    >
+                                                                        <option value="">ทุกวิว</option>
+                                                                        {viewOptions.map((value) => (
+                                                                            <option key={value} value={value}>{value}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+
                                                             {perfectMatchRooms.length > 0 && (
                                                                 <div>
                                                                     <p className="text-[11px] font-bold text-amber-700 mb-1.5 flex items-center gap-1">⭐ ตรงสเปกแนะนำ</p>
@@ -2023,6 +2125,14 @@ export default function BookingsPage() {
                                 onClick={() => {
                                     setIsCreateModalOpen(false);
                                     setIsShortTermContract(false);
+                                    setRoomFilters({
+                                        building: '',
+                                        floor: '',
+                                        room_type: '',
+                                        kitchen: '',
+                                        view: '',
+                                        search: '',
+                                    });
                                 }}
                                 className="flex-1 px-6 py-3.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all"
                             >

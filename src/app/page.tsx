@@ -476,6 +476,7 @@ export default function DashboardPage() {
     if (filterRenewal) {
       const desired = filterRenewal;
       baseRooms = baseRooms.filter(room => {
+        // 1. ดึงสัญญาทั้งหมดของห้องนี้ที่คาบเกี่ยวกับช่วงเวลาของชาร์ตในปัจจุบัน
         const contractsForRoom = allContracts.filter(c => {
           const isAssigned = c.main_room_id === room.id || c.temp_room_id === room.id || c.move_to_room_id === room.id;
           if (!isAssigned) return false;
@@ -511,16 +512,18 @@ export default function DashboardPage() {
 
         if (contractsForRoom.length === 0) return false;
 
-        for (const c of contractsForRoom) {
-          const intent = renewalIntentsMap[c.id] ?? null;
-          if (desired === 'renew' && intent === 'renew') return true;
-          if (desired === 'renew_no_room' && intent === 'renew_no_room') return true;
-          if (desired === 'not_renew' && intent === 'not_renew') return true;
-          if (desired === 'not_asked' && intent === 'not_asked') return true;
-          if (desired === 'pending' && intent === 'pending') return true;
-        }
+        // 🌟 2. จัดเรียงเพื่อหา "สัญญาล่าสุด" (โดยดูจากวันสิ้นสุดสัญญาที่มาทีหลังสุด)
+        const latestContract = contractsForRoom.sort((a, b) => {
+          const endA = new Date(a.contract_end_date || a.main_end_date || a.temp_end_date || a.move_end_date || 0).getTime();
+          const endB = new Date(b.contract_end_date || b.main_end_date || b.temp_end_date || b.move_end_date || 0).getTime();
+          return endB - endA; // เรียงจากสิ้นสุดหลังสุดไปหาสิ้นสุดก่อนหน้า
+        })[0];
 
-        return false;
+        if (!latestContract) return false;
+
+        // 🌟 3. ตรวจเช็คเงื่อนไขความต้องการต่ออายุ "เฉพาะสัญญาล่าสุดใบนั้นใบเดียว"
+        const intent = renewalIntentsMap[latestContract.id] ?? null;
+        return intent === desired;
       });
     }
 
@@ -982,7 +985,7 @@ export default function DashboardPage() {
           <div style={{ width: `${110 + totalDays * dayWidth}px` }} className="flex relative min-w-full">
 
             {/* Sidebar Room Numbers */}
-            <div className="w-[110px] shrink-0 sticky left-0 z-30 bg-white dark:bg-[#001128] border-r border-slate-200 dark:border-slate-800 shadow-[4px_0_15px_-5px_rgba(0,0,0,0.05)]">
+            <div className="w-[110px] shrink-0 sticky left-0 z-31 bg-white dark:bg-[#001128] border-r border-slate-200 dark:border-slate-800 shadow-[4px_0_15px_-5px_rgba(0,0,0,0.05)]">
               <div className={`sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#001128] flex items-center justify-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ${showDayDetails ? 'h-[48px]' : 'h-[32px]'}`}>
                 เลขห้อง
               </div>

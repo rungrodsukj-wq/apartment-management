@@ -70,6 +70,7 @@ export default function BookingsPage() {
         status: 'active',
         monthly_rent: '',
         parent_contract_id: null,
+        bed_size: '3.5 ฟุต',
     });
     const [isShortTermContract, setIsShortTermContract] = useState(false);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -604,7 +605,8 @@ export default function BookingsPage() {
             temp_start_date: '',
             temp_end_date: '',
             status: newStatus,
-            parent_contract_id: oldContract.id
+            parent_contract_id: oldContract.id,
+            bed_size: oldContract.bed_size || '3.5 ฟุต',
         });
         setIsShortTermContract(false);
         setIsCreateModalOpen(true);
@@ -923,7 +925,8 @@ export default function BookingsPage() {
             temp_end_date: editForm.has_temp_room ? normalizeDate(editForm.temp_end_date) : null,
             move_to_room_id: editForm.move_to_room_id || null,
             move_start_date: normalizeDate(editForm.move_start_date),
-            move_end_date: normalizeDate(editForm.move_end_date)
+            move_end_date: normalizeDate(editForm.move_end_date),
+            bed_size: editForm.bed_size || null,
         };
 
         const { error } = await supabase
@@ -1072,6 +1075,7 @@ export default function BookingsPage() {
             temp_room_id: createForm.has_temp_room ? (createForm.temp_room_id || null) : null,
             temp_start_date: createForm.has_temp_room ? normalizeDate(createForm.temp_start_date) : null,
             temp_end_date: createForm.has_temp_room ? normalizeDate(createForm.temp_end_date) : null,
+            bed_size: createForm.bed_size || '3.5 ฟุต',
         };
 
         const { data, error } = await supabase.from('contracts').insert([payload]).select('id');
@@ -1123,6 +1127,7 @@ export default function BookingsPage() {
                 status: 'active',
                 monthly_rent: '',
                 parent_contract_id: null,
+                bed_size: '3.5 ฟุต',
             });
             fetchData();
             if (payload.parent_contract_id) {
@@ -1600,6 +1605,11 @@ export default function BookingsPage() {
                                             <div className="mt-2.5 flex items-center flex-wrap gap-2">
                                                 {getStatusBadge(displayStatus)}
                                                 {getIntentionBadge(contract.id)}
+                                                {contract.bed_size && (
+                                                    <span className="inline-flex items-center bg-teal-50 text-teal-600 border border-teal-200/60 text-[11px] font-bold px-3 py-1.5 rounded-lg tracking-wider">
+                                                        เตียง {contract.bed_size}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1870,20 +1880,34 @@ export default function BookingsPage() {
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="mt-4">
-                                            <label className={labelCls}>ราคาเช่าต่อเดือน (บาท)</label>
-                                            <input
-                                                type="text"
-                                                inputMode="numeric"
-                                                className={inputCls}
-                                                value={createForm.monthly_rent ? Number(createForm.monthly_rent).toLocaleString("en-US") : ""}
-                                                onChange={(e) => {
-                                                    const value = e.target.value.replace(/,/g, "").replace(/\D/g, "");
-                                                    setCreateForm({ ...createForm, monthly_rent: value ? Number(value) : 0 });
-                                                }}
-                                                placeholder="เช่น 17,000"
-                                                required
-                                            />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                            <div>
+                                                <label className={labelCls}>ราคาเช่าต่อเดือน (บาท)</label>
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    className={inputCls}
+                                                    value={createForm.monthly_rent ? Number(createForm.monthly_rent).toLocaleString("en-US") : ""}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value.replace(/,/g, "").replace(/\D/g, "");
+                                                        setCreateForm({ ...createForm, monthly_rent: value ? Number(value) : 0 });
+                                                    }}
+                                                    placeholder="เช่น 17,000"
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelCls}>ขนาดเตียง</label>
+                                                <select
+                                                    className={inputCls}
+                                                    value={createForm.bed_size || '3.5 ฟุต'}
+                                                    onChange={(e) => setCreateForm({ ...createForm, bed_size: e.target.value })}
+                                                >
+                                                    <option value="3.5 ฟุต">3.5 ฟุต</option>
+                                                    <option value="7 ฟุต">7 ฟุต</option>
+                                                    <option value="ไม่ระบุ">ไม่ระบุ</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -2248,9 +2272,23 @@ export default function BookingsPage() {
                         </div>
 
                         <form id="edit-contract-form" onSubmit={handleSaveEdit} className="p-8 space-y-6 overflow-y-auto flex-1">
-                            <div>
-                                <label className={labelCls}>วันเข้าพักก่อนเริ่มสัญญาจริง</label>
-                                <input type="date" className={inputCls} value={editForm.actual_check_in_date || ''} onChange={(e) => setEditForm({ ...editForm, actual_check_in_date: e.target.value })} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className={labelCls}>วันเข้าพักก่อนเริ่มสัญญาจริง</label>
+                                    <input type="date" className={inputCls} value={editForm.actual_check_in_date || ''} onChange={(e) => setEditForm({ ...editForm, actual_check_in_date: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>ขนาดเตียง</label>
+                                    <select
+                                        className={inputCls}
+                                        value={editForm.bed_size || 'ไม่ระบุ'}
+                                        onChange={(e) => setEditForm({ ...editForm, bed_size: e.target.value })}
+                                    >
+                                        <option value="3.5 ฟุต">3.5 ฟุต</option>
+                                        <option value="7 ฟุต">7 ฟุต</option>
+                                        <option value="ไม่ระบุ">ไม่ระบุ</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

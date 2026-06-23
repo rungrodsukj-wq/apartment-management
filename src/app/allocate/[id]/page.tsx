@@ -21,6 +21,7 @@ interface Waitlist {
     allocation_note?: string;
     monthly_rent?: number;
     preferred_floors: number[];
+    bed_size?: string;
 }
 
 interface Room {
@@ -241,6 +242,7 @@ export default function AllocateRoomPage() {
             contract_end_date: waitlist.end_date,
             status: 'active',
             monthly_rent: waitlist.monthly_rent || null,
+            bed_size: waitlist.bed_size || null,
         };
 
         let insertedContractId: string | null = null;
@@ -248,7 +250,7 @@ export default function AllocateRoomPage() {
         if (assignAs === 'main') {
             // If there's an existing contract for this waitlist, update it to include main room
             if (tempContractId) {
-                const updatePayload: any = { main_room_id: selectedRoomId, main_start_date: finalMainStartDate, main_end_date: waitlist.end_date, status: 'active' };
+                const updatePayload: any = { main_room_id: selectedRoomId, main_start_date: finalMainStartDate, main_end_date: waitlist.end_date, status: 'active', bed_size: waitlist.bed_size || null };
                 // ซิงค์วันที่ย้ายออกห้องชั่วคราวให้ตรงกับวันที่ห้องหลักว่าง (ตามที่ผู้ใช้ร้องขอ)
                 if (finalMainStartDate) {
                     updatePayload.temp_end_date = finalMainStartDate;
@@ -284,7 +286,7 @@ export default function AllocateRoomPage() {
 
         } else {
             // temp allocation: update existing temp contract if present, else create
-            const tempFields: any = { temp_room_id: selectedRoomId, temp_start_date: (tempStartDate || actualCheckInDate), temp_end_date: tempEndDate };
+            const tempFields: any = { temp_room_id: selectedRoomId, temp_start_date: (tempStartDate || actualCheckInDate), temp_end_date: tempEndDate, bed_size: waitlist.bed_size || null };
             if (tempContractId) {
                 const { error: updateErr } = await supabase.from('contracts').update(tempFields).eq('id', tempContractId);
                 if (updateErr) {

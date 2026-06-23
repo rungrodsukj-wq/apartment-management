@@ -81,7 +81,7 @@ export default function RenewalCheckPage() {
     async function fetchData() {
         setLoading(true);
         const [{ data: cData }, { data: rData }, { data: iData }] = await Promise.all([
-            supabase.from('contracts').select('*').in('status', ['active', 'upcoming']).order('contract_end_date'),
+            supabase.from('contracts').select('*').order('contract_end_date'),
             supabase.from('rooms').select('*').order('room_number'),
             supabase.from('renewal_intentions').select('*'),
         ]);
@@ -190,8 +190,8 @@ export default function RenewalCheckPage() {
                 const end = new Date(c.contract_end_date);
                 end.setHours(0, 0, 0, 0);
                 if (monthsAheadNum === null) {
-                    // 'all' -> include any contract that ends on/after today
-                    return end >= today;
+                    // 'all' -> include every contract regardless of date
+                    return true;
                 }
                 return end >= today && end <= (cutoff as Date);
             })

@@ -99,6 +99,7 @@ export default function BookingsPage() {
     });
 
     const [showNeedsActionFilter, setShowNeedsActionFilter] = useState(false);
+    const [showCompleted, setShowCompleted] = useState(false);
 
     const [waitlists, setWaitlists] = useState<any[]>([]);
     const searchParams = useSearchParams();
@@ -230,6 +231,8 @@ export default function BookingsPage() {
 
     const filteredContracts = useMemo(() => {
         return contracts.filter((contract) => {
+            if (!showCompleted && contract.status === 'completed') return false;
+
             // If the "ต้องดำเนินการ" filter is active, only include contracts without a main room
             if (showNeedsActionFilter) {
                 if (contract.main_room_id) return false;
@@ -264,7 +267,7 @@ export default function BookingsPage() {
 
             return true;
         });
-    }, [contracts, rooms, listFilters, showNeedsActionFilter]);
+    }, [contracts, rooms, listFilters, showNeedsActionFilter, showCompleted]);
 
     const handleRoomClick = (roomId: string) => {
         const room = rooms.find(r => r.id === roomId);
@@ -1472,11 +1475,26 @@ export default function BookingsPage() {
                     </div>
                 </div>
 
-                {/* Filters Section */}
                 <div className="bg-white rounded-3xl p-6 mb-6 border border-slate-100 shadow-sm">
-                    <div className="flex items-center gap-2 mb-4">
-                        <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                        <h2 className="text-sm font-bold text-[#0A2647] uppercase tracking-wider">ตัวกรองข้อมูลสัญญา</h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                            <h2 className="text-sm font-bold text-[#0A2647] uppercase tracking-wider">ตัวกรองข้อมูลสัญญา</h2>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-slate-500">แสดงสัญญาที่สิ้นสุดแล้ว</span>
+                            <button
+                                type="button"
+                                onClick={() => setShowCompleted(prev => !prev)}
+                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${showCompleted ? 'bg-emerald-500' : 'bg-slate-200'}`}
+                                role="switch"
+                                aria-checked={showCompleted}
+                            >
+                                <span
+                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showCompleted ? 'translate-x-5' : 'translate-x-0'}`}
+                                />
+                            </button>
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                         <div>

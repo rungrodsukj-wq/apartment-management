@@ -18,10 +18,34 @@ interface Room {
     view_direction: string;
 }
 
+interface ContractInfo {
+    id: string;
+    tenant_name: string;
+    status: string | null;
+    main_room_id: string | null;
+    temp_room_id: string | null;
+    move_to_room_id: string | null;
+    contract_start_date: string;
+    contract_end_date: string;
+    main_start_date: string | null;
+    main_end_date: string | null;
+    temp_start_date: string | null;
+    temp_end_date: string | null;
+    move_start_date: string | null;
+    move_end_date: string | null;
+}
+
+const formatDate = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '?';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}-${m}-${y}`;
+};
+
 export default function RoomsPage() {
     const { profile } = useAuth();
     const userCanEdit = canEditPage(profile, 'rooms');
     const [rooms, setRooms] = useState<Room[]>([]);
+    const [contracts, setContracts] = useState<ContractInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
@@ -43,6 +67,7 @@ export default function RoomsPage() {
 
     useEffect(() => {
         fetchRooms();
+        fetchContracts();
     }, []);
 
     useEffect(() => {
@@ -92,6 +117,16 @@ export default function RoomsPage() {
         if (data) setRooms(data);
         if (error) console.error(error);
         setLoading(false);
+    }
+
+    async function fetchContracts() {
+        const { data, error } = await supabase
+            .from('contracts')
+            .select('id, tenant_name, status, main_room_id, temp_room_id, move_to_room_id, contract_start_date, contract_end_date, main_start_date, main_end_date, temp_start_date, temp_end_date, move_start_date, move_end_date')
+            .neq('status', 'completed')
+            .neq('status', 'cancelled');
+        if (data) setContracts(data);
+        if (error) console.error(error);
     }
 
     const handleOpenModal = (room?: Room) => {
@@ -342,11 +377,45 @@ export default function RoomsPage() {
                                         <th className="p-5">ประเภทห้อง</th>
                                         <th className="p-5">ประเภทครัว</th>
                                         <th className="p-5">ทิศ / วิว</th>
+                                        <th className="p-5">ผู้เช่าปัจจุบัน</th>
+                                        <th className="p-5">ผู้เช่าที่จะเข้า</th>
                                         <th className="p-5 pr-8 text-right">จัดการ</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {filteredRooms.map(room => (
+                                    {filteredRooms.map(room => {
+                                        const todayStr = new Date().toISOString().slice(0, 10);
+
+                                        // ผู้เช่าปัจจุบัน: contract ที่ครอบคลุมวันนี้ (ผ่าน main_room_id หรือ temp_room_id)
+                                        const currentContracts = contracts.filter(c => {
+                                            const inMain = c.main_room_id === room.id &&
+                                                (c.main_start_date || c.contract_start_date) <= todayStr &&
+                                                (c.main_end_date || c.contract_end_date) >= todayStr;
+                                            const inTemp = c.temp_room_id === room.id &&
+                                                c.temp_start_date && c.temp_end_date &&
+                                                c.temp_start_date <= todayStr &&
+                                                c.temp_end_date >= todayStr;
+                                            const inMove = c.move_to_room_id === room.id &&
+                                                c.move_start_date && c.move_end_date &&
+                                                c.move_start_date <= todayStr &&
+                                                c.move_end_date >= todayStr;
+                                            return inMain || inTemp || inMove;
+                                        });
+
+                                        // ผู้เช่าที่จะเข้า: contract ที่จะเริ่มในอนาคต
+                                        const incomingContracts = contracts.filter(c => {
+                                            const mainFuture = c.main_room_id === room.id &&
+                                                (c.main_start_date || c.contract_start_date) > todayStr;
+                                            const tempFuture = c.temp_room_id === room.id &&
+                                                c.temp_start_date && c.temp_start_date > todayStr;
+                                            const moveFuture = c.move_to_room_id === room.id &&
+                                                c.move_start_date && c.move_start_date > todayStr;
+                                            // ไม่นับถ้าเป็นผู้เช่าปัจจุบันอยู่แล้ว
+                                            const isAlreadyCurrent = currentContracts.some(cc => cc.id === c.id);
+                                            return !isAlreadyCurrent && (mainFuture || tempFuture || moveFuture);
+                                        });
+
+                                        return (
                                         <tr key={room.id} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="p-5 pl-8">
                                                 <div className="flex items-center gap-4">
@@ -395,6 +464,77 @@ export default function RoomsPage() {
                                                     <span className="text-slate-400 text-xs italic font-medium">ไม่ได้ระบุทิศ</span>
                                                 )}
                                             </td>
+
+                                            {/* คอลัมน์: ผู้เช่าปัจจุบัน */}
+                                            <td className="p-5">
+                                                {currentContracts.length > 0 ? (
+                                                    <div className="flex flex-col gap-2">
+                                                        {currentContracts.map(c => {
+                                                            const startDate =
+                                                                (c.main_room_id === room.id ? (c.main_start_date || c.contract_start_date) : null) ||
+                                                                (c.temp_room_id === room.id ? c.temp_start_date : null) ||
+                                                                (c.move_to_room_id === room.id ? c.move_start_date : null) ||
+                                                                c.contract_start_date;
+                                                            const endDate =
+                                                                (c.main_room_id === room.id ? (c.main_end_date || c.contract_end_date) : null) ||
+                                                                (c.temp_room_id === room.id ? c.temp_end_date : null) ||
+                                                                (c.move_to_room_id === room.id ? c.move_end_date : null) ||
+                                                                c.contract_end_date;
+                                                            return (
+                                                                <div key={c.id} className="flex flex-col gap-0.5">
+                                                                    <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-xs px-2.5 py-1.5 rounded-lg font-bold">
+                                                                        <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
+                                                                        {c.tenant_name}
+                                                                    </span>
+                                                                    {(startDate || endDate) && (
+                                                                        <span className="text-[10px] text-slate-400 font-medium pl-1">
+                                                                            {formatDate(startDate)} → {formatDate(endDate)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-300 text-xs font-medium">ว่าง</span>
+                                                )}
+                                            </td>
+
+                                            {/* คอลัมน์: ผู้เช่าที่จะเข้า (Incoming) */}
+                                            <td className="p-5">
+                                                {incomingContracts.length > 0 ? (
+                                                    <div className="flex flex-col gap-2">
+                                                        {incomingContracts.map(c => {
+                                                            const startDate =
+                                                                (c.main_room_id === room.id ? (c.main_start_date || c.contract_start_date) : null) ||
+                                                                (c.temp_room_id === room.id ? c.temp_start_date : null) ||
+                                                                (c.move_to_room_id === room.id ? c.move_start_date : null) ||
+                                                                c.contract_start_date;
+                                                            const endDate =
+                                                                (c.main_room_id === room.id ? (c.main_end_date || c.contract_end_date) : null) ||
+                                                                (c.temp_room_id === room.id ? c.temp_end_date : null) ||
+                                                                (c.move_to_room_id === room.id ? c.move_end_date : null) ||
+                                                                c.contract_end_date;
+                                                            return (
+                                                                <div key={c.id} className="flex flex-col gap-0.5">
+                                                                    <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200/70 text-xs px-2.5 py-1.5 rounded-lg font-bold">
+                                                                        <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                                        {c.tenant_name}
+                                                                    </span>
+                                                                    {(startDate || endDate) && (
+                                                                        <span className="text-[10px] text-slate-400 font-medium pl-1">
+                                                                            {formatDate(startDate)} → {formatDate(endDate)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-300 text-xs font-medium">-</span>
+                                                )}
+                                            </td>
+
                                             <td className="p-5 pr-8 text-right space-x-2">
                                                 {userCanEdit && (
                                                 <>
@@ -408,10 +548,11 @@ export default function RoomsPage() {
                                                 )}
                                             </td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                     {rooms.length === 0 && (
                                         <tr>
-                                            <td colSpan={7} className="p-16 text-center">
+                                            <td colSpan={9} className="p-16 text-center">
                                                 <div className="flex flex-col items-center text-slate-400">
                                                     <div className="text-6xl mb-4 opacity-50">📭</div>
                                                     <p className="font-bold text-xl text-slate-600">ยังไม่มีข้อมูลห้องพัก</p>
